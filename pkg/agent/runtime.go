@@ -1,3 +1,5 @@
+package agent
+
 import (
 	"context"
 	"encoding/json"
@@ -10,10 +12,12 @@ import (
 	"time"
 
 	"github.com/naviNBRuas/APA/pkg/controller"
+	"github.com/naviNBRuas/APA/pkg/controller/task-orchestrator"
 	"github.com/naviNBRuas/APA/pkg/health"
 	"github.com/naviNBRuas/APA/pkg/module"
 	"github.com/naviNBRuas/APA/pkg/networking"
 	"github.com/naviNBRuas/APA/pkg/policy"
+	"github.com/naviNBRuas/APA/pkg/recovery"
 	"github.com/naviNBRuas/APA/pkg/update"
 	"gopkg.in/yaml.v3"
 )

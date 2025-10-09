@@ -20,8 +20,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	discovery "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
-	"github.com/libp2p/go-libp2p/p2p/protocol/autonat"
-	"github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/relay"
+	"github.com/naviNBRuas/APA/pkg/policy"
 )
 
 const (
@@ -62,7 +61,8 @@ type HeartbeatMessage struct {
 
 // ModuleAnnouncementMessage is broadcast when an agent loads a new module.
 type ModuleAnnouncementMessage struct {
-	AnnouncerPeerID peer.ID         `json:"announcer_peer_id"`	Manifest        module.Manifest `json:"manifest"`
+	AnnouncerPeerID peer.ID         `json:"announcer_peer_id"`
+	Manifest        module.Manifest `json:"manifest"`
 }
 
 // ModuleFetchRequest is sent to a peer to request a module.
@@ -77,9 +77,8 @@ func NewP2P(ctx context.Context, logger *slog.Logger, cfg Config, id peer.ID, pr
 		libp2p.Identity(privKey),
 		libp2p.ListenAddrStrings(cfg.ListenAddrs...),
 		libp2p.EnableNATService(), // Enable NAT traversal
-		libp2p.EnableRelay(),      // Enable circuit relay
-		libp2p.EnablePeerExchange(), // Enable peer exchange
-		libp2p.Routing(p.dht),       // Use the DHT for routing
+		libp2p.EnableRelayService(), // Enable circuit relay service
+		libp2p.EnableAutoRelayWithStaticRelays(nil), // Enable automatic relay usage (no static relays for now)
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libp2p host: %w", err)
@@ -93,9 +92,9 @@ func NewP2P(ctx context.Context, logger *slog.Logger, cfg Config, id peer.ID, pr
 	p := &P2P{
 		logger:     logger,
 		Host:       h,
-		serviceTag: cfg.MDNSServiceTag,
 		pubsub:     ps,
 		peerstore:  h.Peerstore(),
+		policyEnforcer: policyEnforcer,
 	}
 
 	// Create a new Kademlia DHT for peer discovery.
@@ -198,23 +197,22 @@ func (p *P2P) findPeersPeriodically(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			p.logger.Info("Searching for peers via DHT...")
-			peers, err := p.routingDiscovery.FindPeers(ctx, p.serviceTag) // Use a common tag for discovery
-			if err != nil {
-				p.logger.Error("Failed to find peers via DHT", "error", err)
-				continue
-			}
-			for peerInfo := range peers {
-				if peerInfo.ID == p.Host.ID() {
-					continue
-				}
-				p.logger.Info("Discovered peer via DHT", "id", peerInfo.ID)
-				p.peerstore.AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.PermanentAddrTTL) // Add to peerstore
-				if err := p.Host.Connect(ctx, peerInfo); err != nil {
-					p.logger.Error("Failed to connect to DHT peer", "peer", peerInfo.ID, "error", err)
-				}
-			}
-		}
+							p.logger.Info("Searching for peers via DHT...")
+						peers, err := p.routingDiscovery.FindPeers(ctx, "apa-agent") // Use a common tag for discovery
+						if err != nil {
+							p.logger.Error("Failed to find peers via DHT", "error", err)
+							continue
+						}
+						for peerInfo := range peers {
+							if peerInfo.ID == p.Host.ID() {
+								continue
+							}
+							p.logger.Info("Discovered peer via DHT", "id", peerInfo.ID)
+							p.peerstore.AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.PermanentAddrTTL) // Add to peerstore
+							if err := p.Host.Connect(ctx, peerInfo); err != nil {
+								p.logger.Error("Failed to connect to DHT peer", "peer", peerInfo.ID, "error", err)
+							}
+						}		}
 	}
 }
 
