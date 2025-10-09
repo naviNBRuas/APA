@@ -12,6 +12,8 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/agentd ./cmd/agentd
 
 FROM scratch
 COPY --from=builder /out/agentd /agentd
+COPY configs /configs
+COPY examples /examples
 EXPOSE 8080 9090
-ENTRYPOINT ["/agentd"]
+ENTRYPOINT ["/agentd", "-config", "/configs/agent-config.yaml"]
 

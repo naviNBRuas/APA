@@ -8,7 +8,6 @@ import (
 	"github.com/tetratelabs/wazero"
 	"github.com/tetratelabs/wazero/api"
 	"github.com/tetratelabs/wazero/imports/wasi_snapshot_preview1"
-    "github.com/tetratelabs/wazero/sys"
 )
 
 // WasmRuntime encapsulates the wazero runtime and provides a safe execution environment.
@@ -89,11 +88,6 @@ func (m *WasmModule) Start() error {
 	// The _start function in WASI has a specific signature (no params, no results).
 	_, err := entryFunc.Call(context.Background())
 	if err != nil {
-		// Check if the module exited with a status code.
-		if exitErr, ok := err.(*sys.ExitError); ok && exitErr.ExitCode() == 0 {
-			m.logger.Info("Module finished successfully", "name", m.Name())
-			return nil // Graceful exit
-		}
 		return fmt.Errorf("module '%s' execution failed: %w", m.Name(), err)
 	}
 
