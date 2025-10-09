@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 )
@@ -101,16 +102,63 @@ func (m *Manager) loadModuleFromManifest(manifestPath string) error {
 	return nil
 }
 
-// InstallModule fetches a module from a URL and installs it. (STUB)
+// InstallModule fetches a module from a URL, verifies it, and installs it.
 func (m *Manager) InstallModule(manifestURL string) error {
 	m.logger.Info("Installing module from URL", "url", manifestURL)
-	// In a real implementation:
+
 	// 1. Fetch manifest from URL
+	resp, err := http.Get(manifestURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch manifest from URL: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("bad status fetching manifest: %s", resp.Status)
+	}
+
+	manifestBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read manifest body: %w", err)
+	}
+
+	var manifest Manifest
+	if err := json.Unmarshal(manifestBytes, &manifest); err != nil {
+		return fmt.Errorf("failed to unmarshal manifest: %w", err)
+	}
+
 	// 2. Fetch wasm file from URL specified in manifest
-	// 3. Verify signatures and hash
-	// 4. Save to moduleDir
-	// 5. Call loadModuleFromManifest
-	return fmt.Errorf("InstallModule not implemented")
+	wasmURL := manifest.WasmURL
+	if wasmURL == "" {
+		return fmt.Errorf("manifest for %s does not contain a WasmURL", manifest.Name)
+	}
+
+	resp, err = http.Get(wasmURL)
+	if err != nil {
+		return fmt.Errorf("failed to fetch wasm file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("bad status fetching wasm file: %s", resp.Status)
+	}
+
+	wasmBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read wasm file body: %w", err)
+	}
+
+	// 3. Verify hash
+	hasher := sha256.New()
+	hasher.Write(wasmBytes)
+	actualHash := hex.EncodeToString(hasher.Sum(nil))
+	if actualHash != manifest.Hash {
+		return fmt.Errorf("hash mismatch for %s: expected %s, got %s", manifest.Name, manifest.Hash, actualHash)
+	}
+	m.logger.Info("Module hash verified", "name", manifest.Name)
+
+	// 4. Save to moduleDir and load
+	return m.SaveAndLoadModule(&manifest, wasmBytes)
 }
 
 // RunModule starts a loaded module by name.
@@ -200,17 +248,16 @@ func (m *Manager) SaveAndLoadModule(manifest *Manifest, wasmBytes []byte) error 
 	return m.loadModuleFromManifest(manifestPath)
 }
 
-// Shutdown gracefully closes the wasm runtime.
-func (m *Manager) Shutdown(ctx context.Context) {
+// Shutdown gracefully stops all modules and closes the wasm runtime.
+func (m *Manager) Shutdown() error {
 	m.logger.Info("Shutting down module manager")
-	for _, module := range m.modules {
+	for name, module := range m.modules {
 		if err := module.Stop(); err != nil {
-			m.logger.Error("Failed to stop module during shutdown", "name", module.Name(), "error", err)
+			m.logger.Error("Failed to stop module during shutdown", "name", name, "error", err)
+			// We continue trying to stop other modules
 		}
 	}
-	if err := m.wasmRuntime.Close(ctx); err != nil {
-		m.logger.Error("Failed to close wasm runtime", "error", err)
-	}
+	return m.wasmRuntime.Close(context.Background())
 }
 
 func (m *Manager) parseManifest(path string) (*Manifest, error) {

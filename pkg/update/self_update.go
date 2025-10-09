@@ -3,7 +3,6 @@ package update
 import (
 	"log"
 	"os"
-	"path/filepath"
 
 	"github.com/inconshreveable/go-update"
 )
@@ -25,9 +24,17 @@ func ApplyPendingUpdate() {
 
 	log.Println("[INFO] New binary found, applying update...")
 
+	// Open the new binary file for reading.
+	file, err := os.Open(newBinaryName)
+	if err != nil {
+		log.Printf("[ERROR] Failed to open new binary: %v", err)
+		return
+	}
+	defer file.Close()
+
 	// Use a library to handle the cross-platform complexities of replacing
 	// the currently running executable.
-	err = update.Apply(newBinaryName, update.Options{})
+	err = update.Apply(file, update.Options{})
 	if err != nil {
 		log.Printf("[ERROR] Failed to apply update: %v", err)
 		// If the update failed, we might want to try to remove the new binary

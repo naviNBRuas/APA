@@ -12,10 +12,10 @@ import (
 	"github.com/naviNBRuas/APA/pkg/module"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 )
 
@@ -66,7 +66,7 @@ type ModuleFetchRequest struct {
 }
 
 // NewP2P creates and initializes a new libp2p host.
-func NewP2P(ctx context.Context, logger *slog.Logger, cfg Config, id peer.ID, privKey interface{}) (*P2P, error) {
+func NewP2P(ctx context.Context, logger *slog.Logger, cfg Config, id peer.ID, privKey crypto.PrivKey) (*P2P, error) {
 	h, err := libp2p.New(
 		libp2p.Identity(privKey),
 		libp2p.ListenAddrStrings(cfg.ListenAddrs...),
@@ -90,7 +90,44 @@ func NewP2P(ctx context.Context, logger *slog.Logger, cfg Config, id peer.ID, pr
 	h.SetStreamHandler(ModuleFetchProtocol, p.handleModuleFetchStream)
 
 	logger.Info("P2P host created", "id", h.ID(), "addrs", h.Addrs())
+
+	// Connect to bootstrap peers
+	p.connectToBootstrapPeers(ctx, cfg.BootstrapPeers)
+
 	return p, nil
+}
+
+// Close gracefully shuts down the P2P host.
+func (p *P2P) Close() error {
+	p.logger.Info("Shutting down P2P host")
+	if p.heartbeatSub != nil {
+		p.heartbeatSub.Cancel()
+	}
+	if p.heartbeatTopic != nil {
+		p.heartbeatTopic.Close()
+	}
+	if p.moduleSub != nil {
+		p.moduleSub.Cancel()
+	}
+	if p.moduleTopic != nil {
+		p.moduleTopic.Close()
+	}
+	return p.Host.Close()
+}
+
+// connectToBootstrapPeers connects to the initial set of bootstrap peers.
+func (p *P2P) connectToBootstrapPeers(ctx context.Context, bootstrapPeers []string) {
+	p.logger.Info("Connecting to bootstrap peers...")
+	for _, addr := range bootstrapPeers {
+		peerInfo, err := peer.AddrInfoFromString(addr)
+		if err != nil {
+			p.logger.Error("Failed to parse bootstrap peer address", "address", addr, "error", err)
+			continue
+		}
+		if err := p.Host.Connect(ctx, *peerInfo); err != nil {
+			p.logger.Error("Failed to connect to bootstrap peer", "peer", peerInfo.ID, "error", err)
+		}
+	}
 }
 
 // StartDiscovery initializes peer discovery mechanisms.

@@ -2,7 +2,6 @@ package update
 
 import (
 	"context"
-	"crypto"
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
@@ -64,27 +63,38 @@ func NewManager(logger *slog.Logger, cfg Config, currentVersion string) (*Manage
 	}, nil
 }
 
+// CurrentVersion returns the agent's current version string.
+func (m *Manager) CurrentVersion() string {
+	return m.currentVersion
+}
+
 // StartPeriodicCheck begins a loop to check for updates.
 func (m *Manager) StartPeriodicCheck(ctx context.Context, interval time.Duration) {
 	m.logger.Info("Update checker started", "interval", interval)
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	// Check immediately on start, then on each tick.
-	m.CheckForUpdate(ctx)
+	// Wait a bit before the first check to allow the agent to settle.
+	time.Sleep(5 * time.Second)
+	m.CheckForUpdate()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			m.CheckForUpdate(ctx)
+			m.CheckForUpdate()
 		}
 	}
 }
 
-func (m *Manager) CheckForUpdate(ctx context.Context) {
+// CheckForUpdate fetches the latest release information and, if a newer version
+// is available, downloads and verifies the update.
+func (m *Manager) CheckForUpdate() {
 	m.logger.Info("Checking for agent updates", "url", m.updateURL)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
 
 	// 1. Fetch release info
 	release, err := m.fetchReleaseInfo(ctx)

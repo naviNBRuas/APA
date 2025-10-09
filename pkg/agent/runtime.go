@@ -1,3 +1,5 @@
+package agent
+
 import (
 	"context"
 	"encoding/json"
@@ -140,12 +142,36 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	return rt, nil
 }
 
+// Stop gracefully shuts down the agent runtime.
+func (rt *Runtime) Stop() {
+	rt.logger.Info("Shutting down agent runtime...")
+
+	// Shutdown the P2P network
+	if err := rt.p2p.Close(); err != nil {
+		rt.logger.Error("Failed to shutdown P2P networking", "error", err)
+	}
+
+	// Shutdown the module manager
+	if err := rt.moduleManager.Shutdown(); err != nil {
+		rt.logger.Error("Failed to shutdown module manager", "error", err)
+	}
+
+	// Shutdown the admin API server
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := rt.server.Shutdown(ctx); err != nil {
+		rt.logger.Error("Admin API server shutdown failed", "error", err)
+	}
+
+	rt.logger.Info("Agent runtime shut down gracefully.")
+}
+
 // Start starts the agent runtime and blocks until shutdown.
 func (rt *Runtime) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	rt.logger.Info("Starting APA agent runtime", "version", rt.updateManager.currentVersion)
+	rt.logger.Info("Starting APA agent runtime", "version", rt.updateManager.CurrentVersion())
 
 	// Start the update checker
 	go rt.updateManager.StartPeriodicCheck(ctx, rt.config.Update.CheckInterval)
@@ -202,4 +228,68 @@ func (rt *Runtime) Start() {
 
 	// Wait for shutdown signal
 	rt.waitForShutdown(cancel)
+}
+
+// loadConfig loads the configuration from the given path.
+func loadConfig(path string) (*Config, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, err
+	}
+
+	return &config, nil
+}
+
+// waitForShutdown waits for a shutdown signal and gracefully shuts down the runtime.
+func (rt *Runtime) waitForShutdown(cancel context.CancelFunc) {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+	<-sigCh
+
+	rt.logger.Info("Shutdown signal received.")
+	cancel() // Cancel the main context
+	rt.Stop()
+}
+
+// healthHandler is the handler for the /admin/health endpoint.
+func (rt *Runtime) healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintln(w, "OK")
+}
+
+// statusHandler is the handler for the /admin/status endpoint.
+func (rt *Runtime) statusHandler(w http.ResponseWriter, r *http.Request) {
+	status := StatusResponse{
+		Version:       rt.updateManager.CurrentVersion(),
+		PeerID:        rt.identity.PeerID.String(),
+		LoadedModules: rt.moduleManager.ListModules(),
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(status); err != nil {
+		rt.logger.Error("Failed to encode status response", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+// listModulesHandler is the handler for the /admin/modules/list endpoint.
+func (rt *Runtime) listModulesHandler(w http.ResponseWriter, r *http.Request) {
+	modules := rt.moduleManager.ListModules()
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(modules); err != nil {
+		rt.logger.Error("Failed to encode modules list response", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
+}
+
+// updateCheckHandler is the handler for the /admin/update/check endpoint.
+func (rt *Runtime) updateCheckHandler(w http.ResponseWriter, r *http.Request) {
+	go rt.updateManager.CheckForUpdate()
+	w.WriteHeader(http.StatusAccepted)
+	fmt.Fprintln(w, "Update check initiated.")
 }
