@@ -1,0 +1,12 @@
+{
+  "name": "net-monitor",
+  "version": "v0.1.0",
+  "arch": "wasm",
+  "os": "wasip1",
+  "wasm_file": "net-monitor.wasm",
+  "hash": "...",
+  "signatures": [],
+  "entry": "_start",
+  "capabilities": ["network"],
+  "policy": ""
+}

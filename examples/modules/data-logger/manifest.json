@@ -1,0 +1,12 @@
+{
+  "name": "data-logger",
+  "version": "v0.1.0",
+  "arch": "wasm",
+  "os": "wasip1",
+  "wasm_file": "data-logger.wasm",
+  "hash": "...",
+  "signatures": [],
+  "entry": "_start",
+  "capabilities": ["filesystem"],
+  "policy": ""
+}

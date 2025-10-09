@@ -1,0 +1,12 @@
+{
+  "name": "system-info",
+  "version": "v0.1.0",
+  "arch": "wasm",
+  "os": "wasip1",
+  "wasm_file": "system-info.wasm",
+  "hash": "...",
+  "signatures": [],
+  "entry": "_start",
+  "capabilities": ["system"],
+  "policy": ""
+}
