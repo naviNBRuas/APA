@@ -1,0 +1,335 @@
+package networking
+
+import (
+	"bufio"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log/slog"
+	"time"
+
+	"github.com/naviNBRuas/APA/pkg/module"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
+	"github.com/libp2p/go-libp2p/core/peer"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
+)
+
+const (
+	HeartbeatTopic    = "apa/heartbeat/1.0.0"
+	ModuleTopic       = "apa/modules/1.0.0"
+	ModuleFetchProtocol = "/apa/fetch-module/1.0.0"
+)
+
+// P2P manages the libp2p host, peer discovery, and pubsub.
+type P2P struct {
+	logger               *slog.Logger
+	Host                 host.Host
+	serviceTag           string
+	pubsub               *pubsub.PubSub
+	heartbeatTopic         *pubsub.Topic
+	heartbeatSub           *pubsub.Subscription
+	moduleTopic            *pubsub.Topic
+	moduleSub              *pubsub.Subscription
+	OnModuleAnnouncement func(announcement ModuleAnnouncementMessage)
+	FetchModuleHandler   func(name, version string) (*module.Manifest, []byte, error)
+}
+
+// Config holds the configuration for the P2P network.
+type Config struct {
+	ListenAddrs      []string      `yaml:"listen_addresses"`
+	BootstrapPeers   []string      `yaml:"bootstrap_peers"`
+	MDNSServiceTag   string        `yaml:"discovery_mdns_service_tag"`
+	HeartbeatInterval time.Duration `yaml:"heartbeat_interval"`
+}
+
+// HeartbeatMessage is the message broadcast by agents to announce their presence.
+type HeartbeatMessage struct {
+	PeerID    string    `json:"peer_id"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// ModuleAnnouncementMessage is broadcast when an agent loads a new module.
+type ModuleAnnouncementMessage struct {
+	AnnouncerPeerID peer.ID         `json:"announcer_peer_id"`
+	Manifest        module.Manifest `json:"manifest"`
+}
+
+// ModuleFetchRequest is sent to a peer to request a module.
+type ModuleFetchRequest struct {
+	Name    string `json:"name"`
+	Version string `json:"version"`
+}
+
+// NewP2P creates and initializes a new libp2p host.
+func NewP2P(ctx context.Context, logger *slog.Logger, cfg Config, id peer.ID, privKey interface{}) (*P2P, error) {
+	h, err := libp2p.New(
+		libp2p.Identity(privKey),
+		libp2p.ListenAddrStrings(cfg.ListenAddrs...),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create libp2p host: %w", err)
+	}
+
+	ps, err := pubsub.NewGossipSub(ctx, h)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create pubsub service: %w", err)
+	}
+
+	p := &P2P{
+		logger:     logger,
+		Host:       h,
+		serviceTag: cfg.MDNSServiceTag,
+		pubsub:     ps,
+	}
+
+	h.SetStreamHandler(ModuleFetchProtocol, p.handleModuleFetchStream)
+
+	logger.Info("P2P host created", "id", h.ID(), "addrs", h.Addrs())
+	return p, nil
+}
+
+// StartDiscovery initializes peer discovery mechanisms.
+func (p *P2P) StartDiscovery(ctx context.Context) {
+	go p.setupMDNS(ctx)
+}
+
+// JoinHeartbeatTopic joins the heartbeat topic and starts processing incoming messages.
+func (p *P2P) JoinHeartbeatTopic(ctx context.Context) error {
+	topic, err := p.pubsub.Join(HeartbeatTopic)
+	if err != nil {
+		return fmt.Errorf("failed to join heartbeat topic: %w", err)
+	}
+	p.heartbeatTopic = topic
+
+	sub, err := topic.Subscribe()
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to heartbeat topic: %w", err)
+	}
+	p.heartbeatSub = sub
+
+	go p.heartbeatReadLoop(ctx)
+	return nil
+}
+
+// JoinModuleTopic joins the module announcement topic.
+func (p *P2P) JoinModuleTopic(ctx context.Context) error {
+	topic, err := p.pubsub.Join(ModuleTopic)
+	if err != nil {
+		return fmt.Errorf("failed to join module topic: %w", err)
+	}
+	p.moduleTopic = topic
+
+	sub, err := topic.Subscribe()
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to module topic: %w", err)
+	}
+	p.moduleSub = sub
+
+	go p.moduleReadLoop(ctx)
+	return nil
+}
+
+// AnnounceModule broadcasts a module's manifest to the network.
+func (p *P2P) AnnounceModule(ctx context.Context, manifest module.Manifest) error {
+	msg := ModuleAnnouncementMessage{
+		AnnouncerPeerID: p.Host.ID(),
+		Manifest:        manifest,
+	}
+	bytes, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal module announcement: %w", err)
+	}
+
+	p.logger.Info("Announcing module", "name", manifest.Name, "version", manifest.Version)
+	return p.moduleTopic.Publish(ctx, bytes)
+}
+
+// FetchModule connects to a peer and downloads the requested module.
+func (p *P2P) FetchModule(ctx context.Context, peerID peer.ID, name, version string) (*module.Manifest, []byte, error) {
+	p.logger.Info("Fetching module from peer", "peer", peerID, "name", name, "version", version)
+	stream, err := p.Host.NewStream(ctx, peerID, ModuleFetchProtocol)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to open stream to peer %s: %w", peerID, err)
+	}
+	defer stream.Close()
+
+	// 1. Send request
+	req := ModuleFetchRequest{Name: name, Version: version}
+	if err := json.NewEncoder(stream).Encode(req); err != nil {
+		return nil, nil, fmt.Errorf("failed to send fetch request: %w", err)
+	}
+
+	// 2. Read response (manifest)
+	var manifest module.Manifest
+	if err := json.NewDecoder(stream).Decode(&manifest); err != nil {
+		return nil, nil, fmt.Errorf("failed to decode manifest from response: %w", err)
+	}
+
+	// 3. Read response (wasm bytes)
+	wasmBytes, err := io.ReadAll(stream)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to read wasm bytes from response: %w", err)
+	}
+
+	p.logger.Info("Successfully fetched module", "name", name, "version", version, "size", len(wasmBytes))
+	return &manifest, wasmBytes, nil
+}
+
+// handleModuleFetchStream handles incoming requests for modules.
+func (p *P2P) handleModuleFetchStream(s network.Stream) {
+	p.logger.Info("Received new module fetch stream", "from", s.Conn().RemotePeer())
+	defer s.Close()
+
+	if p.FetchModuleHandler == nil {
+		p.logger.Error("FetchModuleHandler is not set, cannot serve module")
+		return
+	}
+
+	// 1. Read request
+	var req ModuleFetchRequest
+	if err := json.NewDecoder(s).Decode(&req); err != nil {
+		p.logger.Error("Failed to decode fetch request", "error", err)
+		return
+	}
+
+	// 2. Use the handler to get the module data
+	manifest, wasmBytes, err := p.FetchModuleHandler(req.Name, req.Version)
+	if err != nil {
+		p.logger.Error("Failed to handle fetch request", "module_name", req.Name, "error", err)
+		// TODO: Send an error response back to the requester
+		return
+	}
+
+	// 3. Send response (manifest)
+	bufWriter := bufio.NewWriter(s)
+	if err := json.NewEncoder(bufWriter).Encode(manifest); err != nil {
+		p.logger.Error("Failed to send manifest response", "error", err)
+		return
+	}
+
+	// 4. Send response (wasm bytes)
+	if _, err := bufWriter.Write(wasmBytes); err != nil {
+		p.logger.Error("Failed to send wasm bytes response", "error", err)
+		return
+	}
+
+	if err := bufWriter.Flush(); err != nil {
+		p.logger.Error("Failed to flush stream writer", "error", err)
+	}
+}
+
+// StartHeartbeat starts a periodic broadcast of heartbeat messages.
+func (p *P2P) StartHeartbeat(ctx context.Context, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			msg := HeartbeatMessage{
+				PeerID:    p.Host.ID().String(),
+				Timestamp: time.Now(),
+			}
+			bytes, err := json.Marshal(msg)
+			if err != nil {
+				p.logger.Error("Failed to marshal heartbeat message", "error", err)
+				continue
+			}
+
+			if err := p.heartbeatTopic.Publish(ctx, bytes); err != nil {
+				p.logger.Error("Failed to publish heartbeat message", "error", err)
+			}
+		}
+	}
+}
+
+// heartbeatReadLoop processes messages received on the heartbeat topic.
+func (p *P2P) heartbeatReadLoop(ctx context.Context) {
+	for {
+		msg, err := p.heartbeatSub.Next(ctx)
+		if err != nil {
+			return // Topic has been closed
+		}
+		if msg.ReceivedFrom == p.Host.ID() {
+			continue
+		}
+		var hb HeartbeatMessage
+		if err := json.Unmarshal(msg.Data, &hb); err != nil {
+			p.logger.Error("Failed to unmarshal heartbeat message", "from", msg.ReceivedFrom)
+			continue
+		}
+		p.logger.Info("Received heartbeat", "from", hb.PeerID)
+	}
+}
+
+// moduleReadLoop processes messages received on the module topic.
+func (p *P2P) moduleReadLoop(ctx context.Context) {
+	for {
+		msg, err := p.moduleSub.Next(ctx)
+		if err != nil {
+			return // Topic has been closed
+		}
+		if msg.ReceivedFrom == p.Host.ID() {
+			continue
+		}
+		var announcement ModuleAnnouncementMessage
+		if err := json.Unmarshal(msg.Data, &announcement); err != nil {
+			p.logger.Error("Failed to unmarshal module announcement", "from", msg.ReceivedFrom)
+			continue
+		}
+		announcement.AnnouncerPeerID = msg.ReceivedFrom
+
+		if p.OnModuleAnnouncement != nil {
+			p.OnModuleAnnouncement(announcement)
+		}
+	}
+}
+
+// Shutdown gracefully closes the libp2p host.
+func (p *P2P) Shutdown() error {
+	p.logger.Info("Shutting down P2P host")
+	if p.heartbeatSub != nil {
+		p.heartbeatSub.Cancel()
+	}
+	if p.heartbeatTopic != nil {
+		p.heartbeatTopic.Close()
+	}
+	if p.moduleSub != nil {
+		p.moduleSub.Cancel()
+	}
+	if p.moduleTopic != nil {
+		p.moduleTopic.Close()
+	}
+	return p.Host.Close()
+}
+
+// discoveryNotifee gets notified when we find a new peer via mDNS.
+type discoveryNotifee struct {
+	host   host.Host
+	logger *slog.Logger
+}
+
+// HandlePeerFound is called when a new peer is discovered.
+func (n *discoveryNotifee) HandlePeerFound(pi peer.AddrInfo) {
+	if pi.ID == n.host.ID() {
+		return
+	}
+	n.logger.Info("Discovered a new peer", "id", pi.ID)
+}
+
+// setupMDNS initializes the mDNS discovery service.
+func (p *P2P) setupMDNS(ctx context.Context) {
+	disc := mdns.NewMdnsService(p.Host, p.serviceTag, &discoveryNotifee{host: p.Host, logger: p.logger})
+	if err := disc.Start(); err != nil {
+		p.logger.Error("Failed to start mDNS service", "error", err)
+	}
+	<-ctx.Done()
+	disc.Close()
+}
