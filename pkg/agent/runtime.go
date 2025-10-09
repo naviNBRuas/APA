@@ -1,5 +1,3 @@
-package agent
-
 import (
 	"context"
 	"encoding/json"
@@ -11,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/naviNBRuas/APA/pkg/controller"
+	"github.com/naviNBRuas/APA/pkg/health"
 	"github.com/naviNBRuas/APA/pkg/module"
 	"github.com/naviNBRuas/APA/pkg/networking"
 	"github.com/naviNBRuas/APA/pkg/policy"
@@ -38,13 +38,16 @@ type Config struct {
 
 // Runtime is the core agent runtime. It manages all agent components.
 type Runtime struct {
-	config        *Config
-	logger        *slog.Logger
-	identity      *Identity
-	server        *http.Server
-	moduleManager *module.Manager
-	p2p           *networking.P2P
-	updateManager *update.Manager
+	config           *Config
+	logger           *slog.Logger
+	identity         *Identity
+	server           *http.Server
+	moduleManager    *module.Manager
+	p2p              *networking.P2P
+	updateManager    *update.Manager
+	healthController *health.HealthController
+	recoveryController *RecoveryController // Placeholder for now
+	controllers      []controller.Controller
 }
 
 // NewRuntime creates a new agent runtime.
@@ -99,6 +102,18 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 		return nil, fmt.Errorf("failed to initialize update manager: %w", err)
 	}
 
+	// Initialize Health Controller
+	healthController := health.NewHealthController(logger)
+	healthController.RegisterCheck(health.NewProcessLivenessCheck())
+
+	// Initialize Recovery Controller
+	recoveryController := recovery.NewRecoveryController(logger)
+
+	// Initialize decentralized controllers
+	var controllers []controller.Controller
+	taskOrchestrator := task_orchestrator.NewTaskOrchestrator(logger)
+	controllers = append(controllers, taskOrchestrator)
+
 	rt := &Runtime{
 		config:        config,
 		logger:        logger,
@@ -106,6 +121,9 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 		moduleManager: moduleManager,
 		p2p:           p2p,
 		updateManager: updateManager,
+		healthController: healthController,
+		recoveryController: recoveryController,
+		controllers:   controllers,
 	}
 
 	// Connect the module manager to the P2P network via the callback
@@ -146,39 +164,20 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	return rt, nil
 }
 
-// Stop gracefully shuts down the agent runtime.
-func (rt *Runtime) Stop() {
-	rt.logger.Info("Shutting down agent runtime...")
-
-	// Shutdown the P2P network
-	if err := rt.p2p.Close(); err != nil {
-		rt.logger.Error("Failed to shutdown P2P networking", "error", err)
-	}
-
-	// Shutdown the module manager
-	if err := rt.moduleManager.Shutdown(); err != nil {
-		rt.logger.Error("Failed to shutdown module manager", "error", err)
-	}
-
-	// Shutdown the admin API server
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := rt.server.Shutdown(ctx); err != nil {
-		rt.logger.Error("Admin API server shutdown failed", "error", err)
-	}
-
-	rt.logger.Info("Agent runtime shut down gracefully.")
-}
-
-// Start starts the agent runtime and blocks until shutdown.
-func (rt *Runtime) Start() {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	rt.logger.Info("Starting APA agent runtime", "version", rt.updateManager.CurrentVersion())
-
 	// Start the update checker
 	go rt.updateManager.StartPeriodicCheck(ctx, rt.config.Update.CheckInterval)
+
+	// Start health checks
+	go rt.healthController.StartHealthChecks(ctx, 10*time.Second) // Run health checks every 10 seconds
+
+	// Start all registered controllers
+	for _, ctrl := range rt.controllers {
+		go func(c controller.Controller) {
+			if err := c.Start(ctx); err != nil {
+				rt.logger.Error("Failed to start controller", "name", c.Name(), "error", err)
+			}
+		}(ctrl)
+	}
 
 	// Start P2P discovery
 	rt.p2p.StartDiscovery(ctx)
@@ -232,6 +231,39 @@ func (rt *Runtime) Start() {
 
 	// Wait for shutdown signal
 	rt.waitForShutdown(cancel)
+}
+
+// Stop gracefully shuts down the agent runtime.
+func (rt *Runtime) Stop() {
+	rt.logger.Info("Shutting down agent runtime...")
+
+	// Stop all registered controllers
+	for _, ctrl := range rt.controllers {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := ctrl.Stop(ctx); err != nil {
+			rt.logger.Error("Failed to stop controller", "name", ctrl.Name(), "error", err)
+		}
+	}
+
+	// Shutdown the P2P network
+	if err := rt.p2p.Close(); err != nil {
+		rt.logger.Error("Failed to shutdown P2P networking", "error", err)
+	}
+
+	// Shutdown the module manager
+	if err := rt.moduleManager.Shutdown(); err != nil {
+		rt.logger.Error("Failed to shutdown module manager", "error", err)
+	}
+
+	// Shutdown the admin API server
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := rt.server.Shutdown(ctx); err != nil {
+		rt.logger.Error("Admin API server shutdown failed", "error", err)
+	}
+
+	rt.logger.Info("Agent runtime shut down gracefully.")
 }
 
 // loadConfig loads the configuration from the given path.
