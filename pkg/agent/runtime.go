@@ -13,6 +13,7 @@ import (
 
 	"github.com/naviNBRuas/APA/pkg/module"
 	"github.com/naviNBRuas/APA/pkg/networking"
+	"github.com/naviNBRuas/APA/pkg/policy"
 	"github.com/naviNBRuas/APA/pkg/update"
 	"gopkg.in/yaml.v3"
 )
@@ -83,8 +84,11 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 		return nil, fmt.Errorf("failed to initialize module manager: %w", err)
 	}
 
+	// Initialize Policy Enforcer (dummy for now)
+	policyEnforcer := &policy.DummyPolicyEnforcer{}
+
 	// Initialize P2P Networking
-	p2p, err := networking.NewP2P(ctx, logger, config.P2P, identity.PeerID, identity.PrivKey)
+	p2p, err := networking.NewP2P(ctx, logger, config.P2P, identity.PeerID, identity.PrivKey, policyEnforcer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize P2P networking: %w", err)
 	}

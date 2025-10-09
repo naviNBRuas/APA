@@ -5,7 +5,6 @@ p2p:
   listen_addresses:
     - "/ip4/0.0.0.0/tcp/0"
   bootstrap_peers: []
-  discovery_mdns_service_tag: "apa-agent"
   heartbeat_interval: "10s"
 update:
   server_url: "http://127.0.0.1:8000/release.json"
