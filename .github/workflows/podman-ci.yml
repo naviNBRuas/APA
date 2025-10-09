@@ -1,0 +1,22 @@
+name: Podman CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Podman
+        run: sudo apt-get update && sudo apt-get install -y podman
+      - name: Build APA image
+        run: podman build -t apa:ci -f Containerfile .
+      - name: Run APA container
+        run: podman run --rm -d -p 8080:8080 --name apa-agent-ci apa:ci
+      - name: Health check
+        run: |
+          sleep 5
+          curl http://localhost:8080/health
