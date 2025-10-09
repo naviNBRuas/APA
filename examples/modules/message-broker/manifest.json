@@ -1,0 +1,12 @@
+{
+  "name": "message-broker",
+  "version": "v0.1.0",
+  "arch": "wasm",
+  "os": "wasip1",
+  "wasm_file": "message-broker.wasm",
+  "hash": "...",
+  "signatures": [],
+  "entry": "_start",
+  "capabilities": ["network", "messaging"],
+  "policy": ""
+}

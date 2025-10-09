@@ -1,0 +1,12 @@
+{
+  "name": "config-watcher",
+  "version": "v0.1.0",
+  "arch": "wasm",
+  "os": "wasip1",
+  "wasm_file": "config-watcher.wasm",
+  "hash": "...",
+  "signatures": [],
+  "entry": "_start",
+  "capabilities": ["filesystem"],
+  "policy": ""
+}

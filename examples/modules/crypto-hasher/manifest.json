@@ -1,0 +1,12 @@
+{
+  "name": "crypto-hasher",
+  "version": "v0.1.0",
+  "arch": "wasm",
+  "os": "wasip1",
+  "wasm_file": "crypto-hasher.wasm",
+  "hash": "...",
+  "signatures": [],
+  "entry": "_start",
+  "capabilities": ["crypto"],
+  "policy": ""
+}
