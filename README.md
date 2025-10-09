@@ -1,10 +1,19 @@
 # Autonomous Polymorphic Agent (APA)
 
+[![Build Status](https://github.com/naviNBRuas/APA/workflows/CI/badge.svg)](https://github.com/naviNBRuas/APA/actions?query=workflow%3ACI)
+[![Podman CI](https://github.com/naviNBRuas/APA/workflows/Podman%20CI/badge.svg)](https://github.com/naviNBRuas/APA/actions?query=workflow%3A%22Podman+CI%22)
+
 ## Project Overview
 
-The Autonomous Polymorphic Agent (APA) is a cutting-edge, self-healing, and decentralized agent platform designed for robust, secure, and autonomous operation across diverse environments. Inspired by the need for resilient and adaptable systems, APA aims to provide a highly available and secure foundation for distributed applications and services.
+The **Autonomous Polymorphic Agent (APA)** is a state-of-the-art, self-healing, and decentralized agent platform meticulously engineered for robust, secure, and autonomous operation across a myriad of computing environments. Driven by the imperative for resilient and highly adaptable systems, APA is designed to establish a high-availability and secure foundation for sophisticated distributed applications and services.
 
-Our vision is to create an agent that can autonomously discover peers, adapt to changing network conditions, self-heal from failures, and securely manage its own lifecycle, including module updates and policy enforcement. The platform is built with a strong emphasis on modern networking paradigms, cryptographic security, and extensibility through a modular architecture.
+Our overarching vision is to cultivate an intelligent agent capable of:
+- **Autonomous Peer Discovery:** Proactively identifying and connecting with other agents in a decentralized network.
+- **Adaptive Network Resilience:** Dynamically adjusting to fluctuating network conditions and topologies.
+- **Proactive Self-Healing:** Automatically recovering from operational failures and maintaining system integrity.
+- **Secure Lifecycle Management:** Ensuring the secure and verifiable management of its own operational lifecycle, encompassing dynamic module updates and stringent policy enforcement.
+
+The APA platform is architected with an unwavering commitment to modern networking paradigms, advanced cryptographic security, and unparalleled extensibility through its modular design. It represents a significant leap towards truly autonomous and self-governing distributed systems.
 
 ## Current Implemented Features
 
@@ -166,6 +175,28 @@ To build and run the APA agent:
 ## Contributing
 
 We welcome contributions to the Autonomous Polymorphic Agent project! Please refer to `CONTRIBUTING.md` for guidelines on how to get involved.
+
+## Security Policy
+
+For information on security vulnerabilities and how to report them, please refer to our `SECURITY.md`.
+
+## Code of Conduct
+
+Our project adheres to a Code of Conduct. Please review `CODE_OF_CONDUCT.md` to understand the expectations for participation.
+
+## Contact and Support
+
+For general inquiries, support, or to connect with the development team, please reach out via [email](mailto:support@example.com) or join our [community forum/chat](https://example.com/community).
+
+## Acknowledgements
+
+We extend our gratitude to the creators and maintainers of the following key technologies and inspirations that have made the APA project possible:
+
+*   [libp2p](https://libp2p.io/): For providing the foundational peer-to-peer networking stack.
+*   [wazero](https://wazero.io/): For the efficient and secure WebAssembly runtime.
+*   [Go-Update](https://github.com/inconshreveable/go-update): For robust self-update capabilities.
+*   [Open Policy Agent (OPA)](https://www.openpolicyagent.org/): For inspiring the policy enforcement and RBAC design.
+*   The broader open-source community for their invaluable tools and knowledge.
 
 ## License
 

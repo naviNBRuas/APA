@@ -78,6 +78,8 @@ func NewP2P(ctx context.Context, logger *slog.Logger, cfg Config, id peer.ID, pr
 		libp2p.ListenAddrStrings(cfg.ListenAddrs...),
 		libp2p.EnableNATService(), // Enable NAT traversal
 		libp2p.EnableRelay(),      // Enable circuit relay
+		libp2p.EnablePeerExchange(), // Enable peer exchange
+		libp2p.Routing(p.dht),       // Use the DHT for routing
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libp2p host: %w", err)
