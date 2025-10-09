@@ -1,0 +1,37 @@
+# Binaries
+bin/
+build/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node/npm
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Containers
+.containerfile
+Dockerfile
+*.tar
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Secrets
+secrets/
+*.pem
+*.key
+.env
