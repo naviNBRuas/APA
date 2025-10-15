@@ -12,6 +12,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+
+	"github.com/naviNBRuas/APA/pkg/policy"
 )
 
 // Manager handles the lifecycle of WASM modules.
@@ -21,11 +23,12 @@ type Manager struct {
 	modules        map[string]Module // Maps module name to Module instance
 	moduleDir      string
 	signingPrivKey ed25519.PrivateKey
+	policyEnforcer policy.PolicyEnforcer
 	OnModuleLoad   func(manifest Manifest)
 }
 
 // NewManager creates a new module manager.
-func NewManager(ctx context.Context, logger *slog.Logger, moduleDir string, signingPrivKey ed25519.PrivateKey) (*Manager, error) {
+func NewManager(ctx context.Context, logger *slog.Logger, moduleDir string, signingPrivKey ed25519.PrivateKey, policyEnforcer policy.PolicyEnforcer) (*Manager, error) {
 	wasmRuntime, err := NewWasmRuntime(ctx, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create wasm runtime: %w", err)
@@ -37,6 +40,7 @@ func NewManager(ctx context.Context, logger *slog.Logger, moduleDir string, sign
 		modules:        make(map[string]Module),
 		moduleDir:      moduleDir,
 		signingPrivKey: signingPrivKey,
+		policyEnforcer: policyEnforcer,
 	}, nil
 }
 
@@ -170,6 +174,16 @@ func (m *Manager) RunModule(name string) error {
 	if !ok {
 		return fmt.Errorf("module '%s' not found", name)
 	}
+
+	// Authorize module execution
+	allowed, reason, err := m.policyEnforcer.Authorize(context.Background(), module.Name(), "run_module", module.Name())
+	if err != nil {
+		return fmt.Errorf("failed to authorize module execution: %w", err)
+	}
+	if !allowed {
+		return fmt.Errorf("module execution not authorized: %s", reason)
+	}
+
 	return module.Start()
 }
 
@@ -232,10 +246,7 @@ func (m *Manager) SignModule(wasmBytes []byte, manifest *Manifest) error {
 	hasher.Write(wasmBytes)
 	hash := hasher.Sum(nil)
 
-	signature, err := ed25519.Sign(m.signingPrivKey, hash)
-	if err != nil {
-		return fmt.Errorf("failed to sign module: %w", err)
-	}
+	signature := ed25519.Sign(m.signingPrivKey, hash)
 
 	manifest.Signatures = append(manifest.Signatures, hex.EncodeToString(signature))
 	return nil

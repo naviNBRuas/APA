@@ -59,6 +59,14 @@ trusted_authors:
 	assert.NoError(t, err)
 	policyFile.Close()
 
+	// Create a dummy signing private key file
+	signingPrivKeyFile, err := os.CreateTemp("", "signing_private-*.key")
+	assert.NoError(t, err)
+	defer os.Remove(signingPrivKeyFile.Name())
+	_, err = signingPrivKeyFile.WriteString("66de82dd3b2ab364a58c741e152f1bdb195cddde0e7e30431c466ea647ea733b1041e474e8c1fc4cf42a183dcfc27ccefc0fde534368f3aff3ee9856a8a960c4")
+	assert.NoError(t, err)
+	signingPrivKeyFile.Close()
+
 	// Create a dummy config file
 	config := `
 admin_listen_address: ":8080"
@@ -66,13 +74,14 @@ log_level: "debug"
 module_path: "/tmp/modules"
 identity_file_path: "` + identityPath + `"
 policy_path: "` + policyFile.Name() + `"
+signing_priv_key_path: "` + signingPrivKeyFile.Name() + `"
 p2p:
   listen_addresses:
     - "/ip4/0.0.0.0/tcp/0"
   bootstrap_peers:
     []
   heartbeat_interval: "10s"
-  service_tag: "test-agent"
+  service_tag: "apa-test"
 update:
   public_key: "` + pubKey + `"
 `
@@ -120,12 +129,21 @@ trusted_authors:
 	require.NoError(t, err)
 	defer os.Remove(configFile.Name())
 
+	// Create a dummy signing private key file
+	signingPrivKeyFile, err := os.CreateTemp("", "signing_private-*.key")
+	require.NoError(t, err)
+	defer os.Remove(signingPrivKeyFile.Name())
+	_, err = signingPrivKeyFile.WriteString("66de82dd3b2ab364a58c741e152f1bdb195cddde0e7e30431c466ea647ea733b1041e474e8c1fc4cf42a183dcfc27ccefc0fde534368f3aff3ee9856a8a960c4")
+	require.NoError(t, err)
+	signingPrivKeyFile.Close()
+
 	_, err = configFile.WriteString(`
 admin_listen_address: ":8081"
 log_level: "debug"
 identity_file_path: "` + identityPath + `"
 module_path: "/tmp/modules"
 policy_path: "` + policyFile.Name() + `"
+signing_priv_key_path: "` + signingPrivKeyFile.Name() + `"
 p2p:
   listen_addresses:
     - "/ip4/0.0.0.0/tcp/0"

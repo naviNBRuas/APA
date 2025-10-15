@@ -11,11 +11,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/naviNBRuas/APA/pkg/policy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func createTestModule(t *testing.T, dir, name string) {
+func createTestModule(t *testing.T, dir, name string, signingPrivKey ed25519.PrivateKey) {
 	moduleDir := filepath.Join(dir, name)
 	require.NoError(t, os.MkdirAll(moduleDir, 0755))
 
@@ -30,12 +31,8 @@ func createTestModule(t *testing.T, dir, name string) {
 	hasher.Write(wasmBytes)
 	actualHash := hex.EncodeToString(hasher.Sum(nil))
 
-	// Generate a dummy private key for signing
-	_, privKey, err := ed25519.GenerateKey(nil)
-	require.NoError(t, err)
-
 	// Sign the hash
-	signature := ed25519.Sign(privKey, hasher.Sum(nil))
+	signature := ed25519.Sign(signingPrivKey, hasher.Sum(nil))
 
 	manifest := Manifest{
 		Name:     name,
@@ -53,13 +50,29 @@ func createTestModule(t *testing.T, dir, name string) {
 func TestManager_LoadModulesFromDir(t *testing.T) {
 	// Setup
 	tempDir := t.TempDir()
-	createTestModule(t, tempDir, "test-module-1")
-	createTestModule(t, tempDir, "test-module-2")
+
+	// Generate a single private key for the test
+	_, signingPrivKey, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+
+	createTestModule(t, tempDir, "test-module-1", signingPrivKey)
+	createTestModule(t, tempDir, "test-module-2", signingPrivKey)
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	_, privKey, err := ed25519.GenerateKey(nil)
+	// Create a dummy policy enforcer
+	policyFile, err := os.CreateTemp("", "policy-*.yaml")
 	require.NoError(t, err)
-	manager, err := NewManager(context.Background(), logger, tempDir, privKey)
+	defer os.Remove(policyFile.Name())
+	_, err = policyFile.WriteString(`
+trusted_authors:
+  - "naviNBRuas"
+`)
+	require.NoError(t, err)
+	policyFile.Close()
+
+	dummyPolicyEnforcer, err := policy.NewPolicyEnforcer(policyFile.Name())
+	require.NoError(t, err)
+	manager, err := NewManager(context.Background(), logger, tempDir, signingPrivKey, dummyPolicyEnforcer)
 	require.NoError(t, err)
 	defer manager.Shutdown()
 

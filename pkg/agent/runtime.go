@@ -103,15 +103,15 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	}
 	signingPrivKey := ed25519.PrivateKey(signingPrivKeyDecoded)
 
-	moduleManager, err := module.NewManager(ctx, logger, config.ModulePath, signingPrivKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize module manager: %w", err)
-	}
-
 	// Initialize Policy Enforcer
 	policyEnforcer, err := policy.NewPolicyEnforcer(config.PolicyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize policy enforcer: %w", err)
+	}
+
+	moduleManager, err := module.NewManager(ctx, logger, config.ModulePath, signingPrivKey, policyEnforcer)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize module manager: %w", err)
 	}
 
 	// Initialize P2P Networking
