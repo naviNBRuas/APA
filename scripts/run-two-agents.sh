@@ -21,7 +21,7 @@ AGENT1_IDENTITY_PATH="${AGENT1_DIR}/agent-identity.json"
 AGENT1_POLICY_PATH="${AGENT1_DIR}/policy.yaml"
 
 # Generate identity for Agent 1
-go run cmd/agentd/main.go -config "${AGENT1_CONFIG_PATH}" # This will create agent-identity.json in the current dir
+go run cmd/agentd/main.go
 mv agent-identity.json "${AGENT1_IDENTITY_PATH}"
 
 # Create policy.yaml for Agent 1
@@ -35,8 +35,8 @@ cat <<EOF > "${AGENT1_CONFIG_PATH}"
 admin_listen_address: "0.0.0.0:${AGENT1_PORT}"
 log_level: "debug"
 module_path: "/tmp/modules"
-identity_file_path: "${AGENT1_IDENTITY_PATH}"
-policy_path: "${AGENT1_POLICY_PATH}"
+identity_file_path: "/app/config/agent-identity.json"
+policy_path: "/app/config/policy.yaml"
 p2p:
   listen_addresses:
     - "/ip4/0.0.0.0/tcp/0"
@@ -58,7 +58,7 @@ AGENT2_IDENTITY_PATH="${AGENT2_DIR}/agent-identity.json"
 AGENT2_POLICY_PATH="${AGENT2_DIR}/policy.yaml"
 
 # Generate identity for Agent 2
-go run cmd/agentd/main.go -config "${AGENT2_CONFIG_PATH}" # This will create agent-identity.json in the current dir
+go run cmd/agentd/main.go
 mv agent-identity.json "${AGENT2_IDENTITY_PATH}"
 
 # Create policy.yaml for Agent 2
@@ -72,8 +72,8 @@ cat <<EOF > "${AGENT2_CONFIG_PATH}"
 admin_listen_address: "0.0.0.0:${AGENT2_PORT}"
 log_level: "debug"
 module_path: "/tmp/modules"
-identity_file_path: "${AGENT2_IDENTITY_PATH}"
-policy_path: "${AGENT2_POLICY_PATH}"
+identity_file_path: "/app/config/agent-identity.json"
+policy_path: "/app/config/policy.yaml"
 p2p:
   listen_addresses:
     - "/ip4/0.0.0.0/tcp/0"
