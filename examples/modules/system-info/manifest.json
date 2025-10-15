@@ -4,9 +4,10 @@
   "arch": "wasm",
   "os": "wasip1",
   "wasm_file": "system-info.wasm",
-  "hash": "...",
+  "hash": "46ca67f76cf889ea2dd2a7ff05de727be2fc42de137bcedcbb340d4c176fad9f",
   "signatures": [],
   "entry": "_start",
+  "exported_functions": ["get_system_info"],
   "capabilities": ["system"],
   "policy": ""
 }
