@@ -2,6 +2,7 @@ package module
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -15,25 +16,27 @@ import (
 
 // Manager handles the lifecycle of WASM modules.
 type Manager struct {
-	logger      *slog.Logger
-	wasmRuntime *WasmRuntime
-	modules     map[string]Module // Maps module name to Module instance
-	moduleDir   string
-	OnModuleLoad func(manifest Manifest)
+	logger         *slog.Logger
+	wasmRuntime    *WasmRuntime
+	modules        map[string]Module // Maps module name to Module instance
+	moduleDir      string
+	signingPrivKey ed25519.PrivateKey
+	OnModuleLoad   func(manifest Manifest)
 }
 
 // NewManager creates a new module manager.
-func NewManager(ctx context.Context, logger *slog.Logger, moduleDir string) (*Manager, error) {
+func NewManager(ctx context.Context, logger *slog.Logger, moduleDir string, signingPrivKey ed25519.PrivateKey) (*Manager, error) {
 	wasmRuntime, err := NewWasmRuntime(ctx, logger)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create wasm runtime: %w", err)
 	}
 
 	return &Manager{
-		logger:      logger,
-		wasmRuntime: wasmRuntime,
-		modules:     make(map[string]Module),
-		moduleDir:   moduleDir,
+		logger:         logger,
+		wasmRuntime:    wasmRuntime,
+		modules:        make(map[string]Module),
+		moduleDir:      moduleDir,
+		signingPrivKey: signingPrivKey,
 	}, nil
 }
 
@@ -63,9 +66,9 @@ func (m *Manager) loadModuleFromManifest(manifestPath string) error {
 		return err
 	}
 
-	// 2. Verify Wasm file hash
+	// 2. Verify Wasm file hash and signatures
 	wasmPath := filepath.Join(filepath.Dir(manifestPath), manifest.WasmFile)
-	err = m.verifyHash(wasmPath, manifest.Hash)
+	err = m.verifyHash(wasmPath, manifest.Hash, manifest)
 	if err != nil {
 		return fmt.Errorf("module '%s' hash verification failed: %w", manifest.Name, err)
 	}
@@ -219,8 +222,32 @@ func (m *Manager) GetModuleData(name, version string) (*Manifest, []byte, error)
 	return nil, nil, fmt.Errorf("module %s version %s not found", name, version)
 }
 
+// SignModule signs the WASM bytes and adds the signature to the manifest.
+func (m *Manager) SignModule(wasmBytes []byte, manifest *Manifest) error {
+	if m.signingPrivKey == nil {
+		return fmt.Errorf("signing private key not provided")
+	}
+
+	hasher := sha256.New()
+	hasher.Write(wasmBytes)
+	hash := hasher.Sum(nil)
+
+	signature, err := ed25519.Sign(m.signingPrivKey, hash)
+	if err != nil {
+		return fmt.Errorf("failed to sign module: %w", err)
+	}
+
+	manifest.Signatures = append(manifest.Signatures, hex.EncodeToString(signature))
+	return nil
+}
+
 // SaveAndLoadModule saves a new module to disk and loads it into the runtime.
 func (m *Manager) SaveAndLoadModule(manifest *Manifest, wasmBytes []byte) error {
+	// Sign the module before saving
+	if err := m.SignModule(wasmBytes, manifest); err != nil {
+		return fmt.Errorf("failed to sign module: %w", err)
+	}
+
 	moduleSubDir := filepath.Join(m.moduleDir, manifest.Name)
 	if err := os.MkdirAll(moduleSubDir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory for new module %s: %w", manifest.Name, err)
@@ -274,7 +301,7 @@ func (m *Manager) parseManifest(path string) (*Manifest, error) {
 
 // verifyHash calculates the SHA256 hash of a file and compares it to an expected hex-encoded hash.
 // A placeholder hash "..." is always considered valid for testing.
-func (m *Manager) verifyHash(filePath, expectedHash string) error {
+func (m *Manager) verifyHash(filePath, expectedHash string, manifest *Manifest) error {
 	if expectedHash == "..." {
 		m.logger.Warn("Skipping hash verification for placeholder hash", "file", filePath)
 		return nil
@@ -295,5 +322,24 @@ func (m *Manager) verifyHash(filePath, expectedHash string) error {
 	if actualHash != expectedHash {
 		return fmt.Errorf("hash mismatch: expected %s, got %s", expectedHash, actualHash)
 	}
+
+	// Verify signatures
+	if len(manifest.Signatures) > 0 {
+		if m.signingPrivKey == nil {
+			return fmt.Errorf("cannot verify signature: signing private key not provided to manager")
+		}
+		pubKey := m.signingPrivKey.Public().(ed25519.PublicKey)
+		for _, sigHex := range manifest.Signatures {
+			sig, err := hex.DecodeString(sigHex)
+			if err != nil {
+				return fmt.Errorf("failed to decode signature: %w", err)
+			}
+			if !ed25519.Verify(pubKey, hasher.Sum(nil), sig) {
+				return fmt.Errorf("signature verification failed")
+			}
+		}
+		m.logger.Debug("Module signatures verified", "name", manifest.Name)
+	}
+
 	return nil
 }

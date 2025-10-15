@@ -27,7 +27,7 @@ mv agent-identity.json "${AGENT1_IDENTITY_PATH}"
 # Create policy.yaml for Agent 1
 cat <<EOF > "${AGENT1_POLICY_PATH}"
 trusted_authors:
-  - "Navi"
+  - "naviNBRuas"
 EOF
 
 # Create agent-config.yaml for Agent 1
@@ -64,7 +64,7 @@ mv agent-identity.json "${AGENT2_IDENTITY_PATH}"
 # Create policy.yaml for Agent 2
 cat <<EOF > "${AGENT2_POLICY_PATH}"
 trusted_authors:
-  - "Navi"
+  - "naviNBRuas"
 EOF
 
 # Create agent-config.yaml for Agent 2

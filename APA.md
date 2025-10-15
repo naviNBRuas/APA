@@ -145,7 +145,7 @@ agent-platform/
     "arch":["amd64","arm64"],
     "os":["linux","darwin","windows"],
     "hash":"sha256:...",
-    "signatures":[{"key":"op1","sig":"..."}],
+signatures":[{"key":"naviNBRuas","sig":"..."}],
     "entry":"main",
     "capabilities":["network","metrics"],
     "policy":"module.policy"
@@ -244,7 +244,7 @@ telemetry:
     {"name":"agent-linux-amd64","url":"https://store.example/agent-v1.2.0-linux-amd64.tar.gz","hash":"sha256:..."},
     {"name":"net-monitor.wasm","url":"ipfs://Qm...","hash":"sha256:..."}
   ],
-  "signatures":[{"key":"op1","sig":"..."}],
+  "signatures":[{"key":"naviNBRuas","sig":"..."}],
   "required_quorum":2
 }
 ```

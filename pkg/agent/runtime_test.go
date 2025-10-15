@@ -54,7 +54,7 @@ func TestNewRuntime(t *testing.T) {
 	defer os.Remove(policyFile.Name())
 	_, err = policyFile.WriteString(`
 trusted_authors:
-  - "Navi"
+  - "naviNBRuas"
 `)
 	assert.NoError(t, err)
 	policyFile.Close()
@@ -110,7 +110,7 @@ func TestHealthEndpoint(t *testing.T) {
 	defer os.Remove(policyFile.Name())
 	_, err = policyFile.WriteString(`
 trusted_authors:
-  - "Navi"
+  - "naviNBRuas"
 `)
 	require.NoError(t, err)
 	policyFile.Close()

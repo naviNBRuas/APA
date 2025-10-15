@@ -3,6 +3,7 @@ log_level: "info"
 module_path: "examples/modules"
 identity_file_path: "agent-identity.json"
 policy_path: "configs/policy.yaml"
+signing_priv_key_path: "configs/signing_private.key"
 p2p:
   listen_addresses:
     - "/ip4/0.0.0.0/tcp/0"

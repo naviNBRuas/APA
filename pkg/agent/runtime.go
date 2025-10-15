@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -38,6 +40,7 @@ type Config struct {
 	ModulePath         string             `yaml:"module_path"`
 	IdentityFilePath   string             `yaml:"identity_file_path"`
 	PolicyPath         string             `yaml:"policy_path"`
+	SigningPrivKeyPath string             `yaml:"signing_priv_key_path"`
 	P2P                networking.Config `yaml:"p2p"`
 	Update             update.Config     `yaml:"update"`
 }
@@ -88,7 +91,19 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	logger.Info("Identity initialized", "agent_peer_id", identity.PeerID)
 
 	// Initialize Module Manager
-	moduleManager, err := module.NewManager(ctx, logger, config.ModulePath)
+	// Load signing private key
+	signingPrivKeyBytes, err := os.ReadFile(config.SigningPrivKeyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read signing private key: %w", err)
+	}
+	signingPrivKeyHex := string(signingPrivKeyBytes)
+	signingPrivKeyDecoded, err := hex.DecodeString(signingPrivKeyHex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode signing private key: %w", err)
+	}
+	signingPrivKey := ed25519.PrivateKey(signingPrivKeyDecoded)
+
+	moduleManager, err := module.NewManager(ctx, logger, config.ModulePath, signingPrivKey)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize module manager: %w", err)
 	}

@@ -41,11 +41,11 @@ func NewPolicyEnforcer(policyPath string) (*PolicyEnforcerImpl, error) {
 }
 
 // Authorize checks if the action is authorized based on the policy.
-func (p *PolicyEnforcerImpl) Authorize(ctx context.Context, subject string, action string, resource string) (bool, string, error) {
+func (p *PolicyEnforcerImpl) Authorize(ctx context.Context, author string, action string, resource string) (bool, string, error) {
 	// For now, we only check if the author of a module is trusted.
 	if action == "load_module" {
-		for _, author := range p.config.TrustedAuthors {
-			if subject == author {
+		for _, trustedAuthor := range p.config.TrustedAuthors {
+			if author == trustedAuthor {
 				return true, "authorized", nil
 			}
 		}

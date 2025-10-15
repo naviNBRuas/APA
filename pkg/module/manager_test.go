@@ -2,6 +2,7 @@ package module
 
 import (
 	"context"
+	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -29,11 +30,19 @@ func createTestModule(t *testing.T, dir, name string) {
 	hasher.Write(wasmBytes)
 	actualHash := hex.EncodeToString(hasher.Sum(nil))
 
+	// Generate a dummy private key for signing
+	_, privKey, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+
+	// Sign the hash
+	signature := ed25519.Sign(privKey, hasher.Sum(nil))
+
 	manifest := Manifest{
 		Name:     name,
 		Version:  "v1.0.0",
 		WasmFile: name + ".wasm",
 		Hash:     actualHash,
+		Signatures: []string{hex.EncodeToString(signature)},
 	}
 	manifestPath := filepath.Join(moduleDir, "manifest.json")
 	manifestBytes, err := json.Marshal(manifest)
@@ -48,7 +57,9 @@ func TestManager_LoadModulesFromDir(t *testing.T) {
 	createTestModule(t, tempDir, "test-module-2")
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	manager, err := NewManager(context.Background(), logger, tempDir)
+	_, privKey, err := ed25519.GenerateKey(nil)
+	require.NoError(t, err)
+	manager, err := NewManager(context.Background(), logger, tempDir, privKey)
 	require.NoError(t, err)
 	defer manager.Shutdown()
 
