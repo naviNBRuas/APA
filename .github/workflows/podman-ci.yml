@@ -1,5 +1,8 @@
 name: Podman CI
 
+# This workflow builds and runs the agent in a Podman container.
+# The Go tests are run in the main CI workflow (ci.yml).
+
 on:
   push:
     branches: [ main ]
