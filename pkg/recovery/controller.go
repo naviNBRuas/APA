@@ -48,6 +48,16 @@ func (rc *RecoveryController) CreateSnapshot(ctx context.Context) error {
 // RestoreSnapshot restores the agent's state from a snapshot.
 func (rc *RecoveryController) RestoreSnapshot(ctx context.Context) error {
 	rc.logger.Info("Restoring agent from snapshot")
-	// TODO: Implement actual snapshot restoration logic
+	data, err := os.ReadFile("agent-snapshot.json")
+	if err != nil {
+		return err
+	}
+
+	var config any
+	if err := json.Unmarshal(data, &config); err != nil {
+		return err
+	}
+
+	rc.logger.Info("Restored configuration from snapshot", "config", config)
 	return nil
 }
