@@ -26,18 +26,20 @@ type Manifest struct {
 
 // Manager handles the lifecycle of drivers.
 type Manager struct {
-	logger    *slog.Logger
-	drivers   map[string]Driver // Maps driver name to Driver instance
-	driverDir string
-	mu        sync.RWMutex
+	logger     *slog.Logger
+	drivers    map[string]Driver // Maps driver name to Driver instance
+	driverDir  string
+	mu         sync.RWMutex
+	httpClient *http.Client
 }
 
 // NewManager creates a new driver manager.
 func NewManager(logger *slog.Logger, driverDir string) *Manager {
 	return &Manager{
-		logger:    logger,
-		drivers:   make(map[string]Driver),
-		driverDir: driverDir,
+		logger:     logger,
+		drivers:    make(map[string]Driver),
+		driverDir:  driverDir,
+		httpClient: &http.Client{},
 	}
 }
 
@@ -81,7 +83,8 @@ func (m *Manager) FetchAndVerify(ctx context.Context, manifestURL string) (*Mani
 	}
 	m.logger.Info("Driver hash verified", "name", manifest.Name)
 
-	// TODO: 4. Verify signatures (requires crypto/signature package)
+	// 4. Verify signatures
+	m.logger.Warn("Signature verification is not yet implemented.")
 
 	// 5. Save driver binary and manifest
 	driverSubDir := filepath.Join(m.driverDir, manifest.Name)

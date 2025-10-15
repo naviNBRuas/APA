@@ -2,7 +2,6 @@ package policy
 
 import (
 	"context"
-	"fmt"
 )
 
 // PolicyEnforcer defines the interface for enforcing policies.
@@ -17,10 +16,13 @@ type AuthService interface {
 }
 
 // DummyPolicyEnforcer is a placeholder implementation of PolicyEnforcer.
+// It currently only checks for a static token.
 type DummyPolicyEnforcer struct{}
 
-// Authorize always returns true for now.
+// Authorize checks if the token is "super-secret-token".
 func (d *DummyPolicyEnforcer) Authorize(ctx context.Context, token string, action string, resource string) (bool, string, error) {
-	fmt.Printf("DummyPolicyEnforcer: Authorizing token %s for action %s on resource %s\n", token, action, resource)
-	return true, "", nil
+	if token == "super-secret-token" {
+		return true, "authorized", nil
+	}
+	return false, "unauthorized", nil
 }

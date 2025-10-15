@@ -44,6 +44,7 @@ type P2P struct {
 	OnModuleAnnouncement func(announcement ModuleAnnouncementMessage)
 	FetchModuleHandler   func(name, version string) (*module.Manifest, []byte, error)
 	policyEnforcer       policy.PolicyEnforcer
+	serviceTag           string
 }
 
 // Config holds the configuration for the P2P network.
@@ -51,6 +52,7 @@ type Config struct {
 	ListenAddrs      []string      `yaml:"listen_addresses"`
 	BootstrapPeers   []string      `yaml:"bootstrap_peers"`
 	HeartbeatInterval time.Duration `yaml:"heartbeat_interval"`
+	ServiceTag       string        `yaml:"service_tag"`
 }
 
 // HeartbeatMessage is the message broadcast by agents to announce their presence.
@@ -95,6 +97,7 @@ func NewP2P(ctx context.Context, logger *slog.Logger, cfg Config, id peer.ID, pr
 		pubsub:     ps,
 		peerstore:  h.Peerstore(),
 		policyEnforcer: policyEnforcer,
+		serviceTag: cfg.ServiceTag,
 	}
 
 	// Create a new Kademlia DHT for peer discovery.

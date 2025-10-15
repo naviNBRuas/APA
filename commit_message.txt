@@ -1,0 +1,15 @@
+fix: Resolve networking build errors and clean up imports
+
+This commit addresses several build errors in the networking and controller packages, primarily related to `libp2p` integration and unused imports.
+
+* `pkg/networking/p2p.go`:
+    * Corrected import paths for `autonat` and `relay` to align with `go-libp2p v0.44.0`'s refactored structure.
+    * Removed `libp2p.EnablePeerExchange()` and `libp2p.Routing(p.dht)` options from `libp2p.New` as they were causing build errors and are not the correct way to enable peer exchange or routing with the DHT at that stage.
+    * Removed the `serviceTag` field from the `P2P` struct and all its usages, as it was no longer needed with the `routingDiscovery` approach.
+    * Fixed a syntax error in the `ModuleAnnouncementMessage` struct definition.
+* `pkg/controller/task-orchestrator/task_orchestrator.go`:
+    * Removed the unused `fmt` import.
+* `pkg/agent/runtime.go`:
+    * Re-added the missing `package agent` declaration.
+
+These fixes should resolve the GitHub CI failures related to these build errors.

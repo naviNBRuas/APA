@@ -50,7 +50,7 @@ type Runtime struct {
 	p2p              *networking.P2P
 	updateManager    *update.Manager
 	healthController *health.HealthController
-	recoveryController *RecoveryController // Placeholder for now
+	recoveryController *recovery.RecoveryController // Placeholder for now
 	controllers      []controller.Controller
 }
 
@@ -168,6 +168,8 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	return rt, nil
 }
 
+// Start starts the agent runtime.
+func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 	// Start the update checker
 	go rt.updateManager.StartPeriodicCheck(ctx, rt.config.Update.CheckInterval)
 

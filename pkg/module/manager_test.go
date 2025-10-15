@@ -44,7 +44,7 @@ func TestManager_LoadModulesFromDir(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	manager, err := NewManager(context.Background(), logger, tempDir)
 	require.NoError(t, err)
-	defer manager.Shutdown(context.Background())
+	defer manager.Shutdown()
 
 	// Execute
 	err = manager.LoadModulesFromDir()

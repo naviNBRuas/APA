@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 
@@ -26,5 +27,8 @@ func main() {
 		log.Fatalf("Failed to create agent runtime: %v", err)
 	}
 
-	runtime.Start()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	runtime.Start(ctx, cancel)
 }
