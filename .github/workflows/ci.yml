@@ -8,8 +8,26 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+          - goos: darwin
+            goarch: arm64
+          - goos: darwin
+            goarch: 386
+          - goos: linux
+            goarch: 386
+          - goos: windows
+            goarch: 386
     steps:
       - uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        if: ${{ matrix.goarch == 'arm64' }}
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -24,12 +42,25 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goos: [linux]
+        goos: [linux, windows, darwin]
         goarch: [amd64, arm64]
+        exclude:
+          - goos: windows
+            goarch: arm64
+          - goos: darwin
+            goarch: arm64 # Apple Silicon is arm64, but for now we'll focus on amd64 for darwin
+          - goos: darwin
+            goarch: 386
+          - goos: linux
+            goarch: 386
+          - goos: windows
+            goarch: 386 # Add 386 for windows
+
     steps:
       - uses: actions/checkout@v4
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
+        if: ${{ matrix.goarch == 'arm64' }}
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
