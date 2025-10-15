@@ -39,7 +39,7 @@ jobs:
       - name: Build
         run: |
           CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-            go build -o build/agentd-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/agentd
+            go build -v -o build/agentd-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/agentd
       - name: Archive artifact
         uses: actions/upload-artifact@v4
         with:
