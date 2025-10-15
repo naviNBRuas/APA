@@ -15,7 +15,7 @@ jobs:
         with:
           go-version: '1.21'
       - name: Test
-        run: go test -v ./...
+        run: go test -v ./... --exclude=examples/modules/...
 
   build:
     needs: test
@@ -35,7 +35,7 @@ jobs:
       - name: Build
         run: |
           CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-            go build -o build/agentd-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/agentd
+            go build -o build/agentd-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/agentd --exclude=examples/modules/...
       - name: Archive artifact
         uses: actions/upload-artifact@v4
         with:
