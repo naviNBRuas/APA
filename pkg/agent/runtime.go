@@ -131,7 +131,7 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	healthController.RegisterCheck(health.NewProcessLivenessCheck())
 
 	// Initialize Recovery Controller
-	recoveryController := recovery.NewRecoveryController(logger, config)
+	recoveryController := recovery.NewRecoveryController(logger, config, rt.ApplyConfig)
 
 	// Initialize decentralized controllers
 	var controllers []controller.Controller
@@ -186,6 +186,18 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	updateManager.OnUpdateReady = rt.Stop
 
 	return rt, nil
+}
+
+// ApplyConfig applies a new configuration to the agent runtime.
+func (rt *Runtime) ApplyConfig(newConfig *Config) error {
+	rt.logger.Info("Applying new configuration", "config", newConfig)
+	// In a real implementation, this would involve:
+	// 1. Gracefully shutting down components affected by the config change.
+	// 2. Reinitializing components with the new configuration.
+	// 3. Restarting affected components.
+	// 4. Updating the rt.config field.
+	rt.config = newConfig
+	return nil
 }
 
 // Start starts the agent runtime.

@@ -4,9 +4,10 @@
   "arch": "wasm",
   "os": "wasip1",
   "wasm_file": "crypto-hasher.wasm",
-  "hash": "...",
+  "hash": "bdd45dcd8e698d8354e91548e7859b5a9bbd130b246a863aee244a2b5bfb052b",
   "signatures": [],
   "entry": "_start",
+  "exported_functions": ["hash_data"],
   "capabilities": ["crypto"],
   "policy": ""
 }

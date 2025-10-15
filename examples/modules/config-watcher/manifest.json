@@ -4,9 +4,10 @@
   "arch": "wasm",
   "os": "wasip1",
   "wasm_file": "config-watcher.wasm",
-  "hash": "...",
+  "hash": "534d782e0339defbbefba0d9dc32d14463edd504f416dade270b5cea737a186b",
   "signatures": [],
   "entry": "_start",
+  "exported_functions": ["watch_config"],
   "capabilities": ["filesystem"],
   "policy": ""
 }

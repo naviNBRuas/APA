@@ -4,9 +4,10 @@
   "arch": "wasm",
   "os": "wasip1",
   "wasm_file": "message-broker.wasm",
-  "hash": "...",
+  "hash": "1851f8619d6cd197452d9d40bbdbc4e37581cf9f288dd2fecd7e062f82d0cfdd",
   "signatures": [],
   "entry": "_start",
+  "exported_functions": ["publish_message", "subscribe_to_topic"],
   "capabilities": ["network", "messaging"],
   "policy": ""
 }

@@ -4,9 +4,10 @@
   "arch": "wasm",
   "os": "wasip1",
   "wasm_file": "net-monitor.wasm",
-  "hash": "...",
+  "hash": "15b0c6a358b6160e6c86f80b587babbaa1864a218e1a70b052df2cf3472819a1",
   "signatures": [],
   "entry": "_start",
+  "exported_functions": ["monitor_network"],
   "capabilities": ["network"],
   "policy": ""
 }

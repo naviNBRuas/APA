@@ -4,9 +4,10 @@
   "arch": "wasm",
   "os": "wasip1",
   "wasm_file": "data-logger.wasm",
-  "hash": "...",
+  "hash": "c1364f54a8eb3088b48efd0326f19a8a4f9815d45c905dabad21b796dfe65847",
   "signatures": [],
   "entry": "_start",
+  "exported_functions": ["log_data"],
   "capabilities": ["filesystem"],
   "policy": ""
 }
