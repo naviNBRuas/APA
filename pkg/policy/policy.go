@@ -2,27 +2,55 @@ package policy
 
 import (
 	"context"
+	"fmt"
+	"os"
+
+	"gopkg.in/yaml.v3"
 )
 
 // PolicyEnforcer defines the interface for enforcing policies.
 type PolicyEnforcer interface {
-	Authorize(ctx context.Context, token string, action string, resource string) (bool, string, error)
+	Authorize(ctx context.Context, subject string, action string, resource string) (bool, string, error)
 }
 
-// AuthService defines the interface for authenticating and authorizing peers.
-type AuthService interface {
-	Authenticate(ctx context.Context, peerID string, credentials []byte) (string, error)
-	AuthorizeConnection(ctx context.Context, peerID string, role string) (bool, error)
+// Config holds the policy configuration.
+type Config struct {
+	TrustedAuthors []string `yaml:"trusted_authors"`
 }
 
-// DummyPolicyEnforcer is a placeholder implementation of PolicyEnforcer.
-// It currently only checks for a static token.
-type DummyPolicyEnforcer struct{}
+// PolicyEnforcerImpl implements the PolicyEnforcer interface.
+type PolicyEnforcerImpl struct {
+	config *Config
+}
 
-// Authorize checks if the token is "super-secret-token".
-func (d *DummyPolicyEnforcer) Authorize(ctx context.Context, token string, action string, resource string) (bool, string, error) {
-	if token == "super-secret-token" {
-		return true, "authorized", nil
+// NewPolicyEnforcer creates a new PolicyEnforcer.
+func NewPolicyEnforcer(policyPath string) (*PolicyEnforcerImpl, error) {
+	data, err := os.ReadFile(policyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read policy file: %w", err)
 	}
-	return false, "unauthorized", nil
+
+	var config Config
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal policy file: %w", err)
+	}
+
+	return &PolicyEnforcerImpl{
+		config: &config,
+	}, nil
+}
+
+// Authorize checks if the action is authorized based on the policy.
+func (p *PolicyEnforcerImpl) Authorize(ctx context.Context, subject string, action string, resource string) (bool, string, error) {
+	// For now, we only check if the author of a module is trusted.
+	if action == "load_module" {
+		for _, author := range p.config.TrustedAuthors {
+			if subject == author {
+				return true, "authorized", nil
+			}
+		}
+		return false, "unauthorized: author not trusted", nil
+	}
+
+	return false, "unauthorized: action not supported by policy", nil
 }

@@ -48,12 +48,24 @@ func TestNewRuntime(t *testing.T) {
 	pubKey, identityPath := generateTestKeys(t)
 	defer os.Remove(identityPath)
 
+	// Create a dummy policy file
+	policyFile, err := os.CreateTemp("", "policy-*.yaml")
+	assert.NoError(t, err)
+	defer os.Remove(policyFile.Name())
+	_, err = policyFile.WriteString(`
+trusted_authors:
+  - "Navi"
+`)
+	assert.NoError(t, err)
+	policyFile.Close()
+
 	// Create a dummy config file
 	config := `
 admin_listen_address: ":8080"
 log_level: "debug"
 module_path: "/tmp/modules"
 identity_file_path: "` + identityPath + `"
+policy_path: "` + policyFile.Name() + `"
 p2p:
   listen_addresses:
     - "/ip4/0.0.0.0/tcp/0"
@@ -92,6 +104,17 @@ func TestHealthEndpoint(t *testing.T) {
 	pubKey, identityPath := generateTestKeys(t)
 	defer os.Remove(identityPath)
 
+	// Create a dummy policy file
+	policyFile, err := os.CreateTemp("", "policy-*.yaml")
+	require.NoError(t, err)
+	defer os.Remove(policyFile.Name())
+	_, err = policyFile.WriteString(`
+trusted_authors:
+  - "Navi"
+`)
+	require.NoError(t, err)
+	policyFile.Close()
+
 	// Create a temporary config file
 	configFile, err := os.CreateTemp("", "agent-config-*.yaml")
 	require.NoError(t, err)
@@ -102,6 +125,7 @@ admin_listen_address: ":8081"
 log_level: "debug"
 identity_file_path: "` + identityPath + `"
 module_path: "/tmp/modules"
+policy_path: "` + policyFile.Name() + `"
 p2p:
   listen_addresses:
     - "/ip4/0.0.0.0/tcp/0"

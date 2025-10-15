@@ -37,6 +37,7 @@ type Config struct {
 	LogLevel           string             `yaml:"log_level"`
 	ModulePath         string             `yaml:"module_path"`
 	IdentityFilePath   string             `yaml:"identity_file_path"`
+	PolicyPath         string             `yaml:"policy_path"`
 	P2P                networking.Config `yaml:"p2p"`
 	Update             update.Config     `yaml:"update"`
 }
@@ -92,8 +93,11 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 		return nil, fmt.Errorf("failed to initialize module manager: %w", err)
 	}
 
-	// Initialize Policy Enforcer (dummy for now)
-	policyEnforcer := &policy.DummyPolicyEnforcer{}
+	// Initialize Policy Enforcer
+	policyEnforcer, err := policy.NewPolicyEnforcer(config.PolicyPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize policy enforcer: %w", err)
+	}
 
 	// Initialize P2P Networking
 	p2p, err := networking.NewP2P(ctx, logger, config.P2P, identity.PeerID, identity.PrivKey, policyEnforcer)
