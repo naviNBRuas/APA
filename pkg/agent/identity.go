@@ -22,9 +22,8 @@ type identityState struct {
 
 // NewIdentity creates a new identity for the agent, loading it from disk if it
 // exists or creating a new one otherwise.
-func NewIdentity() (*Identity, error) {
-	// TODO: Load from a configurable path
-	const identityPath = "agent-identity.json"
+func NewIdentity(identityPath string) (*Identity, error) {
+
 
 	if _, err := os.Stat(identityPath); os.IsNotExist(err) {
 		return createAndSaveIdentity(identityPath)

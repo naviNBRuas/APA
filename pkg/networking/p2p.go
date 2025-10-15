@@ -1,11 +1,9 @@
 package networking
 
 import (
-	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log/slog"
 	"time"
 
@@ -71,6 +69,15 @@ type ModuleAnnouncementMessage struct {
 type ModuleFetchRequest struct {
 	Name    string `json:"name"`
 	Version string `json:"version"`
+}
+
+// ModuleFetchResponse is the response to a module fetch request.
+// It contains either the module data or an error message.
+
+type ModuleFetchResponse struct {
+	Manifest  *module.Manifest `json:"manifest,omitempty"`
+	WasmBytes []byte           `json:"wasm_bytes,omitempty"`
+	Error     string           `json:"error,omitempty"`
 }
 
 // NewP2P creates and initializes a new libp2p host.
@@ -284,20 +291,18 @@ func (p *P2P) FetchModule(ctx context.Context, peerID peer.ID, name, version str
 		return nil, nil, fmt.Errorf("failed to send fetch request: %w", err)
 	}
 
-	// 2. Read response (manifest)
-	var manifest module.Manifest
-	if err := json.NewDecoder(stream).Decode(&manifest); err != nil {
-		return nil, nil, fmt.Errorf("failed to decode manifest from response: %w", err)
+	// 2. Read response
+	var resp ModuleFetchResponse
+	if err := json.NewDecoder(stream).Decode(&resp); err != nil {
+		return nil, nil, fmt.Errorf("failed to decode fetch response: %w", err)
 	}
 
-	// 3. Read response (wasm bytes)
-	wasmBytes, err := io.ReadAll(stream)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read wasm bytes from response: %w", err)
+	if resp.Error != "" {
+		return nil, nil, fmt.Errorf("peer returned an error: %s", resp.Error)
 	}
 
-	p.logger.Info("Successfully fetched module", "name", name, "version", version, "size", len(wasmBytes))
-	return &manifest, wasmBytes, nil
+	p.logger.Info("Successfully fetched module", "name", name, "version", version, "size", len(resp.WasmBytes))
+	return resp.Manifest, resp.WasmBytes, nil
 }
 
 // handleModuleFetchStream handles incoming requests for modules.
@@ -319,27 +324,19 @@ func (p *P2P) handleModuleFetchStream(s network.Stream) {
 
 	// 2. Use the handler to get the module data
 	manifest, wasmBytes, err := p.FetchModuleHandler(req.Name, req.Version)
+	response := &ModuleFetchResponse{}
 	if err != nil {
 		p.logger.Error("Failed to handle fetch request", "module_name", req.Name, "error", err)
-		// TODO: Send an error response back to the requester
-		return
+		response.Error = err.Error()
+	} else {
+		response.Manifest = manifest
+		response.WasmBytes = wasmBytes
 	}
 
-	// 3. Send response (manifest)
-	bufWriter := bufio.NewWriter(s)
-	if err := json.NewEncoder(bufWriter).Encode(manifest); err != nil {
-		p.logger.Error("Failed to send manifest response", "error", err)
+	// 3. Send response
+	if err := json.NewEncoder(s).Encode(response); err != nil {
+		p.logger.Error("Failed to send fetch response", "error", err)
 		return
-	}
-
-	// 4. Send response (wasm bytes)
-	if _, err := bufWriter.Write(wasmBytes); err != nil {
-		p.logger.Error("Failed to send wasm bytes response", "error", err)
-		return
-	}
-
-	if err := bufWriter.Flush(); err != nil {
-		p.logger.Error("Failed to flush stream writer", "error", err)
 	}
 }
 

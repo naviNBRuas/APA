@@ -2,18 +2,22 @@ package recovery
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"os"
 )
 
 // RecoveryController manages the agent's recovery mechanisms.
 type RecoveryController struct {
 	logger *slog.Logger
+	config any
 }
 
 // NewRecoveryController creates a new RecoveryController.
-func NewRecoveryController(logger *slog.Logger) *RecoveryController {
+func NewRecoveryController(logger *slog.Logger, config any) *RecoveryController {
 	return &RecoveryController{
 		logger: logger,
+		config: config,
 	}
 }
 
@@ -34,8 +38,11 @@ func (rc *RecoveryController) QuarantineNode(ctx context.Context, nodeID string)
 // CreateSnapshot saves the agent's state.
 func (rc *RecoveryController) CreateSnapshot(ctx context.Context) error {
 	rc.logger.Info("Creating agent snapshot")
-	// TODO: Implement actual snapshot creation logic
-	return nil
+	data, err := json.MarshalIndent(rc.config, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile("agent-snapshot.json", data, 0644)
 }
 
 // RestoreSnapshot restores the agent's state from a snapshot.

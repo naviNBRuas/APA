@@ -36,6 +36,7 @@ type Config struct {
 	AdminListenAddress string             `yaml:"admin_listen_address"`
 	LogLevel           string             `yaml:"log_level"`
 	ModulePath         string             `yaml:"module_path"`
+	IdentityFilePath   string             `yaml:"identity_file_path"`
 	P2P                networking.Config `yaml:"p2p"`
 	Update             update.Config     `yaml:"update"`
 }
@@ -79,7 +80,7 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel}))
 
 	// Initialize identity
-	identity, err := NewIdentity()
+	identity, err := NewIdentity(config.IdentityFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize identity: %w", err)
 	}
@@ -111,7 +112,7 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	healthController.RegisterCheck(health.NewProcessLivenessCheck())
 
 	// Initialize Recovery Controller
-	recoveryController := recovery.NewRecoveryController(logger)
+	recoveryController := recovery.NewRecoveryController(logger, config)
 
 	// Initialize decentralized controllers
 	var controllers []controller.Controller

@@ -26,7 +26,24 @@ func NewWasmRuntime(ctx context.Context, logger *slog.Logger) (*WasmRuntime, err
 		return nil, fmt.Errorf("failed to instantiate WASI: %w", err)
 	}
 
-	// TODO: Instantiate host APIs (e.g., metrics, KV store) and add them to the runtime.
+	// Define the host logger function
+	logMessage := func(ctx context.Context, m api.Module, ptr, size uint32) {
+		buf, ok := m.Memory().Read(ptr, size)
+		if !ok {
+			logger.Error("Failed to read memory for log message")
+			return
+		}
+		logger.Info("Message from WASM", "module", m.Name(), "message", string(buf))
+	}
+
+	// Create the host module
+	_, err := runtime.NewHostModuleBuilder("apa_host").
+		NewFunctionBuilder().WithFunc(logMessage).Export("log_message").
+		Instantiate(ctx)
+	if err != nil {
+		runtime.Close(ctx)
+		return nil, fmt.Errorf("failed to instantiate host module: %w", err)
+	}
 
 	return &WasmRuntime{
 		logger:  logger,

@@ -14,9 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type identityState struct {
-	PrivateKey string `json:"private_key"`
-}
+
 
 func generateTestKeys(t *testing.T) (string, string) {
 	priv, pub, err := crypto.GenerateEd25519Key(nil)
@@ -40,10 +38,10 @@ func generateTestKeys(t *testing.T) (string, string) {
 	require.NoError(t, err)
 	identityFile.Close()
 
-	pubBytes, err := crypto.MarshalPublicKey(pub)
+	raw, err := pub.Raw()
 	require.NoError(t, err)
 
-	return hex.EncodeToString(pubBytes), identityFile.Name()
+	return hex.EncodeToString(raw), identityFile.Name()
 }
 
 func TestNewRuntime(t *testing.T) {
@@ -55,7 +53,7 @@ func TestNewRuntime(t *testing.T) {
 admin_listen_address: ":8080"
 log_level: "debug"
 module_path: "/tmp/modules"
-identity_path: "` + identityPath + `"
+identity_file_path: "` + identityPath + `"
 p2p:
   listen_addresses:
     - "/ip4/0.0.0.0/tcp/0"
@@ -64,7 +62,6 @@ p2p:
   heartbeat_interval: "10s"
   service_tag: "test-agent"
 update:
-  enabled: true
   public_key: "` + pubKey + `"
 `
 	tmpfile, err := os.CreateTemp("", "agent-config-*.yaml")
@@ -78,6 +75,13 @@ update:
 	rt, err := NewRuntime(tmpfile.Name(), "v0.1.0")
 	assert.NoError(t, err)
 	assert.NotNil(t, rt)
+	assert.NotNil(t, rt.logger)
+	assert.NotNil(t, rt.identity)
+	assert.NotNil(t, rt.moduleManager)
+	assert.NotNil(t, rt.p2p)
+	assert.NotNil(t, rt.updateManager)
+	assert.NotNil(t, rt.healthController)
+	assert.NotNil(t, rt.recoveryController)
 
 	// Test NewRuntime with a non-existent config
 	_, err = NewRuntime("non-existent-config.yaml", "v0.1.0")
@@ -96,7 +100,7 @@ func TestHealthEndpoint(t *testing.T) {
 	_, err = configFile.WriteString(`
 admin_listen_address: ":8081"
 log_level: "debug"
-identity_path: "` + identityPath + `"
+identity_file_path: "` + identityPath + `"
 module_path: "/tmp/modules"
 p2p:
   listen_addresses:
@@ -106,7 +110,6 @@ p2p:
   heartbeat_interval: "10s"
   service_tag: "test-agent"
 update:
-  enabled: true
   public_key: "` + pubKey + `"
 `)
 	require.NoError(t, err)
@@ -127,6 +130,7 @@ update:
 
 	// Check the response
 	assert.Equal(t, http.StatusOK, res.StatusCode)
+	assert.Equal(t, "text/plain; charset=utf-8", res.Header.Get("Content-Type"))
 	body, err := io.ReadAll(res.Body)
 	require.NoError(t, err)
 	assert.Equal(t, "OK\n", string(body))

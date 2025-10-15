@@ -2,6 +2,8 @@ package module
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"log/slog"
 	"os"
@@ -23,11 +25,15 @@ func createTestModule(t *testing.T, dir, name string) {
 	require.NoError(t, os.WriteFile(wasmPath, wasmBytes, 0644))
 
 	// Create manifest
+	hasher := sha256.New()
+	hasher.Write(wasmBytes)
+	actualHash := hex.EncodeToString(hasher.Sum(nil))
+
 	manifest := Manifest{
 		Name:     name,
 		Version:  "v1.0.0",
 		WasmFile: name + ".wasm",
-		Hash:     "...", // Use placeholder for simplicity
+		Hash:     actualHash,
 	}
 	manifestPath := filepath.Join(moduleDir, "manifest.json")
 	manifestBytes, err := json.Marshal(manifest)
