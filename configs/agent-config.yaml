@@ -1,4 +1,4 @@
-admin_listen_address: "127.0.0.1:8080"
+admin_listen_address: "0.0.0.0:8080"
 log_level: "info"
 module_path: "examples/modules"
 identity_file_path: "agent-identity.json"

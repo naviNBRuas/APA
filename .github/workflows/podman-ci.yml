@@ -21,5 +21,7 @@ jobs:
         run: podman run --rm -d -p 8080:8080 --name apa-agent-ci apa:ci
       - name: Health check
         run: |
-          sleep 5
-          curl http://localhost:8080/health
+          for i in $(seq 1 10); do
+            curl http://localhost:8080/admin/health && break
+            sleep 5
+          done
