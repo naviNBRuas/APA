@@ -61,10 +61,16 @@ func TestManager_LoadModulesFromDir(t *testing.T) {
 	assert.Len(t, loadedModules, 2)
 
 	// Check if modules are loaded correctly
-	names := make(map[string]bool)
+	assert.Len(t, loadedModules, 2)
 	for _, m := range loadedModules {
-		names[m.Name] = true
+		if m.Name == "test-module-1" {
+			assert.Equal(t, "v1.0.0", m.Version)
+			assert.NotEmpty(t, m.Hash)
+		} else if m.Name == "test-module-2" {
+			assert.Equal(t, "v1.0.0", m.Version)
+			assert.NotEmpty(t, m.Hash)
+		} else {
+			t.Errorf("Unexpected module loaded: %s", m.Name)
+		}
 	}
-	assert.True(t, names["test-module-1"])
-	assert.True(t, names["test-module-2"])
 }
