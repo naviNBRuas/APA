@@ -43,5 +43,5 @@ jobs:
       - name: Archive artifact
         uses: actions/upload-artifact@v4
         with:
-          name: agentbinaries
+          name: agentbinaries-${{ matrix.goos }}-${{ matrix.goarch }}
           path: build/
