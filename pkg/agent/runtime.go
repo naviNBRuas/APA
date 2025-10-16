@@ -154,7 +154,7 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	}
 
 	// Initialize Recovery Controller
-	recoveryController := recovery.NewRecoveryController(logger, config, rt.ApplyConfig)
+	recoveryController := recovery.NewRecoveryController(logger, config, rt.ApplyConfig, p2p, moduleManager)
 	rt.recoveryController = recoveryController
 
 	// Connect the module manager to the P2P network via the callback
