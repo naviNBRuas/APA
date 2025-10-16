@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/naviNBRuas/APA/pkg/controller"
+	manager "github.com/naviNBRuas/APA/pkg/controller/manager"
 	"github.com/naviNBRuas/APA/pkg/controller/task-orchestrator"
 	"github.com/naviNBRuas/APA/pkg/health"
 	"github.com/naviNBRuas/APA/pkg/module"
@@ -41,22 +42,24 @@ type Config struct {
 	IdentityFilePath   string             `yaml:"identity_file_path"`
 	PolicyPath         string             `yaml:"policy_path"`
 	SigningPrivKeyPath string             `yaml:"signing_priv_key_path"`
+	ControllerPath     string             `yaml:"controller_path"`
 	P2P                networking.Config `yaml:"p2p"`
 	Update             update.Config     `yaml:"update"`
 }
 
 // Runtime is the core agent runtime. It manages all agent components.
 type Runtime struct {
-	config           *Config
-	logger           *slog.Logger
-	identity         *Identity
-	server           *http.Server
-	moduleManager    *module.Manager
-	p2p              *networking.P2P
-	updateManager    *update.Manager
-	healthController *health.HealthController
-	recoveryController *recovery.RecoveryController // Placeholder for now
-	controllers      []controller.Controller
+	config             *Config
+	logger             *slog.Logger
+	identity           *Identity
+	server             *http.Server
+	moduleManager      *module.Manager
+	p2p                *networking.P2P
+	updateManager      *update.Manager
+	healthController   *health.HealthController
+	recoveryController *recovery.RecoveryController
+	controllerManager  *manager.Manager
+	controllers        []controller.Controller
 }
 
 // NewRuntime creates a new agent runtime.
@@ -130,8 +133,8 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	healthController := health.NewHealthController(logger)
 	healthController.RegisterCheck(health.NewProcessLivenessCheck())
 
-	// Initialize Recovery Controller
-	recoveryController := recovery.NewRecoveryController(logger, config, rt.ApplyConfig)
+	// Initialize Controller Manager
+	controllerManager := manager.NewManager(logger, config.ControllerPath)
 
 	// Initialize decentralized controllers
 	var controllers []controller.Controller
@@ -146,9 +149,13 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 		p2p:           p2p,
 		updateManager: updateManager,
 		healthController: healthController,
-		recoveryController: recoveryController,
+		controllerManager: controllerManager,
 		controllers:   controllers,
 	}
+
+	// Initialize Recovery Controller
+	recoveryController := recovery.NewRecoveryController(logger, config, rt.ApplyConfig)
+	rt.recoveryController = recoveryController
 
 	// Connect the module manager to the P2P network via the callback
 	moduleManager.OnModuleLoad = func(manifest module.Manifest) {
@@ -189,15 +196,14 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 }
 
 // ApplyConfig applies a new configuration to the agent runtime.
-func (rt *Runtime) ApplyConfig(newConfig *Config) error {
-	rt.logger.Info("Applying new configuration", "config", newConfig)
-	// In a real implementation, this would involve:
-	// 1. Gracefully shutting down components affected by the config change.
-	// 2. Reinitializing components with the new configuration.
-	// 3. Restarting affected components.
-	// 4. Updating the rt.config field.
-	rt.config = newConfig
-	return nil
+func (rt *Runtime) ApplyConfig(configData []byte) error {
+	var newConfig Config
+	if err := yaml.Unmarshal(configData, &newConfig); err != nil {
+		return fmt.Errorf("failed to unmarshal new configuration: %w", err)
+	}
+
+	rt.logger.Info("Applying new configuration (not fully implemented)", "config", newConfig)
+	return fmt.Errorf("ApplyConfig is not yet fully implemented")
 }
 
 // Start starts the agent runtime.
@@ -207,6 +213,20 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 
 	// Start health checks
 	go rt.healthController.StartHealthChecks(ctx, 10*time.Second) // Run health checks every 10 seconds
+
+	// Load controllers
+	if err := rt.controllerManager.LoadControllersFromDir(ctx); err != nil {
+		rt.logger.Error("Failed to load controllers", "error", err)
+	}
+
+	// Start all loaded controllers
+	for _, manifest := range rt.controllerManager.ListControllers() {
+		go func(name string) {
+			if err := rt.controllerManager.StartController(ctx, name); err != nil {
+				rt.logger.Error("Failed to start controller", "name", name, "error", err)
+			}
+		}(manifest.Name)
+	}
 
 	// Start all registered controllers
 	for _, ctrl := range rt.controllers {
@@ -277,11 +297,18 @@ func (rt *Runtime) Stop() {
 
 	// Stop all registered controllers
 	for _, ctrl := range rt.controllers {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := ctrl.Stop(ctx); err != nil {
+		ctrlCtx, ctrlCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer ctrlCancel()
+		if err := ctrl.Stop(ctrlCtx); err != nil {
 			rt.logger.Error("Failed to stop controller", "name", ctrl.Name(), "error", err)
 		}
+	}
+
+	// Shutdown the controller manager
+	cmCtx, cmCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cmCancel()
+	if err := rt.controllerManager.Shutdown(cmCtx); err != nil {
+		rt.logger.Error("Failed to shutdown controller manager", "error", err)
 	}
 
 	// Shutdown the P2P network
@@ -295,9 +322,9 @@ func (rt *Runtime) Stop() {
 	}
 
 	// Shutdown the admin API server
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := rt.server.Shutdown(ctx); err != nil {
+	serverCtx, serverCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer serverCancel()
+	if err := rt.server.Shutdown(serverCtx); err != nil {
 		rt.logger.Error("Admin API server shutdown failed", "error", err)
 	}
 

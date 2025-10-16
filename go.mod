@@ -9,7 +9,11 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.15.0
 	github.com/stretchr/testify v1.11.1
 	github.com/tetratelabs/wazero v1.9.0
+	gopkg.in/yaml.v3 v3.0.1
 )
+
+replace github.com/naviNBRuas/APA/pkg/controller/manager => ./pkg/controller/manager
+replace github.com/naviNBRuas/APA/pkg/controller/manifest => ./pkg/controller/manifest
 
 require (
 	github.com/benbjohnson/clock v1.3.5 // indirect
@@ -124,6 +128,5 @@ require (
 	golang.org/x/tools v0.37.0 // indirect
 	gonum.org/v1/gonum v0.16.0 // indirect
 	google.golang.org/protobuf v1.36.9 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
 )

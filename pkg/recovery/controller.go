@@ -1,22 +1,22 @@
+package recovery
+
 import (
 	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
-
-	"github.com/naviNBRuas/APA/pkg/agent"
 )
 
 // RecoveryController manages the agent's recovery mechanisms.
 type RecoveryController struct {
 	logger          *slog.Logger
 	config          any
-	applyConfigFunc func(*agent.Config) error
+	applyConfigFunc func(configData []byte) error
 }
 
 // NewRecoveryController creates a new RecoveryController.
-func NewRecoveryController(logger *slog.Logger, config any, applyConfigFunc func(*agent.Config) error) *RecoveryController {
+func NewRecoveryController(logger *slog.Logger, config any, applyConfigFunc func(configData []byte) error) *RecoveryController {
 	return &RecoveryController{
 		logger:          logger,
 		config:          config,
@@ -26,23 +26,14 @@ func NewRecoveryController(logger *slog.Logger, config any, applyConfigFunc func
 
 // RequestPeerCopy requests a module artifact from a trusted peer.
 func (rc *RecoveryController) RequestPeerCopy(ctx context.Context, moduleName string, peerID string) error {
-	rc.logger.Info("Simulating request for peer copy", "module", moduleName, "peer", peerID)
-	// In a real implementation, this would involve:
-	// 1. Initiating a P2P request to the specified peerID.
-	// 2. Requesting the moduleName artifact.
-	// 3. Verifying the received artifact (hash, signature).
-	// 4. Saving and loading the module.
-	return nil
+	rc.logger.Info("Requesting peer copy (not fully implemented)", "module", moduleName, "peer", peerID)
+	return fmt.Errorf("RequestPeerCopy is not yet fully implemented")
 }
 
 // QuarantineNode marks a node as quarantined.
 func (rc *RecoveryController) QuarantineNode(ctx context.Context, nodeID string) error {
-	rc.logger.Warn("Simulating quarantining node", "node", nodeID)
-	// In a real implementation, this would involve:
-	// 1. Isolating the node from the network.
-	// 2. Preventing it from running modules or participating in P2P.
-	// 3. Triggering further recovery actions.
-	return nil
+	rc.logger.Warn("Quarantining node (not fully implemented)", "node", nodeID)
+	return fmt.Errorf("QuarantineNode is not yet fully implemented")
 }
 
 // CreateSnapshot saves the agent's state.
@@ -63,8 +54,8 @@ func (rc *RecoveryController) RestoreSnapshot(ctx context.Context) error {
 		return err
 	}
 
-	var restoredConfig agent.Config
-	if err := json.Unmarshal(data, &restoredConfig); err != nil {
+	var config any
+	if err := json.Unmarshal(data, &config); err != nil {
 		return fmt.Errorf("failed to unmarshal snapshot: %w", err)
 	}
 
@@ -72,5 +63,5 @@ func (rc *RecoveryController) RestoreSnapshot(ctx context.Context) error {
 		return fmt.Errorf("applyConfigFunc is not set in RecoveryController")
 	}
 
-	return rc.applyConfigFunc(&restoredConfig)
+	return rc.applyConfigFunc(data)
 }
