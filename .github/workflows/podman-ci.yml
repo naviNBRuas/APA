@@ -13,10 +13,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.24' # Ensure Go is set up for building WASM
+      - name: Build WASM modules
+        run: |
+          MODULES=(config-watcher crypto-hasher data-logger message-broker net-monitor simple-adder system-info)
+          for module in "${MODULES[@]}"; do
+            echo "Building WASM module: $module"
+            GOOS=wasip1 GOARCH=wasm go build -o examples/modules/$module/$module.wasm examples/modules/$module/main.go
+          done
       - name: Set up Podman
         run: sudo apt-get update && sudo apt-get install -y podman
       - name: Build APA image
-        run: podman build -t apa:ci -f Containerfile .
+        run: podman build --build-arg GOOS=linux --build-arg GOARCH=amd64 -t apa:ci -f Containerfile . # Explicitly set GOOS/GOARCH
       - name: Run APA container
         run: podman run --rm -d -p 8080:8080 --name apa-agent-ci apa:ci
       - name: Health check

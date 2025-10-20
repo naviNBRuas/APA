@@ -31,9 +31,16 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.22'
+          go-version: '1.24' # Updated Go version
       - name: Clean Go build cache
         run: go clean -cache
+      - name: Build WASM modules
+        run: |
+          MODULES=(config-watcher crypto-hasher data-logger message-broker net-monitor simple-adder system-info)
+          for module in "${MODULES[@]}"; do
+            echo "Building WASM module: $module"
+            GOOS=wasip1 GOARCH=wasm go build -o examples/modules/$module/$module.wasm examples/modules/$module/main.go
+          done
       - name: Test
         run: go list ./... | grep -v /examples/modules | xargs go test -v
 
@@ -64,7 +71,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.22'
+          go-version: '1.24' # Updated Go version
       - name: Clean Go build cache
         run: go clean -cache
       - name: Build
