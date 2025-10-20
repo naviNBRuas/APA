@@ -158,7 +158,7 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 	rt.controllers = controllers
 
 	// Initialize Recovery Controller
-	recoveryController := recovery.NewRecoveryController(logger, config, rt.ApplyConfig, p2p, moduleManager)
+	recoveryController := recovery.NewRecoveryController(logger, config, rt.ApplyConfig, p2p, moduleManager, controllerManager)
 	rt.recoveryController = recoveryController
 
 	// Connect the module manager to the P2P network via the callback

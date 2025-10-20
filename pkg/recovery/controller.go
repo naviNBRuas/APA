@@ -21,16 +21,18 @@ type RecoveryController struct {
 	applyConfigFunc func(configData []byte) error
 	p2p             *networking.P2P
 	moduleManager   *module.Manager
+	controllerManager *manager.Manager
 }
 
 // NewRecoveryController creates a new RecoveryController.
-func NewRecoveryController(logger *slog.Logger, config any, applyConfigFunc func(configData []byte) error, p2p *networking.P2P, moduleManager *module.Manager) *RecoveryController {
+func NewRecoveryController(logger *slog.Logger, config any, applyConfigFunc func(configData []byte) error, p2p *networking.P2P, moduleManager *module.Manager, controllerManager *manager.Manager) *RecoveryController {
 	return &RecoveryController{
 		logger:          logger,
 		config:          config,
 		applyConfigFunc: applyConfigFunc,
 		p2p:             p2p,
 		moduleManager:   moduleManager,
+		controllerManager: controllerManager,
 	}
 }
 
@@ -61,11 +63,20 @@ func (rc *RecoveryController) RequestPeerCopy(ctx context.Context, moduleName st
 func (rc *RecoveryController) QuarantineNode(ctx context.Context, nodeID string) error {
 	rc.logger.Warn("Quarantining node", "node", nodeID)
 
+	peerID, err := peer.Decode(nodeID)
+	if err != nil {
+		return fmt.Errorf("failed to decode peer ID: %w", err)
+	}
+
 	// 1. Isolate the node from the network (e.g., disconnect from peers, block incoming connections)
 	if rc.p2p != nil {
 		rc.logger.Info("Attempting to isolate node from P2P network", "node", nodeID)
-		// In a real implementation, this would involve more sophisticated P2P isolation.
-		// For now, we'll just log the intent.
+		// Disconnect from the peer
+		if err := rc.p2p.Host.Network().ClosePeer(peerID); err != nil {
+			rc.logger.Error("Failed to close peer connection during quarantine", "peer", peerID, "error", err)
+		} else {
+			rc.logger.Info("Successfully closed peer connection", "peer", peerID)
+		}
 	}
 
 	// 2. Stop all running modules on the node
@@ -78,7 +89,18 @@ func (rc *RecoveryController) QuarantineNode(ctx context.Context, nodeID string)
 		}
 	}
 
+	// Stop all running controllers on the node
+	if rc.controllerManager != nil {
+		rc.logger.Info("Attempting to stop all running controllers on node", "node", nodeID)
+		for _, manifest := range rc.controllerManager.ListControllers() {
+			if err := rc.controllerManager.StopController(manifest.Name); err != nil {
+				rc.logger.Error("Failed to stop controller during quarantine", "controller", manifest.Name, "error", err)
+			}
+		}
+	}
+
 	// 3. Prevent it from running new modules or participating in P2P (handled by policy enforcement)
+	rc.logger.Warn("Dynamic policy update for quarantined node is not yet fully implemented.", "node", nodeID)
 
 	// 4. Trigger further recovery actions (e.g., reporting, re-imaging)
 
