@@ -81,6 +81,11 @@ func (m *Manager) loadControllerFromManifest(ctx context.Context, manifestPath s
 	}
 	m.logger.Info("Controller loading authorized", "name", manifest.Name)
 
+	// 4. Note required capabilities (not actively enforced at this stage)
+	if len(manifest.Capabilities) > 0 {
+		m.logger.Info("Controller requires capabilities (not actively enforced)", "name", manifest.Name, "capabilities", manifest.Capabilities)
+	}
+
 	// For now, we'll assume the controller is a simple Go binary.
 	// In a real implementation, this would involve dynamic loading (e.g., WASM, plugins).
 	// We'll create a GoBinaryController for now.
