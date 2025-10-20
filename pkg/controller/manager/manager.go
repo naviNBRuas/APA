@@ -100,7 +100,9 @@ func (m *Manager) ListControllers() []*manifest.Manifest {
 	defer m.mu.RUnlock()
 	manifests := make([]*manifest.Manifest, 0, len(m.controllers))
 	for _, ctrl := range m.controllers {
-		if dummyCtrl, ok := ctrl.(*controllerPkg.DummyController); ok {
+		if goBinaryCtrl, ok := ctrl.(*controllerPkg.GoBinaryController); ok {
+			manifests = append(manifests, goBinaryCtrl.Manifest)
+		} else if dummyCtrl, ok := ctrl.(*controllerPkg.DummyController); ok {
 			manifests = append(manifests, dummyCtrl.Manifest)
 		}
 	}

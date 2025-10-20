@@ -15,6 +15,8 @@ type Controller interface {
 	Name() string
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
+	Configure(configData []byte) error // New method for configuration
+	Status() (map[string]string, error) // New method for status reporting
 }
 
 // GoBinaryController implements the Controller interface for an external Go binary.
@@ -99,6 +101,20 @@ func (gbc *GoBinaryController) Stop(ctx context.Context) error {
 	}
 }
 
+// Configure is not yet implemented for GoBinaryController.
+func (gbc *GoBinaryController) Configure(configData []byte) error {
+	gbc.logger.Warn("Configure method not implemented for GoBinaryController", "name", gbc.name)
+	return fmt.Errorf("configure method not implemented for GoBinaryController")
+}
+
+// Status returns a basic status for GoBinaryController.
+func (gbc *GoBinaryController) Status() (map[string]string, error) {
+	status := make(map[string]string)
+	status["status"] = "running" // Placeholder
+	status["pid"] = fmt.Sprintf("%d", gbc.cmd.Process.Pid)
+	return status, nil
+}
+
 // logWriter is an io.Writer that writes to slog.Logger.
 type logWriter struct {
 	logger *slog.Logger
@@ -155,4 +171,17 @@ func (dc *DummyController) Start(ctx context.Context) error {
 func (dc *DummyController) Stop(ctx context.Context) error {
 	dc.logger.Info("DummyController stopped", "name", dc.name)
 	return nil
+}
+
+// Configure is not yet implemented for DummyController.
+func (dc *DummyController) Configure(configData []byte) error {
+	dc.logger.Info("DummyController Configure method called (no-op)", "name", dc.name)
+	return nil
+}
+
+// Status returns a basic status for DummyController.
+func (dc *DummyController) Status() (map[string]string, error) {
+	status := make(map[string]string)
+	status["status"] = "dummy_running"
+	return status, nil
 }
