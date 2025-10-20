@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"time"
+	"fmt"
 )
 
 // TaskOrchestrator is an example decentralized controller module.
@@ -47,4 +48,18 @@ func (to *TaskOrchestrator) Stop(ctx context.Context) error {
 	to.logger.Info("TaskOrchestrator stopping...")
 	// Perform any cleanup here
 	return nil
+}
+
+// Configure is not yet implemented for TaskOrchestrator.
+func (to *TaskOrchestrator) Configure(configData []byte) error {
+	to.logger.Warn("Configure method not implemented for TaskOrchestrator", "name", to.name)
+	return fmt.Errorf("configure method not implemented for TaskOrchestrator")
+}
+
+// Status returns a basic status for TaskOrchestrator.
+func (to *TaskOrchestrator) Status() (map[string]string, error) {
+	status := make(map[string]string)
+	status["status"] = "running" // Placeholder
+	status["last_task_time"] = time.Now().Format(time.RFC3339)
+	return status, nil
 }

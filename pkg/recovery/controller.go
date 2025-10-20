@@ -2,13 +2,13 @@ package recovery
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
 
 	"github.com/naviNBRuas/APA/pkg/module"
 	"github.com/naviNBRuas/APA/pkg/networking"
+	manager "github.com/naviNBRuas/APA/pkg/controller/manager"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"gopkg.in/yaml.v3"
@@ -93,7 +93,7 @@ func (rc *RecoveryController) QuarantineNode(ctx context.Context, nodeID string)
 	if rc.controllerManager != nil {
 		rc.logger.Info("Attempting to stop all running controllers on node", "node", nodeID)
 		for _, manifest := range rc.controllerManager.ListControllers() {
-			if err := rc.controllerManager.StopController(manifest.Name); err != nil {
+			if err := rc.controllerManager.StopController(ctx, manifest.Name); err != nil {
 				rc.logger.Error("Failed to stop controller during quarantine", "controller", manifest.Name, "error", err)
 			}
 		}
