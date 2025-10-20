@@ -64,14 +64,20 @@ type Runtime struct {
 
 // NewRuntime creates a new agent runtime.
 func NewRuntime(configPath string, version string) (*Runtime, error) {
-	ctx := context.Background()
-
-	// Load configuration
 	config, err := loadConfig(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
+	rt := &Runtime{}
+	if err := rt.init(context.Background(), config, version); err != nil {
+		return nil, err
+	}
+
+	return rt, nil
+}
+
+func (rt *Runtime) init(ctx context.Context, config *Config, version string) error {
 	// Initialize logger
 	logLevel := new(slog.LevelVar)
 	switch config.LogLevel {
@@ -89,7 +95,7 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	// Initialize identity
 	identity, err := NewIdentity(config.IdentityFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize identity: %w", err)
+		return fmt.Errorf("failed to initialize identity: %w", err)
 	}
 	logger.Info("Identity initialized", "agent_peer_id", identity.PeerID)
 
@@ -97,36 +103,36 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	// Load signing private key
 	signingPrivKeyBytes, err := os.ReadFile(config.SigningPrivKeyPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read signing private key: %w", err)
+		return fmt.Errorf("failed to read signing private key: %w", err)
 	}
 	signingPrivKeyHex := string(signingPrivKeyBytes)
 	signingPrivKeyDecoded, err := hex.DecodeString(signingPrivKeyHex)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decode signing private key: %w", err)
+		return fmt.Errorf("failed to decode signing private key: %w", err)
 	}
 	signingPrivKey := ed25519.PrivateKey(signingPrivKeyDecoded)
 
 	// Initialize Policy Enforcer
 	policyEnforcer, err := policy.NewPolicyEnforcer(config.PolicyPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize policy enforcer: %w", err)
+		return fmt.Errorf("failed to initialize policy enforcer: %w", err)
 	}
 
 	moduleManager, err := module.NewManager(ctx, logger, config.ModulePath, signingPrivKey, policyEnforcer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize module manager: %w", err)
+		return fmt.Errorf("failed to initialize module manager: %w", err)
 	}
 
 	// Initialize P2P Networking
 	p2p, err := networking.NewP2P(ctx, logger, config.P2P, identity.PeerID, identity.PrivKey, policyEnforcer)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize P2P networking: %w", err)
+		return fmt.Errorf("failed to initialize P2P networking: %w", err)
 	}
 
 	// Initialize Update Manager
 	updateManager, err := update.NewManager(logger, config.Update, version)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize update manager: %w", err)
+		return fmt.Errorf("failed to initialize update manager: %w", err)
 	}
 
 	// Initialize Health Controller
@@ -141,17 +147,15 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	taskOrchestrator := task_orchestrator.NewTaskOrchestrator(logger)
 	controllers = append(controllers, taskOrchestrator)
 
-	rt := &Runtime{
-		config:        config,
-		logger:        logger,
-		identity:      identity,
-		moduleManager: moduleManager,
-		p2p:           p2p,
-		updateManager: updateManager,
-		healthController: healthController,
-		controllerManager: controllerManager,
-		controllers:   controllers,
-	}
+	rt.config = config
+	rt.logger = logger
+	rt.identity = identity
+	rt.moduleManager = moduleManager
+	rt.p2p = p2p
+	rt.updateManager = updateManager
+	rt.healthController = healthController
+	rt.controllerManager = controllerManager
+	rt.controllers = controllers
 
 	// Initialize Recovery Controller
 	recoveryController := recovery.NewRecoveryController(logger, config, rt.ApplyConfig, p2p, moduleManager)
@@ -192,7 +196,7 @@ func NewRuntime(configPath string, version string) (*Runtime, error) {
 	// Set the callback for when an update is ready
 	updateManager.OnUpdateReady = rt.Stop
 
-	return rt, nil
+	return nil
 }
 
 // ApplyConfig applies a new configuration to the agent runtime.
@@ -202,8 +206,24 @@ func (rt *Runtime) ApplyConfig(configData []byte) error {
 		return fmt.Errorf("failed to unmarshal new configuration: %w", err)
 	}
 
-	rt.logger.Info("Applying new configuration (not fully implemented)", "config", newConfig)
-	return fmt.Errorf("ApplyConfig is not yet fully implemented")
+	rt.logger.Info("Applying new configuration")
+
+	// Stop the current runtime
+	rt.Stop()
+
+	// Re-initialize the runtime with the new config
+	// Create a new context for the re-initialized agent
+	ctx, cancel := context.WithCancel(context.Background())
+	if err := rt.init(ctx, &newConfig, rt.updateManager.CurrentVersion()); err != nil {
+		return fmt.Errorf("failed to re-initialize runtime with new config: %w", err)
+	}
+
+	// Start the runtime again
+	go rt.Start(ctx, cancel)
+
+	rt.logger.Info("Successfully applied new configuration")
+
+	return nil
 }
 
 // Start starts the agent runtime.

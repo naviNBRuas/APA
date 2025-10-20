@@ -11,6 +11,7 @@ import (
 	"github.com/naviNBRuas/APA/pkg/networking"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"gopkg.in/yaml.v3"
 )
 
 // RecoveryController manages the agent's recovery mechanisms.
@@ -88,24 +89,19 @@ func (rc *RecoveryController) QuarantineNode(ctx context.Context, nodeID string)
 // CreateSnapshot saves the agent's state.
 func (rc *RecoveryController) CreateSnapshot(ctx context.Context) error {
 	rc.logger.Info("Creating agent snapshot")
-	data, err := json.MarshalIndent(rc.config, "", "  ")
+	data, err := yaml.Marshal(rc.config)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile("agent-snapshot.json", data, 0644)
+	return os.WriteFile("agent-snapshot.yaml", data, 0644)
 }
 
 // RestoreSnapshot restores the agent's state from a snapshot.
 func (rc *RecoveryController) RestoreSnapshot(ctx context.Context) error {
 	rc.logger.Info("Restoring agent from snapshot")
-	data, err := os.ReadFile("agent-snapshot.json")
+	data, err := os.ReadFile("agent-snapshot.yaml")
 	if err != nil {
 		return err
-	}
-
-	var config any
-	if err := json.Unmarshal(data, &config); err != nil {
-		return fmt.Errorf("failed to unmarshal snapshot: %w", err)
 	}
 
 	if rc.applyConfigFunc == nil {
