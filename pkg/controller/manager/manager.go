@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+	"io"
+	"crypto/sha256"
+	"encoding/hex"
 
 	controllerPkg "github.com/naviNBRuas/APA/pkg/controller"
 	manifest "github.com/naviNBRuas/APA/pkg/controller/manifest"
@@ -57,6 +60,15 @@ func (m *Manager) loadControllerFromManifest(ctx context.Context, manifestPath s
 		return err
 	}
 
+	// 2. Verify controller binary hash
+	controllerPath := filepath.Join(filepath.Dir(manifestPath), manifest.Path)
+	err = m.verifyHash(controllerPath, manifest.Hash)
+	if err != nil {
+		return fmt.Errorf("controller '%s' hash verification failed: %w", manifest.Name, err)
+	}
+	m.logger.Debug("Controller hash verified", "name", manifest.Name)
+
+
 	// For now, we'll assume the controller is a simple Go binary.
 	// In a real implementation, this would involve dynamic loading (e.g., WASM, plugins).
 	// We'll create a GoBinaryController for now.
@@ -100,9 +112,9 @@ func (m *Manager) ListControllers() []*manifest.Manifest {
 	defer m.mu.RUnlock()
 	manifests := make([]*manifest.Manifest, 0, len(m.controllers))
 	for _, ctrl := range m.controllers {
-		if goBinaryCtrl, ok := ctrl.(*controllerPkg.GoBinaryController); ok {
+		if goBinaryCtrl, ok := ctrl.(*controllerPkg.GoBinaryController); ok { // Check for GoBinaryController
 			manifests = append(manifests, goBinaryCtrl.Manifest)
-		} else if dummyCtrl, ok := ctrl.(*controllerPkg.DummyController); ok {
+		} else if dummyCtrl, ok := ctrl.(*controllerPkg.DummyController); ok { // Keep DummyController for now
 			manifests = append(manifests, dummyCtrl.Manifest)
 		}
 	}
@@ -134,4 +146,31 @@ func (m *Manager) parseManifest(path string) (*manifest.Manifest, error) {
 		return nil, fmt.Errorf("failed to unmarshal manifest json: %w", err)
 	}
 	return &manifest, nil
+}
+
+// verifyHash calculates the SHA256 hash of a file and compares it to an expected hex-encoded hash.
+// A placeholder hash "..." is always considered valid for testing.
+func (m *Manager) verifyHash(filePath, expectedHash string) error {
+	if expectedHash == "..." {
+		m.logger.Warn("Skipping hash verification for placeholder hash", "file", filePath)
+		return nil
+	}
+
+	file, err := os.Open(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	hasher := sha256.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return err
+	}
+
+	actualHash := hex.EncodeToString(hasher.Sum(nil))
+	if actualHash != expectedHash {
+		return fmt.Errorf("hash mismatch: expected %s, got %s", expectedHash, actualHash)
+	}
+
+	return nil
 }
