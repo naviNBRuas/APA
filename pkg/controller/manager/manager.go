@@ -2,35 +2,38 @@ package manager
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
-	"io"
-	"crypto/sha256"
-	"encoding/hex"
 
 	controllerPkg "github.com/naviNBRuas/APA/pkg/controller"
 	manifest "github.com/naviNBRuas/APA/pkg/controller/manifest"
+	"github.com/naviNBRuas/APA/pkg/policy"
 )
 
 // Manager handles the lifecycle of controllers.
 type Manager struct {
-	logger     *slog.Logger
-	controllers map[string]controllerPkg.Controller // Maps controller name to Controller instance
+	logger        *slog.Logger
+	controllers   map[string]controllerPkg.Controller // Maps controller name to Controller instance
 	controllerDir string
-	mu          sync.RWMutex
+	mu            sync.RWMutex
+	policyEnforcer policy.PolicyEnforcer
 }
 
 // NewManager creates a new controller manager.
-func NewManager(logger *slog.Logger, controllerDir string) *Manager {
+func NewManager(logger *slog.Logger, controllerDir string, policyEnforcer policy.PolicyEnforcer) *Manager {
 	return &Manager{
-		logger:     logger,
-		controllers: make(map[string]controllerPkg.Controller),
+		logger:        logger,
+		controllers:   make(map[string]controllerPkg.Controller),
 		controllerDir: controllerDir,
+		policyEnforcer: policyEnforcer,
 	}
 }
 
@@ -68,6 +71,15 @@ func (m *Manager) loadControllerFromManifest(ctx context.Context, manifestPath s
 	}
 	m.logger.Debug("Controller hash verified", "name", manifest.Name)
 
+	// 3. Authorize controller loading based on policy
+	allowed, reason, err := m.policyEnforcer.Authorize(ctx, manifest.Name, "load_controller", manifest.Policy)
+	if err != nil {
+		return fmt.Errorf("failed to authorize controller loading: %w", err)
+	}
+	if !allowed {
+		return fmt.Errorf("controller loading not authorized: %s", reason)
+	}
+	m.logger.Info("Controller loading authorized", "name", manifest.Name)
 
 	// For now, we'll assume the controller is a simple Go binary.
 	// In a real implementation, this would involve dynamic loading (e.g., WASM, plugins).

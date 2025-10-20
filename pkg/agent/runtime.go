@@ -140,7 +140,7 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 	healthController.RegisterCheck(health.NewProcessLivenessCheck())
 
 	// Initialize Controller Manager
-	controllerManager := manager.NewManager(logger, config.ControllerPath)
+	controllerManager := manager.NewManager(logger, config.ControllerPath, policyEnforcer)
 
 	// Initialize decentralized controllers
 	var controllers []controller.Controller
