@@ -148,6 +148,24 @@ func (p *P2P) Shutdown() error {
 	return p.Host.Close()
 }
 
+// Shutdown gracefully closes the libp2p host.
+func (p *P2P) Shutdown() error {
+	p.logger.Info("Shutting down P2P host")
+	if p.heartbeatSub != nil {
+		p.heartbeatSub.Cancel()
+	}
+	if p.heartbeatTopic != nil {
+		p.heartbeatTopic.Close()
+	}
+	if p.moduleSub != nil {
+		p.moduleSub.Cancel()
+	}
+	if p.moduleTopic != nil {
+		p.moduleTopic.Close()
+	}
+	return p.Host.Close()
+}
+
 // ClosePeer closes the connection to a specific peer.
 func (p *P2P) ClosePeer(peerID peer.ID) error {
 	return p.Host.Network().ClosePeer(peerID)
