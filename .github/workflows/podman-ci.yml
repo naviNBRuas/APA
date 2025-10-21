@@ -11,8 +11,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goarch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        if: ${{ matrix.goarch == 'arm64' }}
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
@@ -27,9 +33,9 @@ jobs:
       - name: Set up Podman
         run: sudo apt-get update && sudo apt-get install -y podman
       - name: Build APA image
-        run: podman build --build-arg GOOS=linux --build-arg GOARCH=amd64 -t apa:ci -f Containerfile . # Explicitly set GOOS/GOARCH
+        run: podman build --build-arg GOOS=linux --build-arg GOARCH=${{ matrix.goarch }} -t apa:ci-${{ matrix.goarch }} -f Containerfile .
       - name: Run APA container
-        run: podman run --rm -d -p 8080:8080 --name apa-agent-ci apa:ci
+        run: podman run --rm -d -p 8080:8080 --name apa-agent-ci-${{ matrix.goarch }} apa:ci-${{ matrix.goarch }}
       - name: Health check
         run: |
           for i in $(seq 1 10); do

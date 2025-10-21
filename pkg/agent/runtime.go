@@ -332,7 +332,7 @@ func (rt *Runtime) Stop() {
 	}
 
 	// Shutdown the P2P network
-	if err := rt.p2p.Close(); err != nil {
+	if err := rt.p2p.Shutdown(); err != nil {
 		rt.logger.Error("Failed to shutdown P2P networking", "error", err)
 	}
 

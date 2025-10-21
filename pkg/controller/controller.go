@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"syscall"
 	"time"
 	"io"
 
@@ -71,15 +72,30 @@ type GoBinaryController struct {
 	cmd           Command // Changed from *exec.Cmd
 	cancel        context.CancelFunc
 	CommandFactory CommandFactory // New field
+	configFilePath string // Path to the controller's configuration file
 }
 
 // NewGoBinaryController creates a new GoBinaryController.
 func NewGoBinaryController(logger *slog.Logger, manifest *manifest.Manifest) *GoBinaryController {
+	// Create a unique temporary file for the controller's configuration
+	tmpFile, err := os.CreateTemp("", fmt.Sprintf("controller-config-%s-*.yaml", manifest.Name))
+	if err != nil {
+		logger.Error("Failed to create temporary config file for controller", "name", manifest.Name, "error", err)
+		return nil // Or handle error appropriately
+	}
+	tmpFile.Close()
+
+	// Ensure the temporary file is cleaned up when the controller is no longer needed
+	// This defer will be executed when the GoBinaryController instance is garbage collected or explicitly set to nil
+	// For more robust cleanup, consider a dedicated Close method or context-based cleanup.
+	defer os.Remove(tmpFile.Name())
+
 	return &GoBinaryController{
 		name:          manifest.Name,
 		logger:        logger,
 		Manifest:      manifest,
 		CommandFactory: DefaultCommandFactory, // Use default factory
+		configFilePath: tmpFile.Name(),
 	}
 }
 
@@ -90,12 +106,13 @@ func (gbc *GoBinaryController) Name() string {
 
 // Start starts the external Go binary controller.
 func (gbc *GoBinaryController) Start(ctx context.Context) error {
-	gbc.logger.Info("Starting GoBinaryController", "name", gbc.name, "path", gbc.Manifest.Path)
+	gbc.logger.Info("Starting GoBinaryController", "name", gbc.name, "path", gbc.Manifest.Path, "config_file", gbc.configFilePath)
 
 	ctrlCtx, cancel := context.WithCancel(context.Background())
 	gbc.cancel = cancel
 
-	gbc.cmd = gbc.CommandFactory(ctrlCtx, gbc.Manifest.Path) // Use command factory
+	// Pass the config file path to the external controller as an argument
+	gbc.cmd = gbc.CommandFactory(ctrlCtx, gbc.Manifest.Path, "--config", gbc.configFilePath)
 	gbc.cmd.SetStdout(newLogWriter(gbc.logger, slog.LevelInfo, gbc.name))
 	gbc.cmd.SetStderr(newLogWriter(gbc.logger, slog.LevelError, gbc.name))
 
@@ -131,7 +148,7 @@ func (gbc *GoBinaryController) Stop(ctx context.Context) error {
 	}
 
 	// Wait for the process to actually stop
-	done := make(chan struct{}) 
+	done := make(chan struct{})
 	go func() {
 		if gbc.cmd != nil && gbc.cmd.Process() != nil {
 			_ = gbc.cmd.Wait() // Wait for the process to exit after kill
@@ -147,17 +164,50 @@ func (gbc *GoBinaryController) Stop(ctx context.Context) error {
 	}
 }
 
-// Configure is not yet implemented for GoBinaryController.
+// Configure writes the configuration data to the controller's config file and sends a SIGHUP signal.
 func (gbc *GoBinaryController) Configure(configData []byte) error {
-	gbc.logger.Warn("Configure method not implemented for GoBinaryController", "name", gbc.name)
-	return fmt.Errorf("configure method not implemented for GoBinaryController")
+	gbc.logger.Info("Configuring GoBinaryController", "name", gbc.name, "config_file", gbc.configFilePath)
+
+	// Write the new configuration to the file
+	if err := os.WriteFile(gbc.configFilePath, configData, 0644); err != nil {
+		return fmt.Errorf("failed to write config to file for controller '%s': %w", gbc.name, err)
+	}
+
+	// Send SIGHUP to the process to signal it to reload its configuration
+	if gbc.cmd != nil && gbc.cmd.Process() != nil {
+		gbc.logger.Info("Sending SIGHUP to GoBinaryController", "name", gbc.name, "pid", gbc.cmd.Process().Pid)
+		if err := gbc.cmd.Process().Signal(syscall.SIGHUP); err != nil {
+			return fmt.Errorf("failed to send SIGHUP to controller '%s': %w", gbc.name, err)
+		}
+	} else {
+		return fmt.Errorf("controller '%s' not running, cannot configure", gbc.name)
+	}
+
+	return nil
 }
 
 // Status returns a basic status for GoBinaryController.
 func (gbc *GoBinaryController) Status() (map[string]string, error) {
 	status := make(map[string]string)
-	status["status"] = "running" // Placeholder
-	status["pid"] = fmt.Sprintf("%d", gbc.cmd.Process().Pid)
+	status["status"] = "unknown"
+
+	if gbc.cmd != nil && gbc.cmd.Process() != nil {
+		processState, err := gbc.cmd.Process().Wait()
+		if err != nil && processState == nil { // Process is still running
+			status["status"] = "running"
+			status["pid"] = fmt.Sprintf("%d", gbc.cmd.Process().Pid)
+			// Add uptime calculation
+			// This requires knowing the start time, which is not currently stored.
+			// For now, we'll just indicate it's running.
+		} else if processState != nil {
+			status["status"] = "exited"
+			status["exit_code"] = fmt.Sprintf("%d", processState.ExitCode())
+			status["success"] = fmt.Sprintf("%t", processState.Success())
+		}
+	} else {
+		status["status"] = "not_started"
+	}
+
 	return status, nil
 }
 
@@ -221,7 +271,7 @@ func (dc *DummyController) Stop(ctx context.Context) error {
 
 // Configure is not yet implemented for DummyController.
 func (dc *DummyController) Configure(configData []byte) error {
-	dc.logger.Info("DummyController Configure method called (no-op)", "name", dc.name)
+	dc.logger.Info("DummyController Configure method called (no-op)", "name", dc.name, "config_data_len", len(configData))
 	return nil
 }
 
@@ -229,5 +279,6 @@ func (dc *DummyController) Configure(configData []byte) error {
 func (dc *DummyController) Status() (map[string]string, error) {
 	status := make(map[string]string)
 	status["status"] = "dummy_running"
+	status["message"] = "This is a dummy controller, status is simulated."
 	return status, nil
 }
