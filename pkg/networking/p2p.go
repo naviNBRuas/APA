@@ -130,8 +130,8 @@ func NewP2P(ctx context.Context, logger *slog.Logger, cfg Config, id peer.ID, pr
 	return p, nil
 }
 
-// Close gracefully shuts down the P2P host.
-func (p *P2P) Close() error {
+// Shutdown gracefully closes the libp2p host.
+func (p *P2P) Shutdown() error {
 	p.logger.Info("Shutting down P2P host")
 	if p.heartbeatSub != nil {
 		p.heartbeatSub.Cancel()
@@ -146,6 +146,11 @@ func (p *P2P) Close() error {
 		p.moduleTopic.Close()
 	}
 	return p.Host.Close()
+}
+
+// ClosePeer closes the connection to a specific peer.
+func (p *P2P) ClosePeer(peerID peer.ID) error {
+	return p.Host.Network().ClosePeer(peerID)
 }
 
 // connectToBootstrapPeers connects to the initial set of bootstrap peers.
@@ -409,25 +414,7 @@ func (p *P2P) moduleReadLoop(ctx context.Context) {
 	}
 }
 
-// Shutdown gracefully closes the libp2p host.
-func (p *P2P) Shutdown() error {
-	p.logger.Info("Shutting down P2P host")
-	if p.heartbeatSub != nil {
-		p.heartbeatSub.Cancel()
-	}
-	if p.heartbeatTopic != nil {
-		p.heartbeatTopic.Close()
-	}
-	if p.moduleSub != nil {
-		p.moduleSub.Cancel()
-	}
-	if p.moduleTopic != nil {
-		p.moduleTopic.Close()
-	}
-	return p.Host.Close()
-}
 
-// discoveryNotifee gets notified when we find a new peer via mDNS.
 type discoveryNotifee struct {
 	host   host.Host
 	logger *slog.Logger

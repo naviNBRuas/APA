@@ -7,25 +7,43 @@ import (
 	"os"
 
 	"github.com/naviNBRuas/APA/pkg/module"
-	"github.com/naviNBRuas/APA/pkg/networking"
-	manager "github.com/naviNBRuas/APA/pkg/controller/manager"
+	controllerManifest "github.com/naviNBRuas/APA/pkg/controller/manifest"
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"gopkg.in/yaml.v3"
 )
+
+// P2PService defines the interface for P2P operations used by RecoveryController.
+type P2PService interface {
+	FetchModule(ctx context.Context, peerID peer.ID, name, version string) (*module.Manifest, []byte, error)
+	ClosePeer(peerID peer.ID) error
+}
+
+// ModuleManagerService defines the interface for ModuleManager operations used by RecoveryController.
+type ModuleManagerService interface {
+	SaveAndLoadModule(manifest *module.Manifest, wasmBytes []byte) error
+	ListModules() []*module.Manifest
+	StopModule(name string) error
+}
+
+// ControllerManagerService defines the interface for ControllerManager operations used by RecoveryController.
+type ControllerManagerService interface {
+	ListControllers() []*controllerManifest.Manifest
+	StopController(ctx context.Context, name string) error
+}
 
 // RecoveryController manages the agent's recovery mechanisms.
 type RecoveryController struct {
 	logger          *slog.Logger
 	config          any
 	applyConfigFunc func(configData []byte) error
-	p2p             *networking.P2P
-	moduleManager   *module.Manager
-	controllerManager *manager.Manager
+	p2p             P2PService
+	moduleManager   ModuleManagerService
+	controllerManager ControllerManagerService
 }
 
 // NewRecoveryController creates a new RecoveryController.
-func NewRecoveryController(logger *slog.Logger, config any, applyConfigFunc func(configData []byte) error, p2p *networking.P2P, moduleManager *module.Manager, controllerManager *manager.Manager) *RecoveryController {
+func NewRecoveryController(logger *slog.Logger, config any, applyConfigFunc func(configData []byte) error, p2p P2PService, moduleManager ModuleManagerService, controllerManager ControllerManagerService) *RecoveryController {
 	return &RecoveryController{
 		logger:          logger,
 		config:          config,
@@ -72,7 +90,7 @@ func (rc *RecoveryController) QuarantineNode(ctx context.Context, nodeID string)
 	if rc.p2p != nil {
 		rc.logger.Info("Attempting to isolate node from P2P network", "node", nodeID)
 		// Disconnect from the peer
-		if err := rc.p2p.Host.Network().ClosePeer(peerID); err != nil {
+		if err := rc.p2p.ClosePeer(peerID); err != nil {
 			rc.logger.Error("Failed to close peer connection during quarantine", "peer", peerID, "error", err)
 		} else {
 			rc.logger.Info("Successfully closed peer connection", "peer", peerID)
