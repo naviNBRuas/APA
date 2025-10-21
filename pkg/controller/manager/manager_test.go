@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/naviNBRuas/APA/pkg/controller"
 	"github.com/naviNBRuas/APA/pkg/controller/manifest"
+	"github.com/naviNBRuas/APA/pkg/networking"
 	"github.com/naviNBRuas/APA/pkg/policy"
 	"io"
 )
@@ -89,6 +90,13 @@ func (m *MockController) Status() (map[string]string, error) {
 	args := m.Called()
 	return args.Get(0).(map[string]string), args.Error(1)
 }
+
+func (m *MockController) HandleMessage(ctx context.Context, message networking.ControllerMessage) error {
+	args := m.Called(ctx, message)
+	return args.Error(0)
+}
+
+
 
 func TestManager_LoadControllersFromDir(t *testing.T) {
 	assert := assert.New(t)

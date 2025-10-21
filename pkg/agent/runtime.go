@@ -12,6 +12,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	"sync"
+
+	"github.com/libp2p/go-libp2p/core/peer"
 
 	"github.com/naviNBRuas/APA/pkg/controller"
 	manager "github.com/naviNBRuas/APA/pkg/controller/manager"
@@ -19,6 +22,7 @@ import (
 	"github.com/naviNBRuas/APA/pkg/health"
 	"github.com/naviNBRuas/APA/pkg/module"
 	"github.com/naviNBRuas/APA/pkg/networking"
+	"github.com/naviNBRuas/APA/pkg/opa"
 	"github.com/naviNBRuas/APA/pkg/policy"
 	"github.com/naviNBRuas/APA/pkg/recovery"
 	"github.com/naviNBRuas/APA/pkg/update"
@@ -43,6 +47,7 @@ type Config struct {
 	PolicyPath         string             `yaml:"policy_path"`
 	SigningPrivKeyPath string             `yaml:"signing_priv_key_path"`
 	ControllerPath     string             `yaml:"controller_path"`
+	AdminPolicyPath    string             `yaml:"admin_policy_path"` // New field for Admin API policy
 	P2P                networking.Config `yaml:"p2p"`
 	Update             update.Config     `yaml:"update"`
 }
@@ -60,6 +65,8 @@ type Runtime struct {
 	recoveryController *recovery.RecoveryController
 	controllerManager  *manager.Manager
 	controllers        []controller.Controller
+	currentLeader      peer.ID // Stores the PeerID of the current leader
+	adminPolicyEngine  *opa.OPAPolicyEngine // New field for OPA policy engine
 }
 
 // NewRuntime creates a new agent runtime.
@@ -156,6 +163,14 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 	rt.healthController = healthController
 	rt.controllerManager = controllerManager
 	rt.controllers = controllers
+
+	// Initialize Admin Policy Engine
+	rt.adminPolicyEngine = opa.NewOPAPolicyEngine()
+	if config.AdminPolicyPath != "" {
+		if err := rt.adminPolicyEngine.LoadPolicy(ctx, config.AdminPolicyPath); err != nil {
+			return fmt.Errorf("failed to load admin policy: %w", err)
+		}
+	}
 
 	// Initialize Recovery Controller
 	recoveryController := recovery.NewRecoveryController(logger, config, rt.ApplyConfig, p2p, moduleManager, controllerManager)
@@ -272,6 +287,130 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 		rt.logger.Error("Failed to join module topic", "error", err)
 	}
 
+	// Join the controller communication topic
+	if err := rt.p2p.JoinControllerCommTopic(ctx); err != nil {
+		rt.logger.Error("Failed to join controller communication topic", "error", err)
+	}
+
+	// Join the leader election topic
+	if err := rt.p2p.JoinLeaderElectionTopic(ctx); err != nil {
+		rt.logger.Error("Failed to join leader election topic", "error", err)
+	}
+
+	// Start goroutine to handle incoming controller messages
+	go func() {
+		msgCh, err := rt.p2p.SubscribeControllerMessages(ctx)
+		if err != nil {
+			rt.logger.Error("Failed to subscribe to controller messages", "error", err)
+			return
+		}
+		for {
+			select {
+			case <-ctx.Done():
+				rt.logger.Info("Stopping controller message dispatcher")
+				return
+			case msg := <-msgCh:
+				if msg == nil {
+					rt.logger.Warn("Received nil controller message")
+					continue
+				}
+				rt.logger.Debug("Dispatching controller message", "type", msg.Type, "sender", msg.SenderPeerID)
+				// Dispatch message to all registered controllers
+				for _, ctrl := range rt.controllers {
+					go func(c controller.Controller, message networking.ControllerMessage) {
+						if err := c.HandleMessage(ctx, message); err != nil {
+							rt.logger.Error("Failed to dispatch message to controller", "controller", c.Name(), "error", err)
+						}
+					}(ctrl, *msg)
+				}
+			}
+		}
+	}()
+
+	// Start goroutine to handle incoming leader election messages
+	go func() {
+		leCh, err := rt.p2p.SubscribeLeaderElectionMessages(ctx)
+		if err != nil {
+			rt.logger.Error("Failed to subscribe to leader election messages", "error", err)
+			return
+		}
+
+		// Map to store last seen leader election messages from peers
+		lastSeen := make(map[peer.ID]networking.LeaderElectionMessage)
+		// Mutex to protect lastSeen map
+		var mu sync.Mutex
+
+		// Goroutine to periodically publish our own leader election message
+		go func() {
+			ticker := time.NewTicker(5 * time.Second) // Announce candidacy every 5 seconds
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					// Determine if we are the leader based on known peers
+					isLeader := true
+					myID := rt.identity.PeerID
+
+					mu.Lock()
+					for pID, msg := range lastSeen {
+						// If a higher-ranked peer (lexicographically greater PeerID) is active, we are not the leader
+						if pID.String() > myID.String() && time.Since(msg.Timestamp) < 15*time.Second { // Consider peer active for 15 seconds
+							isLeader = false
+							break
+						}
+					}
+					mu.Unlock()
+
+					// Publish our candidacy
+					msg := networking.LeaderElectionMessage{
+						Rank:     0, // For now, rank is not used, relying on PeerID comparison
+						IsLeader: isLeader,
+					}
+					if err := rt.p2p.PublishLeaderElectionMessage(ctx, msg); err != nil {
+						rt.logger.Error("Failed to publish leader election message", "error", err)
+					}
+					if isLeader {
+						rt.currentLeader = myID
+						rt.logger.Info("Agent is the current leader", "peer_id", myID)
+					} else {
+						rt.logger.Info("Agent is not the leader")
+					}
+				}
+			}
+		}()
+
+		for {
+			select {
+			case <-ctx.Done():
+				rt.logger.Info("Stopping leader election message handler")
+				return
+			case msg := <-leCh:
+				if msg == nil {
+					rt.logger.Warn("Received nil leader election message")
+					continue
+				}
+				peerID, err := peer.Decode(msg.CandidateID)
+				if err != nil {
+					rt.logger.Error("Failed to decode candidate ID from leader election message", "candidate_id", msg.CandidateID, "error", err)
+					continue
+				}
+
+				mu.Lock()
+				lastSeen[peerID] = *msg
+				mu.Unlock()
+
+				rt.logger.Debug("Received leader election message", "candidate", msg.CandidateID, "is_leader", msg.IsLeader, "from", msg.SenderPeerID)
+				if msg.IsLeader {
+					rt.currentLeader = peerID
+					rt.logger.Info("Leader identified", "leader_id", peerID)
+				}
+			}
+		}
+	}()
+
 	// Load modules
 	if err := rt.moduleManager.LoadModulesFromDir(); err != nil {
 		rt.logger.Error("Failed to load modules", "error", err)
@@ -379,12 +518,48 @@ func (rt *Runtime) waitForShutdown(cancel context.CancelFunc) {
 
 // healthHandler is the handler for the /admin/health endpoint.
 func (rt *Runtime) healthHandler(w http.ResponseWriter, r *http.Request) {
+	// OPA authorization check
+	input := map[string]interface{}{
+		"method": r.Method,
+		"path":   r.URL.Path,
+		"user":   "anonymous", // Placeholder for actual user/auth info
+	}
+	allowed, err := rt.adminPolicyEngine.Authorize(r.Context(), input)
+	if err != nil {
+		rt.logger.Error("Admin API authorization error", "path", r.URL.Path, "error", err)
+		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
+		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "user", input["user"])
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintln(w, "OK")
 }
 
 // statusHandler is the handler for the /admin/status endpoint.
 func (rt *Runtime) statusHandler(w http.ResponseWriter, r *http.Request) {
+	// OPA authorization check
+	input := map[string]interface{}{
+		"method": r.Method,
+		"path":   r.URL.Path,
+		"user":   "anonymous", // Placeholder for actual user/auth info
+	}
+	allowed, err := rt.adminPolicyEngine.Authorize(r.Context(), input)
+	if err != nil {
+		rt.logger.Error("Admin API authorization error", "path", r.URL.Path, "error", err)
+		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
+		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "user", input["user"])
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	status := StatusResponse{
 		Version:       rt.updateManager.CurrentVersion(),
 		PeerID:        rt.identity.PeerID.String(),
@@ -400,6 +575,24 @@ func (rt *Runtime) statusHandler(w http.ResponseWriter, r *http.Request) {
 
 // listModulesHandler is the handler for the /admin/modules/list endpoint.
 func (rt *Runtime) listModulesHandler(w http.ResponseWriter, r *http.Request) {
+	// OPA authorization check
+	input := map[string]interface{}{
+		"method": r.Method,
+		"path":   r.URL.Path,
+		"user":   "anonymous", // Placeholder for actual user/auth info
+	}
+	allowed, err := rt.adminPolicyEngine.Authorize(r.Context(), input)
+	if err != nil {
+		rt.logger.Error("Admin API authorization error", "path", r.URL.Path, "error", err)
+		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
+		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "user", input["user"])
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	modules := rt.moduleManager.ListModules()
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(modules); err != nil {
@@ -410,6 +603,24 @@ func (rt *Runtime) listModulesHandler(w http.ResponseWriter, r *http.Request) {
 
 // updateCheckHandler is the handler for the /admin/update/check endpoint.
 func (rt *Runtime) updateCheckHandler(w http.ResponseWriter, r *http.Request) {
+	// OPA authorization check
+	input := map[string]interface{}{
+		"method": r.Method,
+		"path":   r.URL.Path,
+		"user":   "anonymous", // Placeholder for actual user/auth info
+	}
+	allowed, err := rt.adminPolicyEngine.Authorize(r.Context(), input)
+	if err != nil {
+		rt.logger.Error("Admin API authorization error", "path", r.URL.Path, "error", err)
+		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
+		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "user", input["user"])
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	go rt.updateManager.CheckForUpdate()
 	w.WriteHeader(http.StatusAccepted)
 	fmt.Fprintln(w, "Update check initiated.")

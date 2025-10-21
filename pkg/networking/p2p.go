@@ -22,9 +22,11 @@ import (
 )
 
 const (
-	HeartbeatTopic    = "apa/heartbeat/1.0.0"
-	ModuleTopic       = "apa/modules/1.0.0"
-	ModuleFetchProtocol = "/apa/fetch-module/1.0.0"
+	HeartbeatTopic        = "apa/heartbeat/1.0.0"
+	ModuleTopic           = "apa/modules/1.0.0"
+	ControllerCommTopic   = "apa/controller-comm/1.0.0"
+	LeaderElectionTopic   = "apa/leader-election/1.0.0"
+	ModuleFetchProtocol   = "/apa/fetch-module/1.0.0"
 )
 
 // P2P manages the libp2p host, peer discovery, and pubsub.
@@ -36,6 +38,10 @@ type P2P struct {
 	heartbeatSub           *pubsub.Subscription
 	moduleTopic            *pubsub.Topic
 	moduleSub              *pubsub.Subscription
+	controllerCommTopic    *pubsub.Topic
+	controllerCommSub      *pubsub.Subscription
+	leaderElectionTopic    *pubsub.Topic
+	leaderElectionSub      *pubsub.Subscription
 	dht                  *dht.IpfsDHT
 	routingDiscovery     *discovery.RoutingDiscovery
 	peerstore            peerstore.Peerstore
@@ -78,6 +84,23 @@ type ModuleFetchResponse struct {
 	Manifest  *module.Manifest `json:"manifest,omitempty"`
 	WasmBytes []byte           `json:"wasm_bytes,omitempty"`
 	Error     string           `json:"error,omitempty"`
+}
+
+// ControllerMessage is the message format for inter-controller communication.
+type ControllerMessage struct {
+	SenderPeerID string          `json:"sender_peer_id"`
+	Type         string          `json:"type"`
+	Payload      json.RawMessage `json:"payload"`
+	Timestamp    time.Time       `json:"timestamp"`
+}
+
+// LeaderElectionMessage is used for basic leader election.
+type LeaderElectionMessage struct {
+	CandidateID string    `json:"candidate_id"`
+	SenderPeerID string   `json:"sender_peer_id"`
+	Rank        int       `json:"rank"`
+	Timestamp   time.Time `json:"timestamp"`
+	IsLeader    bool      `json:"is_leader"` // True if the sender claims to be the leader
 }
 
 // NewP2P creates and initializes a new libp2p host.
@@ -145,7 +168,153 @@ func (p *P2P) Shutdown() error {
 	if p.moduleTopic != nil {
 		p.moduleTopic.Close()
 	}
+	if p.controllerCommSub != nil {
+		p.controllerCommSub.Cancel()
+	}
+	if p.controllerCommTopic != nil {
+		p.controllerCommTopic.Close()
+	}
+	if p.leaderElectionSub != nil {
+		p.leaderElectionSub.Cancel()
+	}
+	if p.leaderElectionTopic != nil {
+		p.leaderElectionTopic.Close()
+	}
 	return p.Host.Close()
+}
+
+// JoinControllerCommTopic joins the controller communication topic.
+func (p *P2P) JoinControllerCommTopic(ctx context.Context) error {
+	topic, err := p.pubsub.Join(ControllerCommTopic)
+	if err != nil {
+		return fmt.Errorf("failed to join controller communication topic: %w", err)
+	}
+	p.controllerCommTopic = topic
+
+	sub, err := topic.Subscribe()
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to controller communication topic: %w", err)
+	}
+	p.controllerCommSub = sub
+
+	return nil
+}
+
+// PublishControllerMessage publishes a message to the controller communication topic.
+func (p *P2P) PublishControllerMessage(ctx context.Context, msgType string, payload json.RawMessage) error {
+	if p.controllerCommTopic == nil {
+		return fmt.Errorf("controller communication topic not joined")
+	}
+
+	msg := ControllerMessage{
+		SenderPeerID: p.Host.ID().String(),
+		Type:         msgType,
+		Payload:      payload,
+		Timestamp:    time.Now(),
+	}
+	bytes, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal controller message: %w", err)
+	}
+
+	p.logger.Debug("Publishing controller message", "type", msgType)
+	return p.controllerCommTopic.Publish(ctx, bytes)
+}
+
+// SubscribeControllerMessages returns a channel for receiving controller messages.
+func (p *P2P) SubscribeControllerMessages(ctx context.Context) (<-chan *ControllerMessage, error) {
+	if p.controllerCommSub == nil {
+		return nil, fmt.Errorf("controller communication topic not subscribed")
+	}
+
+	msgCh := make(chan *ControllerMessage)
+	go func() {
+		defer close(msgCh)
+		for {
+			msg, err := p.controllerCommSub.Next(ctx)
+			if err != nil {
+				return // Subscription has been closed or context cancelled
+			}
+			if msg.ReceivedFrom == p.Host.ID() {
+				continue // Don't process our own messages
+			}
+
+			var ctrlMsg ControllerMessage
+			if err := json.Unmarshal(msg.Data, &ctrlMsg); err != nil {
+				p.logger.Error("Failed to unmarshal controller message", "from", msg.ReceivedFrom, "error", err)
+				continue
+			}
+			msgCh <- &ctrlMsg
+		}
+	}()
+
+	return msgCh, nil
+}
+
+// JoinLeaderElectionTopic joins the leader election topic.
+func (p *P2P) JoinLeaderElectionTopic(ctx context.Context) error {
+	topic, err := p.pubsub.Join(LeaderElectionTopic)
+	if err != nil {
+		return fmt.Errorf("failed to join leader election topic: %w", err)
+	}
+	p.leaderElectionTopic = topic
+
+	sub, err := topic.Subscribe()
+	if err != nil {
+		return fmt.Errorf("failed to subscribe to leader election topic: %w", err)
+	}
+	p.leaderElectionSub = sub
+
+	return nil
+}
+
+// PublishLeaderElectionMessage publishes a message to the leader election topic.
+func (p *P2P) PublishLeaderElectionMessage(ctx context.Context, message LeaderElectionMessage) error {
+	if p.leaderElectionTopic == nil {
+		return fmt.Errorf("leader election topic not joined")
+	}
+
+	message.CandidateID = p.Host.ID().String()
+	message.SenderPeerID = p.Host.ID().String()
+	message.Timestamp = time.Now()
+
+	bytes, err := json.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("failed to marshal leader election message: %w", err)
+	}
+
+	p.logger.Debug("Publishing leader election message", "candidate", message.CandidateID, "is_leader", message.IsLeader)
+	return p.leaderElectionTopic.Publish(ctx, bytes)
+}
+
+// SubscribeLeaderElectionMessages returns a channel for receiving leader election messages.
+func (p *P2P) SubscribeLeaderElectionMessages(ctx context.Context) (<-chan *LeaderElectionMessage, error) {
+	if p.leaderElectionSub == nil {
+		return nil, fmt.Errorf("leader election topic not subscribed")
+	}
+
+	msgCh := make(chan *LeaderElectionMessage)
+	go func() {
+		defer close(msgCh)
+		for {
+			msg, err := p.leaderElectionSub.Next(ctx)
+			if err != nil {
+				return // Subscription has been closed or context cancelled
+			}
+			if msg.ReceivedFrom == p.Host.ID() {
+				continue // Don't process our own messages
+			}
+
+			var leMsg LeaderElectionMessage
+			if err := json.Unmarshal(msg.Data, &leMsg); err != nil {
+				p.logger.Error("Failed to unmarshal leader election message", "from", msg.ReceivedFrom, "error", err)
+				continue
+			}
+			msgCh <- &leMsg
+		}
+	}()
+
+	return msgCh, nil
 }
 
 // ClosePeer closes the connection to a specific peer.
@@ -203,36 +372,9 @@ func (p *P2P) StartDiscovery(ctx context.Context) {
 	go p.findPeersPeriodically(ctx)
 }
 
-func (p *P2P) findPeersPeriodically(ctx context.Context) {
-	ticker := time.NewTicker(30 * time.Second) // Find peers every 30 seconds
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-							p.logger.Info("Searching for peers via DHT...")
-						peers, err := p.routingDiscovery.FindPeers(ctx, "apa-agent") // Use a common tag for discovery
-						if err != nil {
-							p.logger.Error("Failed to find peers via DHT", "error", err)
-							continue
-						}
-						for peerInfo := range peers {
-							if peerInfo.ID == p.Host.ID() {
-								continue
-							}
-							p.logger.Info("Discovered peer via DHT", "id", peerInfo.ID)
-							p.peerstore.AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.PermanentAddrTTL) // Add to peerstore
-							if err := p.Host.Connect(ctx, peerInfo); err != nil {
-								p.logger.Error("Failed to connect to DHT peer", "peer", peerInfo.ID, "error", err)
-							}
-						}		}
-	}
-}
-
 // JoinHeartbeatTopic joins the heartbeat topic and starts processing incoming messages.
-func (p *P2P) JoinHeartbeatTopic(ctx context.Context) error {	topic, err := p.pubsub.Join(HeartbeatTopic)
+func (p *P2P) JoinHeartbeatTopic(ctx context.Context) error {
+	topic, err := p.pubsub.Join(HeartbeatTopic)
 	if err != nil {
 		return fmt.Errorf("failed to join heartbeat topic: %w", err)
 	}
@@ -411,6 +553,35 @@ func (p *P2P) moduleReadLoop(ctx context.Context) {
 		if p.OnModuleAnnouncement != nil {
 			p.OnModuleAnnouncement(announcement)
 		}
+	}
+}
+
+
+func (p *P2P) findPeersPeriodically(ctx context.Context) {
+	ticker := time.NewTicker(30 * time.Second) // Find peers every 30 seconds
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+							p.logger.Info("Searching for peers via DHT...")
+						peers, err := p.routingDiscovery.FindPeers(ctx, "apa-agent") // Use a common tag for discovery
+						if err != nil {
+							p.logger.Error("Failed to find peers via DHT", "error", err)
+							continue
+						}
+						for peerInfo := range peers {
+							if peerInfo.ID == p.Host.ID() {
+								continue
+							}
+							p.logger.Info("Discovered peer via DHT", "id", peerInfo.ID)
+							p.peerstore.AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.PermanentAddrTTL) // Add to peerstore
+							if err := p.Host.Connect(ctx, peerInfo); err != nil {
+								p.logger.Error("Failed to connect to DHT peer", "peer", peerInfo.ID, "error", err)
+							}
+						}		}
 	}
 }
 

@@ -2,9 +2,11 @@ package task_orchestrator
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
-	"fmt"
+
+	"github.com/naviNBRuas/APA/pkg/networking"
 )
 
 // TaskOrchestrator is an example decentralized controller module.
@@ -62,4 +64,10 @@ func (to *TaskOrchestrator) Status() (map[string]string, error) {
 	status["status"] = "running" // Placeholder
 	status["last_task_time"] = time.Now().Format(time.RFC3339)
 	return status, nil
+}
+
+// HandleMessage logs the received message.
+func (to *TaskOrchestrator) HandleMessage(ctx context.Context, message networking.ControllerMessage) error {
+	to.logger.Info("TaskOrchestrator received message", "name", to.name, "type", message.Type, "sender", message.SenderPeerID)
+	return nil
 }

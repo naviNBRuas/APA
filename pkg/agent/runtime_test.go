@@ -59,6 +59,16 @@ trusted_authors:
 	assert.NoError(t, err)
 	policyFile.Close()
 
+	// Create a dummy admin policy file
+	adminPolicyFile, err := os.CreateTemp("", "admin_policy-*.rego")
+	assert.NoError(t, err)
+	defer os.Remove(adminPolicyFile.Name())
+	_, err = adminPolicyFile.WriteString(`package apa.authz
+
+default allow = true`)
+	assert.NoError(t, err)
+	adminPolicyFile.Close()
+
 	// Create a dummy signing private key file
 	signingPrivKeyFile, err := os.CreateTemp("", "signing_private-*.key")
 	assert.NoError(t, err)
@@ -75,6 +85,7 @@ module_path: "/tmp/modules"
 identity_file_path: "` + identityPath + `"
 policy_path: "` + policyFile.Name() + `"
 signing_priv_key_path: "` + signingPrivKeyFile.Name() + `"
+admin_policy_path: "` + adminPolicyFile.Name() + `"
 p2p:
   listen_addresses:
     - "/ip4/0.0.0.0/tcp/0"
@@ -103,6 +114,7 @@ update:
 	assert.NotNil(t, rt.updateManager)
 	assert.NotNil(t, rt.healthController)
 	assert.NotNil(t, rt.recoveryController)
+	assert.NotNil(t, rt.adminPolicyEngine)
 
 	// Test NewRuntime with a non-existent config
 	_, err = NewRuntime("non-existent-config.yaml", "v0.1.0")
@@ -124,6 +136,16 @@ trusted_authors:
 	require.NoError(t, err)
 	policyFile.Close()
 
+	// Create a dummy admin policy file
+	adminPolicyFile, err := os.CreateTemp("", "admin_policy-*.rego")
+	assert.NoError(t, err)
+	defer os.Remove(adminPolicyFile.Name())
+	_, err = adminPolicyFile.WriteString(`package apa.authz
+
+default allow = true`)
+	assert.NoError(t, err)
+	adminPolicyFile.Close()
+
 	// Create a temporary config file
 	configFile, err := os.CreateTemp("", "agent-config-*.yaml")
 	require.NoError(t, err)
@@ -144,6 +166,7 @@ identity_file_path: "` + identityPath + `"
 module_path: "/tmp/modules"
 policy_path: "` + policyFile.Name() + `"
 signing_priv_key_path: "` + signingPrivKeyFile.Name() + `"
+admin_policy_path: "` + adminPolicyFile.Name() + `"
 p2p:
   listen_addresses:
     - "/ip4/0.0.0.0/tcp/0"

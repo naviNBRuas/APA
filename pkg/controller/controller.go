@@ -2,15 +2,17 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/exec"
 	"syscall"
 	"time"
-	"io"
 
 	manifest "github.com/naviNBRuas/APA/pkg/controller/manifest"
+	"github.com/naviNBRuas/APA/pkg/networking"
 )
 
 // Command is an interface for os/exec.Cmd, allowing it to be mocked.
@@ -60,42 +62,56 @@ type Controller interface {
 	Name() string
 	Start(ctx context.Context) error
 	Stop(ctx context.Context) error
-	Configure(configData []byte) error // New method for configuration
-	Status() (map[string]string, error) // New method for status reporting
+	Configure(configData []byte) error                                     // New method for configuration
+	Status() (map[string]string, error)                                    // New method for status reporting
+	HandleMessage(ctx context.Context, message networking.ControllerMessage) error // New method for inter-controller communication
 }
 
 // GoBinaryController implements the Controller interface for an external Go binary.
 type GoBinaryController struct {
-	name          string
-	logger        *slog.Logger
-	Manifest      *manifest.Manifest
-	cmd           Command // Changed from *exec.Cmd
-	cancel        context.CancelFunc
-	CommandFactory CommandFactory // New field
-	configFilePath string // Path to the controller's configuration file
+	name            string
+	logger          *slog.Logger
+	Manifest        *manifest.Manifest
+	cmd             Command // Changed from *exec.Cmd
+	cancel          context.CancelFunc
+	CommandFactory  CommandFactory // New field
+	configFilePath  string         // Path to the controller's configuration file
+	messageFilePath string         // Path to the controller's message file
 }
 
 // NewGoBinaryController creates a new GoBinaryController.
 func NewGoBinaryController(logger *slog.Logger, manifest *manifest.Manifest) *GoBinaryController {
 	// Create a unique temporary file for the controller's configuration
-	tmpFile, err := os.CreateTemp("", fmt.Sprintf("controller-config-%s-*.yaml", manifest.Name))
+	tmpConfigFile, err := os.CreateTemp("", fmt.Sprintf("controller-config-%s-*.yaml", manifest.Name))
 	if err != nil {
 		logger.Error("Failed to create temporary config file for controller", "name", manifest.Name, "error", err)
 		return nil // Or handle error appropriately
 	}
-	tmpFile.Close()
+	tmpConfigFile.Close()
 
-	// Ensure the temporary file is cleaned up when the controller is no longer needed
-	// This defer will be executed when the GoBinaryController instance is garbage collected or explicitly set to nil
+	// Create a unique temporary file for controller messages
+	tmpMessageFile, err := os.CreateTemp("", fmt.Sprintf("controller-message-%s-*.json", manifest.Name))
+	if err != nil {
+		logger.Error("Failed to create temporary message file for controller", "name", manifest.Name, "error", err)
+		return nil // Or handle error appropriately
+	}
+	tmpMessageFile.Close()
+
+	// Ensure the temporary files are cleaned up when the controller is no longer needed
 	// For more robust cleanup, consider a dedicated Close method or context-based cleanup.
-	defer os.Remove(tmpFile.Name())
+	// Note: defer os.Remove will only run when the NewGoBinaryController function exits.
+	// For long-lived controllers, this cleanup needs to be managed differently, e.g., in a Stop/Shutdown method.
+	// For now, we'll rely on the OS to clean up /tmp files on reboot.
+	// defer os.Remove(tmpConfigFile.Name())
+	// defer os.Remove(tmpMessageFile.Name())
 
 	return &GoBinaryController{
-		name:          manifest.Name,
-		logger:        logger,
-		Manifest:      manifest,
-		CommandFactory: DefaultCommandFactory, // Use default factory
-		configFilePath: tmpFile.Name(),
+		name:            manifest.Name,
+		logger:          logger,
+		Manifest:        manifest,
+		CommandFactory:  DefaultCommandFactory, // Use default factory
+		configFilePath:  tmpConfigFile.Name(),
+		messageFilePath: tmpMessageFile.Name(),
 	}
 }
 
@@ -106,13 +122,13 @@ func (gbc *GoBinaryController) Name() string {
 
 // Start starts the external Go binary controller.
 func (gbc *GoBinaryController) Start(ctx context.Context) error {
-	gbc.logger.Info("Starting GoBinaryController", "name", gbc.name, "path", gbc.Manifest.Path, "config_file", gbc.configFilePath)
+	gbc.logger.Info("Starting GoBinaryController", "name", gbc.name, "path", gbc.Manifest.Path, "config_file", gbc.configFilePath, "message_file", gbc.messageFilePath)
 
 	ctrlCtx, cancel := context.WithCancel(context.Background())
 	gbc.cancel = cancel
 
-	// Pass the config file path to the external controller as an argument
-	gbc.cmd = gbc.CommandFactory(ctrlCtx, gbc.Manifest.Path, "--config", gbc.configFilePath)
+	// Pass the config and message file paths to the external controller as arguments
+	gbc.cmd = gbc.CommandFactory(ctrlCtx, gbc.Manifest.Path, "--config", gbc.configFilePath, "--message-file", gbc.messageFilePath)
 	gbc.cmd.SetStdout(newLogWriter(gbc.logger, slog.LevelInfo, gbc.name))
 	gbc.cmd.SetStderr(newLogWriter(gbc.logger, slog.LevelError, gbc.name))
 
@@ -211,6 +227,34 @@ func (gbc *GoBinaryController) Status() (map[string]string, error) {
 	return status, nil
 }
 
+// HandleMessage writes the incoming message to a file and sends a SIGUSR1 signal.
+func (gbc *GoBinaryController) HandleMessage(ctx context.Context, message networking.ControllerMessage) error {
+	gbc.logger.Info("GoBinaryController received message", "name", gbc.name, "type", message.Type)
+
+	// Marshal the message to JSON
+	msgBytes, err := json.Marshal(message)
+	if err != nil {
+		return fmt.Errorf("failed to marshal controller message: %w", err)
+	}
+
+	// Write the message to the message file
+	if err := os.WriteFile(gbc.messageFilePath, msgBytes, 0644); err != nil {
+		return fmt.Errorf("failed to write message to file for controller '%s': %w", gbc.name, err)
+	}
+
+	// Send SIGUSR1 to the process to signal it to read the new message
+	if gbc.cmd != nil && gbc.cmd.Process() != nil {
+		gbc.logger.Info("Sending SIGUSR1 to GoBinaryController for message", "name", gbc.name, "pid", gbc.cmd.Process().Pid)
+		if err := gbc.cmd.Process().Signal(syscall.SIGUSR1); err != nil {
+			return fmt.Errorf("failed to send SIGUSR1 to controller '%s': %w", gbc.name, err)
+		}
+	} else {
+		return fmt.Errorf("controller '%s' not running, cannot handle message", gbc.name)
+	}
+
+	return nil
+}
+
 // logWriter is an io.Writer that writes to slog.Logger.
 type logWriter struct {
 	logger *slog.Logger
@@ -229,15 +273,16 @@ func (lw *logWriter) Write(p []byte) (n int, err error) {
 
 // DummyController is a placeholder implementation of the Controller interface.
 type DummyController struct {
-	name   string
-	logger *slog.Logger
+	name     string
+	logger   *slog.Logger
 	Manifest *manifest.Manifest
 }
+
 // NewDummyController creates a new DummyController.
 func NewDummyController(name string, logger *slog.Logger, manifest *manifest.Manifest) *DummyController {
 	return &DummyController{
-		name:   name,
-		logger: logger,
+		name:     name,
+		logger:   logger,
 		Manifest: manifest,
 	}
 }
@@ -281,4 +326,10 @@ func (dc *DummyController) Status() (map[string]string, error) {
 	status["status"] = "dummy_running"
 	status["message"] = "This is a dummy controller, status is simulated."
 	return status, nil
+}
+
+// HandleMessage logs the received message.
+func (dc *DummyController) HandleMessage(ctx context.Context, message networking.ControllerMessage) error {
+	dc.logger.Info("DummyController received message", "name", dc.name, "type", message.Type, "sender", message.SenderPeerID)
+	return nil
 }
