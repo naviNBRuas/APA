@@ -4,11 +4,55 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"os/exec"
 	"time"
+	"io"
 
 	manifest "github.com/naviNBRuas/APA/pkg/controller/manifest"
 )
+
+// Command is an interface for os/exec.Cmd, allowing it to be mocked.
+type Command interface {
+	Start() error
+	Wait() error
+	Process() *os.Process
+	SetStdout(w io.Writer)
+	SetStderr(w io.Writer)
+}
+
+// CommandFactory is a function that creates a Command.
+type CommandFactory func(ctx context.Context, name string, arg ...string) Command
+
+// DefaultCommandFactory is the default CommandFactory using os/exec.CommandContext.
+type osExecCommand struct {
+	cmd *exec.Cmd
+}
+
+func (o *osExecCommand) Start() error {
+	return o.cmd.Start()
+}
+
+func (o *osExecCommand) Wait() error {
+	return o.cmd.Wait()
+}
+
+func (o *osExecCommand) Process() *os.Process {
+	return o.cmd.Process
+}
+
+func (o *osExecCommand) SetStdout(w io.Writer) {
+	o.cmd.Stdout = w
+}
+
+func (o *osExecCommand) SetStderr(w io.Writer) {
+	o.cmd.Stderr = w
+}
+
+func DefaultCommandFactory(ctx context.Context, name string, arg ...string) Command {
+	cmd := exec.CommandContext(ctx, name, arg...)
+	return &osExecCommand{cmd: cmd}
+}
 
 // Controller defines the interface for a decentralized controller module.
 type Controller interface {
@@ -21,19 +65,21 @@ type Controller interface {
 
 // GoBinaryController implements the Controller interface for an external Go binary.
 type GoBinaryController struct {
-	name     string
-	logger   *slog.Logger
-	Manifest *manifest.Manifest
-	cmd      *exec.Cmd
-	cancel   context.CancelFunc
+	name          string
+	logger        *slog.Logger
+	Manifest      *manifest.Manifest
+	cmd           Command // Changed from *exec.Cmd
+	cancel        context.CancelFunc
+	CommandFactory CommandFactory // New field
 }
 
 // NewGoBinaryController creates a new GoBinaryController.
 func NewGoBinaryController(logger *slog.Logger, manifest *manifest.Manifest) *GoBinaryController {
 	return &GoBinaryController{
-		name:     manifest.Name,
-		logger:   logger,
-		Manifest: manifest,
+		name:          manifest.Name,
+		logger:        logger,
+		Manifest:      manifest,
+		CommandFactory: DefaultCommandFactory, // Use default factory
 	}
 }
 
@@ -49,9 +95,9 @@ func (gbc *GoBinaryController) Start(ctx context.Context) error {
 	ctrlCtx, cancel := context.WithCancel(context.Background())
 	gbc.cancel = cancel
 
-	gbc.cmd = exec.CommandContext(ctrlCtx, gbc.Manifest.Path)
-	gbc.cmd.Stdout = newLogWriter(gbc.logger, slog.LevelInfo, gbc.name)
-	gbc.cmd.Stderr = newLogWriter(gbc.logger, slog.LevelError, gbc.name)
+	gbc.cmd = gbc.CommandFactory(ctrlCtx, gbc.Manifest.Path) // Use command factory
+	gbc.cmd.SetStdout(newLogWriter(gbc.logger, slog.LevelInfo, gbc.name))
+	gbc.cmd.SetStderr(newLogWriter(gbc.logger, slog.LevelError, gbc.name))
 
 	if err := gbc.cmd.Start(); err != nil {
 		cancel()
@@ -61,8 +107,8 @@ func (gbc *GoBinaryController) Start(ctx context.Context) error {
 	go func() {
 		<-ctrlCtx.Done()
 		gbc.logger.Info("GoBinaryController context cancelled, stopping process", "name", gbc.name)
-		if gbc.cmd.Process != nil {
-			gbc.cmd.Process.Kill()
+		if gbc.cmd.Process() != nil {
+			gbc.cmd.Process().Kill()
 		}
 	}()
 
@@ -85,9 +131,9 @@ func (gbc *GoBinaryController) Stop(ctx context.Context) error {
 	}
 
 	// Wait for the process to actually stop
-	done := make(chan struct{})
+	done := make(chan struct{}) 
 	go func() {
-		if gbc.cmd != nil && gbc.cmd.Process != nil {
+		if gbc.cmd != nil && gbc.cmd.Process() != nil {
 			_ = gbc.cmd.Wait() // Wait for the process to exit after kill
 		}
 		close(done)
@@ -111,7 +157,7 @@ func (gbc *GoBinaryController) Configure(configData []byte) error {
 func (gbc *GoBinaryController) Status() (map[string]string, error) {
 	status := make(map[string]string)
 	status["status"] = "running" // Placeholder
-	status["pid"] = fmt.Sprintf("%d", gbc.cmd.Process.Pid)
+	status["pid"] = fmt.Sprintf("%d", gbc.cmd.Process().Pid)
 	return status, nil
 }
 
