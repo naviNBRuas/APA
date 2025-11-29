@@ -1,0 +1,11 @@
+# use Go 1.24 alpine image
+FROM golang:1.24.6-alpine
+
+WORKDIR /src
+COPY . .
+
+# install dependencies
+RUN apk add --no-cache build-base git libc-dev
+
+# run networking tests
+CMD ["go", "test", "./pkg/networking/...", "-v"]
