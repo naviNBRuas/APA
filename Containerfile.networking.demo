@@ -1,0 +1,21 @@
+# Containerfile for APA Networking Demo
+# Builds a container that demonstrates the networking capabilities
+
+FROM golang:1.24.6-alpine
+
+# Install dependencies
+RUN apk add --no-cache build-base git libc-dev
+
+# Set working directory
+WORKDIR /src
+
+# Copy the entire project
+COPY . .
+
+# Build the networking demos
+RUN go build -o payloads/networking-demo payloads/networking-demo.go
+RUN go build -o payloads/full-networking-demo payloads/full-networking-demo.go
+RUN go build -o payloads/comprehensive-networking-demo payloads/comprehensive-networking-demo.go
+
+# Default command runs the comprehensive networking demo
+CMD ["./payloads/comprehensive-networking-demo"]
