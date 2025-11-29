@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
+	"crypto/sha256"
+	"encoding/hex"
 
 	"github.com/naviNBRuas/APA/pkg/module"
 	controllerManifest "github.com/naviNBRuas/APA/pkg/controller/manifest"
@@ -40,6 +43,8 @@ type RecoveryController struct {
 	p2p             P2PService
 	moduleManager   ModuleManagerService
 	controllerManager ControllerManagerService
+	snapshotPath    string
+	quarantineList  map[string]time.Time
 }
 
 // NewRecoveryController creates a new RecoveryController.
@@ -51,6 +56,8 @@ func NewRecoveryController(logger *slog.Logger, config any, applyConfigFunc func
 		p2p:             p2p,
 		moduleManager:   moduleManager,
 		controllerManager: controllerManager,
+		snapshotPath:    "agent-snapshot.yaml",
+		quarantineList:  make(map[string]time.Time),
 	}
 }
 
@@ -64,9 +71,15 @@ func (rc *RecoveryController) RequestPeerCopy(ctx context.Context, moduleName st
 	}
 
 	// For now, we assume version is latest
-	manifest, wasmBytes, err := rc.p2p.FetchModule(ctx, peerID, moduleName, "latest")
+	version := "latest"
+	manifest, wasmBytes, err := rc.p2p.FetchModule(ctx, peerID, moduleName, version)
 	if err != nil {
 		return fmt.Errorf("failed to fetch module from peer: %w", err)
+	}
+
+	// Verify the manifest and WASM bytes
+	if err := rc.verifyModule(manifest, wasmBytes); err != nil {
+		return fmt.Errorf("module verification failed: %w", err)
 	}
 
 	if err := rc.moduleManager.SaveAndLoadModule(manifest, wasmBytes); err != nil {
@@ -74,6 +87,33 @@ func (rc *RecoveryController) RequestPeerCopy(ctx context.Context, moduleName st
 	}
 
 	rc.logger.Info("Successfully fetched and loaded module from peer", "module", moduleName, "peer", peerIDStr)
+	return nil
+}
+
+// verifyModule performs basic verification of a module's manifest and WASM bytes
+func (rc *RecoveryController) verifyModule(manifest *module.Manifest, wasmBytes []byte) error {
+	// Check that required fields are present
+	if manifest.Name == "" {
+		return fmt.Errorf("module manifest missing name")
+	}
+	if manifest.Version == "" {
+		return fmt.Errorf("module manifest missing version")
+	}
+	if manifest.Hash == "" {
+		return fmt.Errorf("module manifest missing hash")
+	}
+
+	// Calculate the actual hash of the WASM bytes
+	hasher := sha256.New()
+	hasher.Write(wasmBytes)
+	actualHash := hex.EncodeToString(hasher.Sum(nil))
+
+	// Compare with the expected hash from the manifest
+	if actualHash != manifest.Hash {
+		return fmt.Errorf("module hash mismatch: expected %s, got %s", manifest.Hash, actualHash)
+	}
+
+	rc.logger.Info("Module verification successful", "module", manifest.Name, "hash", actualHash)
 	return nil
 }
 
@@ -120,7 +160,11 @@ func (rc *RecoveryController) QuarantineNode(ctx context.Context, nodeID string)
 	// 3. Prevent it from running new modules or participating in P2P (handled by policy enforcement)
 	rc.logger.Warn("Dynamic policy update for quarantined node is not yet fully implemented.", "node", nodeID)
 
-	// 4. Trigger further recovery actions (e.g., reporting, re-imaging)
+	// 4. Add node to quarantine list with timestamp
+	rc.quarantineList[nodeID] = time.Now()
+
+	// 5. Trigger further recovery actions (e.g., reporting, re-imaging)
+	rc.logger.Info("Initiating recovery actions for quarantined node", "node", nodeID)
 
 	rc.logger.Info("Node quarantined successfully", "node", nodeID)
 	return nil
@@ -148,5 +192,15 @@ func (rc *RecoveryController) RestoreSnapshot(ctx context.Context) error {
 		return fmt.Errorf("applyConfigFunc is not set in RecoveryController")
 	}
 
-	return rc.applyConfigFunc(data)
+	// Apply the configuration to reconfigure all components
+	if err := rc.applyConfigFunc(data); err != nil {
+		return fmt.Errorf("failed to apply configuration during restore: %w", err)
+	}
+
+	// After applying the config, we need to ensure modules are properly loaded
+	// This would typically be handled by the ApplyConfigFunc which restarts the agent
+	// But we can add additional verification steps here if needed
+
+	rc.logger.Info("Agent state successfully restored from snapshot")
+	return nil
 }

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autonomous Polymorphic Agent - Management Console</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Autonomous Polymorphic Agent</h1>
+            <h2>Management Console</h2>
+        </header>
+        
+        <nav>
+            <ul>
+                <li><a href="#dashboard" class="active">Dashboard</a></li>
+                <li><a href="#modules">Modules</a></li>
+                <li><a href="#controllers">Controllers</a></li>
+                <li><a href="#policies">Policies</a></li>
+                <li><a href="#network">Network</a></li>
+                <li><a href="#settings">Settings</a></li>
+            </ul>
+        </nav>
+        
+        <main>
+            <section id="dashboard" class="tab-content active">
+                <h2>Dashboard</h2>
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <h3>Agent Status</h3>
+                        <p>Status: <span id="agent-status">Running</span></p>
+                        <p>Uptime: <span id="agent-uptime">2 days, 4 hours</span></p>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Network Health</h3>
+                        <p>Connected Peers: <span id="connected-peers">12</span></p>
+                        <p>Network Status: <span id="network-status">Healthy</span></p>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Modules</h3>
+                        <p>Active Modules: <span id="active-modules">8</span></p>
+                        <p>Module Errors: <span id="module-errors">0</span></p>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Controllers</h3>
+                        <p>Active Controllers: <span id="active-controllers">5</span></p>
+                        <p>Controller Errors: <span id="controller-errors">0</span></p>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="modules" class="tab-content">
+                <h2>Modules</h2>
+                <div class="actions">
+                    <button id="load-module">Load Module</button>
+                    <button id="unload-module">Unload Module</button>
+                </div>
+                
+                <table id="modules-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Version</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Module rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </section>
+            
+            <section id="controllers" class="tab-content">
+                <h2>Controllers</h2>
+                <div class="actions">
+                    <button id="load-controller">Load Controller</button>
+                    <button id="unload-controller">Unload Controller</button>
+                </div>
+                
+                <table id="controllers-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Version</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Controller rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </section>
+            
+            <section id="policies" class="tab-content">
+                <h2>Policies</h2>
+                <div class="actions">
+                    <button id="add-policy">Add Policy</button>
+                    <button id="edit-policy">Edit Policy</button>
+                    <button id="remove-policy">Remove Policy</button>
+                </div>
+                
+                <table id="policies-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Policy rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </section>
+            
+            <section id="network" class="tab-content">
+                <h2>Network</h2>
+                <div class="card">
+                    <h3>Peer Information</h3>
+                    <p>Total Peers: <span id="total-peers">24</span></p>
+                    <p>Connected Peers: <span id="network-connected-peers">12</span></p>
+                </div>
+                
+                <div class="card">
+                    <h3>Peer List</h3>
+                    <table id="peers-table">
+                        <thead>
+                            <tr>
+                                <th>Peer ID</th>
+                                <th>Status</th>
+                                <th>Last Seen</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Peer rows will be populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            
+            <section id="settings" class="tab-content">
+                <h2>Settings</h2>
+                <form id="settings-form">
+                    <div class="form-group">
+                        <label for="agent-name">Agent Name:</label>
+                        <input type="text" id="agent-name" name="agent-name" value="APA-Node-001">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="log-level">Log Level:</label>
+                        <select id="log-level" name="log-level">
+                            <option value="debug">Debug</option>
+                            <option value="info" selected>Info</option>
+                            <option value="warn">Warning</option>
+                            <option value="error">Error</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="heartbeat-interval">Heartbeat Interval (seconds):</label>
+                        <input type="number" id="heartbeat-interval" name="heartbeat-interval" value="30" min="1" max="300">
+                    </div>
+                    
+                    <button type="submit">Save Settings</button>
+                </form>
+            </section>
+        </main>
+        
+        <footer>
+            <p>&copy; 2025 Autonomous Polymorphic Agent. All rights reserved.</p>
+        </footer>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

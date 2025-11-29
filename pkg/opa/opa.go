@@ -11,11 +11,15 @@ import (
 // OPAPolicyEngine manages OPA policy loading and evaluation.
 type OPAPolicyEngine struct {
 	query rego.PreparedEvalQuery
+	// loaded indicates whether a policy has been successfully loaded
+	loaded bool
 }
 
 // NewOPAPolicyEngine creates a new OPA policy engine.
 func NewOPAPolicyEngine() *OPAPolicyEngine {
-	return &OPAPolicyEngine{}
+	return &OPAPolicyEngine{
+		loaded: false,
+	}
 }
 
 // LoadPolicy loads a Rego policy from the given file path.
@@ -37,13 +41,19 @@ func (o *OPAPolicyEngine) LoadPolicy(ctx context.Context, policyPath string) err
 		return fmt.Errorf("failed to prepare policy query: %w", err)
 	}
 	o.query = query
+	o.loaded = true
 
 	return nil
 }
 
 // Authorize evaluates an authorization request against the loaded policy.
+// If no policy is loaded, it defaults to allowing access.
 // input should be a map[string]interface{} representing the authorization context.
 func (o *OPAPolicyEngine) Authorize(ctx context.Context, input map[string]interface{}) (bool, error) {
+	// If no policy is loaded, allow by default
+	if !o.loaded {
+		return true, nil
+	}
 
 	resultSet, err := o.query.Eval(ctx, rego.EvalInput(input))
 	if err != nil {

@@ -5,6 +5,7 @@ identity_file_path: "agent-identity.json"
 policy_path: "configs/policy.yaml"
 signing_priv_key_path: "configs/signing_private.key"
 controller_path: "controllers"
+admin_policy_path: "configs/admin_policy.rego"
 p2p:
   listen_addresses:
     - "/ip4/0.0.0.0/tcp/0"
@@ -13,4 +14,4 @@ p2p:
 update:
   server_url: "http://127.0.0.1:8000/release.json"
   check_interval: "1m"
-  public_key: "75b351bef5d97a7658610fa29ebcb6a09585fdf195faac66e9041cbf2e3e09e1"
+  public_key: "234447437978db889caa7bc4115d873700d0821f0deedc0c0b03651d59fbc7f6"

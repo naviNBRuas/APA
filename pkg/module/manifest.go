@@ -3,7 +3,7 @@ package module
 // Manifest defines the metadata and security properties of a WASM module.
 type Manifest struct {
 	Name         string   `json:"name"`
-	Version      string   `json:v"ersion"`
+	Version      string   `json:"version"`
 	Arch         string   `json:"arch"`
 	OS           string   `json:"os"`
 	WasmFile     string   `json:"wasm_file,omitempty"` // Path to the wasm file, relative to the manifest

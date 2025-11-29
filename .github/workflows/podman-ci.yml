@@ -13,16 +13,15 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        goarch: [amd64, arm64]
+        platform: [linux/amd64, linux/arm64]
     steps:
       - uses: actions/checkout@v4
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-        if: ${{ matrix.goarch == 'arm64' }}
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.24' # Ensure Go is set up for building WASM
+          go-version: '1.24'
       - name: Build WASM modules
         run: |
           MODULES=(config-watcher crypto-hasher data-logger message-broker net-monitor simple-adder system-info)
@@ -32,10 +31,17 @@ jobs:
           done
       - name: Set up Podman
         run: sudo apt-get update && sudo apt-get install -y podman
-      - name: Build APA image
-        run: podman build --build-arg GOOS=linux --build-arg GOARCH=${{ matrix.goarch }} -t apa:ci-${{ matrix.goarch }} -f Containerfile .
+      - name: Build APA image with cross-compilation
+        run: |
+          # Extract OS and ARCH from platform
+          OS=$(echo ${{ matrix.platform }} | cut -d'/' -f1)
+          ARCH=$(echo ${{ matrix.platform }} | cut -d'/' -f2)
+          podman build --platform ${{ matrix.platform }} -t apa:ci-${OS}-${ARCH} -f Containerfile .
       - name: Run APA container
-        run: podman run --rm -d -p 8080:8080 --name apa-agent-ci-${{ matrix.goarch }} apa:ci-${{ matrix.goarch }}
+        run: |
+          OS=$(echo ${{ matrix.platform }} | cut -d'/' -f1)
+          ARCH=$(echo ${{ matrix.platform }} | cut -d'/' -f2)
+          podman run --rm -d -p 8080:8080 --name apa-agent-ci-${OS}-${ARCH} apa:ci-${OS}-${ARCH}
       - name: Health check
         run: |
           for i in $(seq 1 10); do

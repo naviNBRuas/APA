@@ -8,6 +8,12 @@ dist/
 *.so
 *.dylib
 
+# Compiled binaries
+*/example-controller/*
+*/payloads/*
+!*/payloads/*.go
+*/examples/modules/*/*.wasm
+
 # OS
 .DS_Store
 Thumbs.db
@@ -23,6 +29,7 @@ venv/
 # Containers
 .containerfile
 Dockerfile
+Containerfile.*
 *.tar
 
 # Editor

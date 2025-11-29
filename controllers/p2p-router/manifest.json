@@ -1,0 +1,8 @@
+{
+  "name": "p2p-router",
+  "version": "v1.0.0",
+  "path": "./p2p-router",
+  "hash": "...",
+  "capabilities": ["network", "controller_routing"],
+  "policy": "allow_all"
+}
