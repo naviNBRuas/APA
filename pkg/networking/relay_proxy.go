@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/peer"
 	ma "github.com/multiformats/go-multiaddr"
 	"golang.org/x/net/proxy"
@@ -16,14 +17,14 @@ import (
 // RelayProxyManager manages relay and proxy-based connections
 type RelayProxyManager struct {
 	logger *slog.Logger
-	host   peer.ID
+	host   host.Host
 }
 
 // NewRelayProxyManager creates a new relay proxy manager
-func NewRelayProxyManager(logger *slog.Logger, host peer.ID) *RelayProxyManager {
+func NewRelayProxyManager(logger *slog.Logger, h host.Host) *RelayProxyManager {
 	return &RelayProxyManager{
 		logger: logger,
-		host:   host,
+		host:   h,
 	}
 }
 
@@ -31,14 +32,35 @@ func NewRelayProxyManager(logger *slog.Logger, host peer.ID) *RelayProxyManager 
 func (rpm *RelayProxyManager) EstablishRelayConnection(ctx context.Context, targetPeer peer.ID, relayPeer peer.ID) error {
 	rpm.logger.Info("Attempting to establish relay connection", "target", targetPeer, "relay", relayPeer)
 	
-	// In a real implementation, this would:
-	// 1. Connect to the relay peer
-	// 2. Request the relay to establish a connection to the target peer
-	// 3. Use the relayed connection for communication
+	// Construct the relay multiaddr
+	// /p2p/<relay-id>/p2p-circuit/p2p/<target-id>
+	relayAddrInfo := rpm.host.Peerstore().PeerInfo(relayPeer)
+	if len(relayAddrInfo.Addrs) == 0 {
+		return fmt.Errorf("relay peer address not found in peerstore")
+	}
+
+	// We need to connect to the relay first
+	if err := rpm.host.Connect(ctx, relayAddrInfo); err != nil {
+		return fmt.Errorf("failed to connect to relay: %w", err)
+	}
+
+	// Now connect to the target via the relay
+	// Explicitly: /p2p/RELAY_ID/p2p-circuit/p2p/TARGET_ID
+	relayMa, err := ma.NewMultiaddr(fmt.Sprintf("/p2p/%s/p2p-circuit/p2p/%s", relayPeer.String(), targetPeer.String()))
+	if err != nil {
+		return fmt.Errorf("failed to create relay multiaddr: %w", err)
+	}
 	
-	// Placeholder implementation
-	rpm.logger.Info("Would establish relay connection in a real implementation", "target", targetPeer, "relay", relayPeer)
+	targetInfo := peer.AddrInfo{
+		ID: targetPeer,
+		Addrs: []ma.Multiaddr{relayMa},
+	}
 	
+	if err := rpm.host.Connect(ctx, targetInfo); err != nil {
+		return fmt.Errorf("failed to connect to target via relay: %w", err)
+	}
+	
+	rpm.logger.Info("Successfully established relay connection", "target", targetPeer)
 	return nil
 }
 
@@ -46,27 +68,20 @@ func (rpm *RelayProxyManager) EstablishRelayConnection(ctx context.Context, targ
 func (rpm *RelayProxyManager) EstablishProxyConnection(ctx context.Context, targetAddr string, proxyAddr string) error {
 	rpm.logger.Info("Attempting to establish proxy connection", "target", targetAddr, "proxy", proxyAddr)
 	
-	// Parse the proxy address
-	proxyURL, err := ma.NewMultiaddr(proxyAddr)
+	// Create a dialer that uses the SOCKS5 proxy
+	dialer, err := proxy.SOCKS5("tcp", proxyAddr, nil, proxy.Direct)
 	if err != nil {
-		return fmt.Errorf("failed to parse proxy address: %w", err)
+		return fmt.Errorf("failed to create proxy dialer: %w", err)
 	}
 	
-	// Parse the target address
-	targetURL, err := ma.NewMultiaddr(targetAddr)
+	// Try to dial the target
+	conn, err := dialer.Dial("tcp", targetAddr)
 	if err != nil {
-		return fmt.Errorf("failed to parse target address: %w", err)
+		return fmt.Errorf("failed to dial target via proxy: %w", err)
 	}
+	defer conn.Close()
 	
-	// In a real implementation, this would:
-	// 1. Connect to the proxy server
-	// 2. Send a CONNECT request to the proxy for the target address
-	// 3. Use the proxied connection for communication
-	
-	// Placeholder implementation
-	rpm.logger.Info("Would establish proxy connection in a real implementation", 
-		"target", targetURL.String(), "proxy", proxyURL.String())
-	
+	rpm.logger.Info("Successfully established proxy connection", "target", targetAddr)
 	return nil
 }
 
@@ -74,13 +89,7 @@ func (rpm *RelayProxyManager) EstablishProxyConnection(ctx context.Context, targ
 func (rpm *RelayProxyManager) EstablishHTTPProxyConnection(ctx context.Context, targetAddr string, proxyAddr string) error {
 	rpm.logger.Info("Attempting to establish HTTP proxy connection", "target", targetAddr, "proxy", proxyAddr)
 	
-	// Parse proxy address
-	_, proxyPort, err := net.SplitHostPort(proxyAddr)
-	if err != nil {
-		return fmt.Errorf("failed to parse proxy address: %w", err)
-	}
-	
-	// Create a dialer that uses the HTTP proxy
+	// Create a dialer that uses the SOCKS5 proxy
 	dialer, err := proxy.SOCKS5("tcp", proxyAddr, nil, proxy.Direct)
 	if err != nil {
 		return fmt.Errorf("failed to create proxy dialer: %w", err)
@@ -96,8 +105,21 @@ func (rpm *RelayProxyManager) EstablishHTTPProxyConnection(ctx context.Context, 
 		Timeout:   30 * time.Second,
 	}
 	
-	// In a real implementation, this would:
-	// 1. Use the HTTP client to make requests through the proxy
+	// Make a request to the target
+	req, err := http.NewRequestWithContext(ctx, "GET", targetAddr, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to connect via proxy: %w", err)
+	}
+	defer resp.Body.Close()
+	
+	rpm.logger.Info("Successfully connected via proxy", "status", resp.Status)
+	return nil
+}
 	// 2. Handle authentication if required
 	// 3. Establish a tunnel for peer-to-peer communication
 	

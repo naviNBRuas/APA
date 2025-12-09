@@ -11,9 +11,11 @@ import (
 	"encoding/binary"
 
 	"github.com/libp2p/go-libp2p/core/host"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/peerstore"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/p2p/discovery/mdns"
 	discovery "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 )
 
@@ -42,7 +44,7 @@ func NewAdvancedDiscovery(logger *slog.Logger, host host.Host, dht *dht.IpfsDHT,
 		peerstore:        host.Peerstore(),
 		serviceTag:       serviceTag,
 		connectedPeers:   make(map[peer.ID]bool),
-		relayProxyMgr:    NewRelayProxyManager(logger, host.ID()),
+		relayProxyMgr:    NewRelayProxyManager(logger, host),
 		bluetoothDisc:    NewBluetoothDiscovery(logger, host.ID()),
 		reputationRouting: NewReputationRoutingManager(logger),
 	}
@@ -74,20 +76,33 @@ func (ad *AdvancedDiscovery) Start(ctx context.Context) {
 func (ad *AdvancedDiscovery) startMdnsDiscovery(ctx context.Context) {
 	ad.logger.Info("Starting mDNS discovery")
 
-	// In a real implementation, this would use the libp2p mDNS service
-	// For now, we'll simulate mDNS discovery
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
+	notifee := &discoveryNotifee{
+		h:      ad.host,
+		logger: ad.logger,
+	}
 
-	for {
-		select {
-		case <-ctx.Done():
-			ad.logger.Info("Stopping mDNS discovery")
-			return
-		case <-ticker.C:
-			ad.logger.Debug("Performing mDNS discovery")
-			// Simulate discovering peers via mDNS
-		}
+	s := mdns.NewMdnsService(ad.host, ad.serviceTag, notifee)
+	if err := s.Start(); err != nil {
+		ad.logger.Error("Failed to start mDNS service", "error", err)
+		return
+	}
+	
+	<-ctx.Done()
+	s.Close()
+}
+
+type discoveryNotifee struct {
+	h      host.Host
+	logger *slog.Logger
+}
+
+func (n *discoveryNotifee) HandlePeerFound(pi peer.AddrInfo) {
+	if pi.ID == n.h.ID() {
+		return
+	}
+	n.logger.Debug("mDNS peer found", "peer_id", pi.ID)
+	if err := n.h.Connect(context.Background(), pi); err != nil {
+		n.logger.Debug("Failed to connect to mDNS peer", "peer_id", pi.ID, "error", err)
 	}
 }
 
@@ -95,8 +110,10 @@ func (ad *AdvancedDiscovery) startMdnsDiscovery(ctx context.Context) {
 func (ad *AdvancedDiscovery) startDhtDiscovery(ctx context.Context) {
 	ad.logger.Info("Starting DHT discovery")
 
-	// In a real implementation, this would use the libp2p DHT service
-	// For now, we'll simulate DHT discovery
+	// Advertise ourselves
+	discovery.Advertise(ctx, ad.routingDiscovery, ad.serviceTag)
+
+	// Find peers
 	ticker := time.NewTicker(1 * time.Minute)
 	defer ticker.Stop()
 
@@ -106,8 +123,25 @@ func (ad *AdvancedDiscovery) startDhtDiscovery(ctx context.Context) {
 			ad.logger.Info("Stopping DHT discovery")
 			return
 		case <-ticker.C:
-			ad.logger.Debug("Performing DHT discovery")
-			// Simulate discovering peers via DHT
+			peers, err := discovery.FindPeers(ctx, ad.routingDiscovery, ad.serviceTag)
+			if err != nil {
+				ad.logger.Error("Failed to find peers", "error", err)
+				continue
+			}
+
+			for p := range peers {
+				if p.ID == ad.host.ID() || len(p.Addrs) == 0 {
+					continue
+				}
+				
+				if ad.host.Network().Connectedness(p.ID) != network.Connected {
+					go func(pi peer.AddrInfo) {
+						if err := ad.host.Connect(ctx, pi); err != nil {
+							ad.logger.Debug("Failed to connect to DHT peer", "peer_id", pi.ID, "error", err)
+						}
+					}(p)
+				}
+			}
 		}
 	}
 }

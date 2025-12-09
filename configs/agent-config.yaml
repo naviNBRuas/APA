@@ -9,6 +9,15 @@ admin_policy_path: "configs/admin_policy.rego"
 p2p:
   listen_addresses:
     - "/ip4/0.0.0.0/tcp/0"
+    - "/ip4/0.0.0.0/tcp/8080"
+    - "/ip4/0.0.0.0/tcp/80"
+    - "/ip4/0.0.0.0/tcp/443"
+    - "/ip4/0.0.0.0/udp/8080/quic-v1"
+    - "/ip4/0.0.0.0/udp/80/quic-v1"
+    - "/ip4/0.0.0.0/udp/443/quic-v1"
+    - "/ip4/0.0.0.0/tcp/8080/ws"
+    - "/ip4/0.0.0.0/tcp/80/ws"
+    - "/ip4/0.0.0.0/tcp/443/ws"
   bootstrap_peers: []
   heartbeat_interval: "10s"
 update:

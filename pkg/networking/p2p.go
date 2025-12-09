@@ -83,14 +83,24 @@ func NewP2P(ctx context.Context, logger *slog.Logger, config Config, peerID peer
 	host, err := libp2p.New(
 		libp2p.Identity(privKey),
 		libp2p.ListenAddrStrings(config.ListenAddresses...),
-		libp2p.DisableRelay(), // Disable relay by default
+		libp2p.EnableRelay(),           // Enable Circuit Relay v2 (client and server)
+		libp2p.EnableHolePunching(),    // Enable Hole Punching
+		libp2p.EnableNATService(),      // Enable NAT service
+		libp2p.NATPortMap(),            // Enable NAT port mapping
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create libp2p host: %w", err)
 	}
 
 	// Create the DHT
-	dht, err := dht.New(ctx, host)
+	// Use ModeAuto to automatically switch between client and server mode
+	// Use Public IPFS DHT protocol if we want to join the global network, or a custom one for private.
+	// For "autonomous" discovery without a central server, joining the public DHT is the best bet.
+	dhtOpts := []dht.Option{
+		dht.Mode(dht.ModeAuto),
+	}
+	
+	dht, err := dht.New(ctx, host, dhtOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create DHT: %w", err)
 	}
@@ -125,18 +135,27 @@ func NewP2P(ctx context.Context, logger *slog.Logger, config Config, peerID peer
 
 // connectToBootstrapPeers connects to the configured bootstrap peers.
 func (p *P2P) connectToBootstrapPeers(ctx context.Context, bootstrapPeers []string) error {
-	for _, addrStr := range bootstrapPeers {
-		// Parse the multiaddress
-		addr, err := ma.NewMultiaddr(addrStr)
-		if err != nil {
-			p.logger.Error("Failed to parse bootstrap peer address", "address", addrStr, "error", err)
-			continue
+	var peers []ma.Multiaddr
+	
+	if len(bootstrapPeers) == 0 {
+		p.logger.Info("No bootstrap peers configured, using default IPFS bootstrap peers")
+		peers = dht.DefaultBootstrapPeers
+	} else {
+		for _, addrStr := range bootstrapPeers {
+			addr, err := ma.NewMultiaddr(addrStr)
+			if err != nil {
+				p.logger.Error("Failed to parse bootstrap peer address", "address", addrStr, "error", err)
+				continue
+			}
+			peers = append(peers, addr)
 		}
+	}
 
+	for _, addr := range peers {
 		// Extract the peer ID from the multiaddress
 		peerInfo, err := peer.AddrInfoFromP2pAddr(addr)
 		if err != nil {
-			p.logger.Error("Failed to extract peer info from address", "address", addrStr, "error", err)
+			p.logger.Error("Failed to extract peer info from address", "address", addr.String(), "error", err)
 			continue
 		}
 
@@ -145,7 +164,7 @@ func (p *P2P) connectToBootstrapPeers(ctx context.Context, bootstrapPeers []stri
 
 		// Connect to the peer
 		if err := p.host.Connect(ctx, *peerInfo); err != nil {
-			p.logger.Error("Failed to connect to bootstrap peer", "peer", peerInfo.ID, "error", err)
+			p.logger.Debug("Failed to connect to bootstrap peer", "peer", peerInfo.ID, "error", err)
 		} else {
 			p.logger.Info("Connected to bootstrap peer", "peer", peerInfo.ID)
 		}

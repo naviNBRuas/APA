@@ -156,7 +156,8 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 
 	// Initialize decentralized controllers
 	var controllers []controller.Controller
-	taskOrchestrator := task_orchestrator.NewTaskOrchestrator(logger)
+	taskOrchestrator := task_orchestrator.NewTaskOrchestrator(logger, identity.PeerID.String())
+	taskOrchestrator.SetP2P(p2p) // Inject P2P instance
 	controllers = append(controllers, taskOrchestrator)
 
 	rt.config = config
