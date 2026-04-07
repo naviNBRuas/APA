@@ -1,0 +1,120 @@
+name: Code Quality and Security
+
+concurrency:
+  group: quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Weekly security scan
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: 'Base ref for comparison (e.g. main)'
+        required: false
+      head_ref:
+        description: 'Head ref for comparison (e.g. feature-branch)'
+        required: false
+
+jobs:
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'go' ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Build for CodeQL
+        run: |
+          mkdir -p /tmp/codeql-build
+          while IFS= read -r pkg; do
+            out="/tmp/codeql-build/$(echo "$pkg" | tr '/:' '__')"
+            go build -o "$out" "$pkg"
+          done < <(go list -f '{{if .GoFiles}}{{.ImportPath}}{{end}}' ./... | sed '/^$/d')
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        continue-on-error: true
+        with:
+          category: "/language:${{matrix.language}}"
+
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # this job runs on pull requests or when manually invoked from the Actions
+    # tab.  For manual runs the user may supply base_ref/head_ref inputs to
+    # compare; if omitted the action will run against the repository default
+    # branch.
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-1.0, GPL-2.0, AGPL-1.0, AGPL-3.0
+
+  trivy-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+          exit-code: '0'
+
+      - name: Upload Trivy scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: 'trivy-results.sarif'

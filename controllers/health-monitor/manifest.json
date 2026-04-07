@@ -1,0 +1,8 @@
+{
+  "name": "health-monitor",
+  "version": "v1.0.0",
+  "path": "./health-monitor",
+  "hash": "...",
+  "capabilities": ["health", "telemetry"],
+  "policy": "allow_all"
+}

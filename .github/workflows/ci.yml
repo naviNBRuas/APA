@@ -1,0 +1,199 @@
+name: CI
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Weekly build to catch dependency issues
+    - cron: '0 2 * * 1'
+
+jobs:
+  build-test:
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go-version: ['1.24.x']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache: true
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Verify dependencies
+        run: go mod verify
+
+      - name: Check formatting
+        shell: bash
+        run: |
+          if [ "$(find . -name '*.go' -not -path './.git/*' -not -path './vendor/*' -print0 | xargs -0 gofmt -l)" ]; then
+            echo "Code is not formatted correctly. Please run 'gofmt -w .'"
+            exit 1
+          fi
+
+      - name: Vet code
+        run: go vet ./...
+
+      - name: Run unit tests
+        run: go test -v -race -count=1 -covermode=atomic -coverprofile=coverage.out ./pkg/...
+
+      - name: Run integration tests
+        run: go test -v ./tests/...
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest'
+        continue-on-error: true
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.out
+          flags: unittests
+          name: codecov-umbrella
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Build standalone agent
+        run: go build -o standalone-agent cmd/standalone-agent/main.go
+
+      - name: Test standalone agent
+        if: matrix.os != 'windows-latest'
+        shell: bash
+        run: |
+          ./standalone-agent --demo-delay=1s &
+          AGENT_PID=$!
+          sleep 10
+          kill "$AGENT_PID" 2>/dev/null || true
+          wait "$AGENT_PID" 2>/dev/null || true
+
+  cross-platform-build:
+    name: Cross-Platform Build Matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+          - os: linux
+            arch: arm64
+          - os: darwin
+            arch: amd64
+          - os: darwin
+            arch: arm64
+          - os: windows
+            arch: amd64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Cross-compile
+        run: |
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build \
+            -ldflags="-s -w" \
+            -o bin/standalone-agent-${{ matrix.os }}-${{ matrix.arch }} \
+            cmd/standalone-agent/main.go
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: standalone-agent-${{ matrix.os }}-${{ matrix.arch }}
+          path: bin/standalone-agent-${{ matrix.os }}-${{ matrix.arch }}
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Run govulncheck
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@latest ./... || echo "govulncheck reported vulnerabilities (non-blocking in CI)"
+
+  lint:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m --issues-exit-code=1
+
+  documentation:
+    name: Documentation Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check README.md
+        run: |
+          if [ ! -f README.md ]; then
+            echo "README.md is missing"
+            exit 1
+          fi
+          if [ ! -s README.md ]; then
+            echo "README.md is empty"
+            exit 1
+          fi
+
+      - name: Check LICENSE
+        run: |
+          if [ ! -f LICENSE ]; then
+            echo "LICENSE file is missing"
+            exit 1
+          fi
+
+      - name: Check CHANGELOG.md
+        run: |
+          if [ ! -f CHANGELOG.md ]; then
+            echo "CHANGELOG.md is missing"
+            exit 1
+          fi

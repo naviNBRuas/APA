@@ -1,0 +1,8 @@
+{
+  "name": "telemetry-forwarder",
+  "version": "v1.0.0",
+  "path": "./telemetry-forwarder",
+  "hash": "...",
+  "capabilities": ["telemetry", "egress"],
+  "policy": "allow_all"
+}

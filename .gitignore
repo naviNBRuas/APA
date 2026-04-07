@@ -1,0 +1,75 @@
+# Binaries
+bin/
+build/
+dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go specific
+*.test
+*.out
+go.work
+_coverage/
+cpu.prof
+mem.prof
+trace.out
+
+# Compiled binaries
+*/example-controller/*
+*/payloads/*
+!*/payloads/*.go
+*/examples/modules/*/*.wasm
+
+# Test artifacts
+test-agent
+bench-agent
+coverage.out
+profile.out
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node/npm
+node_modules/
+
+# Python
+__pycache__/
+*.pyc
+venv/
+
+# Containers
+.containerfile
+Dockerfile
+Containerfile.*
+*.tar
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Secrets
+secrets/
+*.pem
+*.key
+.env
+
+# IDE and editor files
+*.sublime-project
+*.sublime-workspace
+.settings/
+.project
+.classpath
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Coverage reports
+*.cover
+coverage.html

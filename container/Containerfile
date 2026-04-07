@@ -1,0 +1,44 @@
+# Build stage
+FROM --platform=$BUILDPLATFORM golang:1.24.6-alpine AS builder
+
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+
+RUN apk add --no-cache build-base git libc-dev
+
+WORKDIR /src
+COPY . .
+
+# Build the agent binary for the requested platform
+RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /out/agentd ./cmd/agentd
+
+# Build WASM modules (deterministic layout under /out)
+RUN set -eux; \
+    modules="simple-adder system-info data-logger net-monitor crypto-hasher message-broker config-watcher"; \
+    for m in $modules; do \
+        outDir="/out/examples/modules/${m}"; \
+        mkdir -p "${outDir}"; \
+        GOOS=wasip1 GOARCH=wasm go build -o "${outDir}/${m}.wasm" "./examples/modules/${m}/main.go"; \
+    done
+
+# Runtime stage
+FROM --platform=$TARGETPLATFORM alpine:3.20
+
+RUN addgroup -S apa && adduser -S apa -G apa
+
+WORKDIR /app
+
+COPY --from=builder /out/agentd /app/agentd
+COPY --from=builder /out/examples /app/examples
+COPY controllers /app/controllers
+COPY configs /app/configs
+
+EXPOSE 8080 9090 4001 4002
+
+RUN mkdir -p /app/state && chown -R apa:apa /app
+VOLUME ["/app/state"]
+
+USER apa
+
+ENTRYPOINT ["/app/agentd"]
+CMD ["-config", "/app/configs/agent-config.yaml"]

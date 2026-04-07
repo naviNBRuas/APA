@@ -1,0 +1,3 @@
+Autonomous Polymorphic Agent (APA) is a resilient, modular, and self-healing peer-to-peer agent platform designed for research, learning, and advanced distributed systems experimentation. APA features adaptive networking, robust security, dynamic module support, audit logging, and observability, making it ideal for academic, cloud, and edge computing scenarios. Built in Go, leveraging libp2p, OPA, and modern best practices.
+
+go, golang, agent, p2p, distributed-systems, resilience, self-healing, modular, networking, security, academic, research, autonomous, decentralized, libp2p, audit, metrics, open-source, system-integration, docker, wasm, opa, rbac, cloud, edge-computing, peer-to-peer, automation, observability

@@ -1,0 +1,1297 @@
+### github.com/naviNBRuas/APA/cmd/agentd
+
+
+### github.com/naviNBRuas/APA/cmd/enhanced-agent
+Package main provides the enhanced autonomous agent demonstration.
+
+### github.com/naviNBRuas/APA/cmd/minimal-enhanced-agent
+Package main provides a minimal enhanced autonomous agent demonstration.
+
+### github.com/naviNBRuas/APA/cmd/p2pnode
+
+
+### github.com/naviNBRuas/APA/cmd/standalone-agent
+Package main provides a standalone minimal autonomous agent demonstration.
+
+### github.com/naviNBRuas/APA/cmd/webui
+
+
+### github.com/naviNBRuas/APA/controllers/health-monitor
+
+
+### github.com/naviNBRuas/APA/controllers/p2p-router
+
+
+### github.com/naviNBRuas/APA/controllers/telemetry-forwarder
+
+
+### github.com/naviNBRuas/APA/examples/drivers
+
+
+### github.com/naviNBRuas/APA/payloads
+
+
+### github.com/naviNBRuas/APA/pkg/agent
+package agent // import "github.com/naviNBRuas/APA/pkg/agent"
+
+Package agent provides the enhanced autonomous agent runtime with advanced
+capabilities.
+
+type ActivationState struct{ ... }
+type AdaptiveOrchestrationLayer struct{ ... }
+    func NewAdaptiveOrchestrationLayer(logger *slog.Logger, thresholds Thresholds) *AdaptiveOrchestrationLayer
+type AdminPeerManager struct{ ... }
+    func NewAdminPeerManager(logger *slog.Logger) *AdminPeerManager
+type AdvancedRuntime struct{ ... }
+    func NewAdvancedRuntime(logger *slog.Logger, eng *TransformationManager, ...) *AdvancedRuntime
+type Anomaly struct{}
+type AnomalyDetectionSystem struct{ ... }
+    func NewAnomalyDetectionSystem(logger *slog.Logger) *AnomalyDetectionSystem
+type AuditEntry struct{ ... }
+type AuditLogger struct{ ... }
+    func NewAuditLogger(logger *slog.Logger, path string) *AuditLogger
+type AutonomousStateMachine struct{ ... }
+    func NewAutonomousStateMachine(budget TaskBudget) *AutonomousStateMachine
+type BackupCommunicationChannel struct{}
+type BehavioralAnalysisSystem struct{}
+type CPUResourceManager struct{}
+type ChannelHealthMetrics struct{}
+type CheckpointManager struct{ ... }
+    func NewCheckpointManager(logger *slog.Logger) *CheckpointManager
+type CommandResult struct{ ... }
+type CommandSpec struct{ ... }
+type CommunicationProtocol string
+type CommunicationRoute struct{}
+type CompatibilityAdapterManager struct{}
+type CompleteSystemState struct{}
+type ComponentStatus struct{}
+type Config struct{ ... }
+type Credential struct{ ... }
+type CredentialVault struct{ ... }
+    func NewCredentialVault() *CredentialVault
+type Decision struct{}
+type DecisionContext struct{ ... }
+type DecisionMakingEngine struct{}
+type DynamicLoadBalancer struct{}
+type EnhancedRuntime struct{ ... }
+    func NewEnhancedRuntime(logger *slog.Logger, config *EnhancedRuntimeConfig) (*EnhancedRuntime, error)
+type EnhancedRuntimeConfig struct{ ... }
+type EnvInspector struct{}
+type EnvProfile struct{ ... }
+type EphemeralConfig struct{ ... }
+type EphemeralIdentityManager struct{ ... }
+    func NewEphemeralIdentityManager(logger *slog.Logger, baseKey libp2pcrypto.PrivKey, interval time.Duration) (*EphemeralIdentityManager, error)
+type EphemeralSession struct{ ... }
+type ErrorClassifier struct{}
+type ExperienceRecord struct{}
+type FailoverCoordinator struct{}
+type FaultEvent struct{}
+type FaultToleranceConfig struct{ ... }
+type FaultToleranceEngine struct{ ... }
+    func NewFaultToleranceEngine(logger *slog.Logger, config FaultToleranceConfig) *FaultToleranceEngine
+type HealingAction struct{}
+type HealthReport struct{ ... }
+type HistoricalDataPoint struct{}
+type IOResourceManager struct{}
+type Identity struct{ ... }
+    func NewIdentity(identityPath string) (*Identity, error)
+type IntelligenceCore struct{ ... }
+    func NewIntelligenceCore(logger *slog.Logger, params LearningParams) *IntelligenceCore
+type KnowledgeBase struct{}
+type LearningParams struct{}
+type Logger interface{ ... }
+type MachineLearningSystem struct{}
+type MemoryExecutor struct{}
+type MemoryResourceManager struct{}
+type MetricsCollector struct{ ... }
+    func NewMetricsCollector(logger *slog.Logger) *MetricsCollector
+type MultiProtocolCommunicationStack struct{ ... }
+    func NewMultiProtocolCommunicationStack(logger *slog.Logger, preferences []ProtocolPreference) *MultiProtocolCommunicationStack
+type NativeOrchestrator struct{ ... }
+    func NewNativeOrchestrator(allowed []string) *NativeOrchestrator
+type NetworkResourceManager struct{}
+type NodePerformanceMetrics struct{}
+type OptimizationProfile struct{}
+type OptimizationRule struct{}
+type OrchestratedTask struct{}
+type OrchestrationStrategy struct{}
+type PerformanceMetrics struct{ ... }
+type PerformanceMonitor struct{ ... }
+    func NewPerformanceMonitor(logger *slog.Logger) *PerformanceMonitor
+type PersistencePlan struct{ ... }
+type PersistencePlanner struct{}
+type PlatformAwarenessManager struct{ ... }
+    func NewPlatformAwarenessManager(logger *slog.Logger, optimizations PlatformOptimizations) *PlatformAwarenessManager
+type PlatformDetector struct{}
+type PlatformOptimizationEngine struct{}
+type PlatformOptimizations struct{}
+type PlatformProfile struct{}
+type PredictiveAnalyticsEngine struct{}
+type PrimaryCommunicationChannel struct{}
+type PrivilegePlan struct{ ... }
+type PrivilegePlanner struct{}
+type ProtocolPreference struct{}
+type ProtocolSelectionEngine struct{}
+type RecoveryPlanGenerator struct{}
+type RedundancyManagementSystem struct{}
+type ResourceAdaptation struct{}
+type ResourceAdaptationEvent struct{}
+type ResourceLimits struct{}
+type ResourceOptimizationEngine struct{ ... }
+    func NewResourceOptimizationEngine(logger *slog.Logger, limits ResourceLimits) *ResourceOptimizationEngine
+type ResourcePool struct{}
+type ResourceUsageSnapshot struct{}
+type Runtime struct{ ... }
+    func NewRuntime(configPath string, version string) (*Runtime, error)
+type SelfHealingEngine struct{ ... }
+    func NewSelfHealingEngine(logger *slog.Logger) *SelfHealingEngine
+type StateManager struct{ ... }
+    func NewStateManager(logger *slog.Logger) *StateManager
+type StatusResponse struct{ ... }
+type StrategicPlan struct{}
+type SystemState struct{ ... }
+type TaskBudget struct{ ... }
+type TaskScheduler struct{}
+type Thresholds struct{}
+type TrafficRoutingManager struct{}
+type TransformationManager struct{ ... }
+    func NewTransformationManager(engine *polymorphic.Engine, logger Logger) *TransformationManager
+type TriggerConditions struct{ ... }
+type TrustedChannel struct{ ... }
+    func NewTrustedChannel(sharedKey []byte) *TrustedChannel
+
+### github.com/naviNBRuas/APA/pkg/backup
+package backup // import "github.com/naviNBRuas/APA/pkg/backup"
+
+type BackupData struct{ ... }
+type BackupManager struct{ ... }
+    func NewBackupManager(logger *slog.Logger, backupDir, passphrase string) *BackupManager
+
+### github.com/naviNBRuas/APA/pkg/consensus
+package consensus // import "github.com/naviNBRuas/APA/pkg/consensus"
+
+type BaseConsensus struct{ ... }
+    func NewBaseConsensus(logger *slog.Logger, config *Config) *BaseConsensus
+type Config struct{ ... }
+type Consensus interface{ ... }
+type LeaderElection struct{ ... }
+    func NewLeaderElection(logger *slog.Logger, config *Config) *LeaderElection
+
+### github.com/naviNBRuas/APA/pkg/controller
+package controller // import "github.com/naviNBRuas/APA/pkg/controller"
+
+type Command interface{ ... }
+    func DefaultCommandFactory(ctx context.Context, name string, arg ...string) Command
+type CommandFactory func(ctx context.Context, name string, arg ...string) Command
+type Controller interface{ ... }
+type DummyController struct{ ... }
+    func NewDummyController(name string, logger *slog.Logger, manifest *manifest.Manifest) *DummyController
+type GoBinaryController struct{ ... }
+    func NewGoBinaryController(logger *slog.Logger, manifest *manifest.Manifest) *GoBinaryController
+type SandboxOptions struct{ ... }
+
+### github.com/naviNBRuas/APA/pkg/controller/manager
+package manager // import "github.com/naviNBRuas/APA/pkg/controller/manager"
+
+type Manager struct{ ... }
+    func NewManager(logger *slog.Logger, controllerDir string, ...) *Manager
+
+### github.com/naviNBRuas/APA/pkg/controller/manifest
+package manifest // import "github.com/naviNBRuas/APA/pkg/controller/manifest"
+
+type Manifest struct{ ... }
+
+### github.com/naviNBRuas/APA/pkg/controller/task-orchestrator
+package task_orchestrator // import "github.com/naviNBRuas/APA/pkg/controller/task-orchestrator"
+
+type MultiPathExecutor struct{ ... }
+    func NewMultiPathExecutor(logger *slog.Logger, workers []Worker, quorum int) *MultiPathExecutor
+type TaskCommand struct{ ... }
+type TaskOrchestrator struct{ ... }
+    func NewTaskOrchestrator(logger *slog.Logger, localPeerID string) *TaskOrchestrator
+type Worker interface{ ... }
+    func NewCommandWorker(to *TaskOrchestrator) Worker
+
+### github.com/naviNBRuas/APA/pkg/controlplane
+package controlplane // import "github.com/naviNBRuas/APA/pkg/controlplane"
+
+type Config struct{ ... }
+type ControlPlane struct{ ... }
+    func New(logger *slog.Logger, transport Transport, cfg Config) *ControlPlane
+type SnapshotEntry struct{ ... }
+type Transport interface{ ... }
+    func NewControllerTransport(logger *slog.Logger, p2p *networking.P2P, idProvider func() string) Transport
+
+### github.com/naviNBRuas/APA/pkg/driver
+package driver // import "github.com/naviNBRuas/APA/pkg/driver"
+
+type ArchitectureInfo struct{ ... }
+type BaseDriver struct{ ... }
+    func NewBaseDriver(manager *Manager, name, version, driverType, description string) *BaseDriver
+type Driver interface{ ... }
+type Manager struct{ ... }
+    func NewManager(logger *slog.Logger, driverDir string) *Manager
+type Manifest struct{ ... }
+
+### github.com/naviNBRuas/APA/pkg/edr
+package edr // import "github.com/naviNBRuas/APA/pkg/edr"
+
+type AnomalyDetector struct{ ... }
+    func NewAnomalyDetector(logger *slog.Logger) *AnomalyDetector
+type Event struct{ ... }
+type MachineLearningDetector struct{ ... }
+    func NewMachineLearningDetector(logger *slog.Logger) *MachineLearningDetector
+type Monitor struct{ ... }
+    func NewMonitor(logger *slog.Logger) *Monitor
+type ResponseAction struct{ ... }
+type ResponseManager struct{ ... }
+    func NewResponseManager(logger *slog.Logger) *ResponseManager
+type SuspiciousConnection struct{ ... }
+type SuspiciousFile struct{ ... }
+type SuspiciousProcess struct{ ... }
+type SuspiciousSyscall struct{ ... }
+
+### github.com/naviNBRuas/APA/pkg/health
+package health // import "github.com/naviNBRuas/APA/pkg/health"
+
+type CheckResult struct{ ... }
+type HealthCheck interface{ ... }
+type HealthController struct{ ... }
+    func NewHealthController(logger *slog.Logger) *HealthController
+type ProcessLivenessCheck struct{ ... }
+    func NewProcessLivenessCheck() *ProcessLivenessCheck
+type Status string
+    const StatusOK Status = "ok" ...
+
+### github.com/naviNBRuas/APA/pkg/injection
+package injection // import "github.com/naviNBRuas/APA/pkg/injection"
+
+Package injection provides capabilities for embedding the agent into system
+libraries
+
+Package injection provides capabilities for injecting the agent into other
+processes
+
+type AdvancedProcessInjector struct{ ... }
+    func NewAdvancedProcessInjector(logger *slog.Logger, agentPath string, peerID peer.ID) *AdvancedProcessInjector
+type InjectionRequest struct{ ... }
+type LibraryEmbedder struct{ ... }
+    func NewLibraryEmbedder(logger *slog.Logger, agentPath string, peerID peer.ID) *LibraryEmbedder
+type ProcessInjector struct{ ... }
+    func NewProcessInjector(logger *slog.Logger, agentPath string, peerID peer.ID) *ProcessInjector
+
+### github.com/naviNBRuas/APA/pkg/intelligence
+package intelligence // import "github.com/naviNBRuas/APA/pkg/intelligence"
+
+Package intelligence provides advanced adaptive algorithms and decision-making
+capabilities.
+
+type AccuracyMetrics struct{ ... }
+type AdaptiveDecisionMaker struct{ ... }
+    func NewAdaptiveDecisionMaker(logger *slog.Logger, config DecisionMakingConfig) *AdaptiveDecisionMaker
+type AdvancedAnomalyDetector struct{ ... }
+    func NewAdvancedAnomalyDetector(logger *slog.Logger, config AnomalyDetectionConfig) *AdvancedAnomalyDetector
+type AlgorithmType string
+    const AlgorithmRandomForest AlgorithmType = "random_forest" ...
+type AnomalyAlertSystem struct{}
+    func NewAnomalyAlertSystem(logger *slog.Logger) *AnomalyAlertSystem
+type AnomalyAlgorithm string
+    const AlgorithmIsolationForest AnomalyAlgorithm = "isolation_forest" ...
+type AnomalyContextEngine struct{}
+    func NewAnomalyContextEngine(logger *slog.Logger) *AnomalyContextEngine
+type AnomalyDetectionConfig struct{}
+type AnomalyDetector struct{ ... }
+type AnomalyFlag struct{}
+type AnomalyFusionEngine struct{ ... }
+    func NewAnomalyFusionEngine(logger *slog.Logger) *AnomalyFusionEngine
+type AnomalySample struct{}
+type AnomalySeverity string
+    const AnomalySeverityLow AnomalySeverity = "low" ...
+type AnomalyType string
+    const AnomalyStatistical AnomalyType = "statistical" ...
+type BehaviorAnalysis struct{}
+type BehaviorBaseline struct{}
+type BehaviorModel struct{ ... }
+type BehaviorPattern struct{ ... }
+type BehaviorProfile struct{ ... }
+type BehaviorThresholds struct{}
+type BehaviorType string
+    const BehaviorNetwork BehaviorType = "network" ...
+type BehavioralAnalysisSystem struct{ ... }
+    func NewBehavioralAnalysisSystem(logger *slog.Logger, config BehavioralConfig) *BehavioralAnalysisSystem
+type BehavioralAnomalyEngine struct{}
+    func NewBehavioralAnomalyEngine(logger *slog.Logger) *BehavioralAnomalyEngine
+type BehavioralConfig struct{}
+type Benefit struct{}
+type ClusteringEngine struct{}
+    func NewClusteringEngine(logger *slog.Logger) *ClusteringEngine
+type Concept struct{}
+type ConfidenceAssessmentEngine struct{}
+    func NewConfidenceAssessmentEngine(logger *slog.Logger) *ConfidenceAssessmentEngine
+type ConflictResolutionEngine struct{}
+type ConsensusBuilder struct{ ... }
+    func NewConsensusBuilder(logger *slog.Logger) *ConsensusBuilder
+type ConsensusMethod string
+    const ConsensusVoting ConsensusMethod = "voting" ...
+type ConsensusWeightEngine struct{}
+type Constraint struct{}
+type ConstraintDefinition struct{}
+type ConstraintManagementEngine struct{ ... }
+    func NewConstraintManagementEngine(logger *slog.Logger) *ConstraintManagementEngine
+type ConstraintPrioritizationEngine struct{}
+type ConstraintRelaxationEngine struct{}
+type ConstraintValidationEngine struct{}
+type ContextAnalyzer struct{ ... }
+    func NewContextAnalyzer(logger *slog.Logger) *ContextAnalyzer
+type ContextFactor struct{ ... }
+type ContextNormalizer struct{}
+type ContextWeightEngine struct{}
+type DecisionAlternative struct{ ... }
+type DecisionContext struct{ ... }
+type DecisionDomain string
+    const DecisionNetwork DecisionDomain = "network" ...
+type DecisionMakingConfig struct{}
+type DecisionModel struct{ ... }
+type DecisionOutcome struct{ ... }
+type DecisionRecord struct{ ... }
+type Dependency struct{}
+type DeploymentStatus string
+    const DeploymentDevelopment DeploymentStatus = "development" ...
+type DetectedAnomaly struct{ ... }
+type DetectionMetrics struct{}
+type Deviation struct{}
+type EnsembleLearningSystem struct{}
+    func NewEnsembleLearningSystem(logger *slog.Logger) *EnsembleLearningSystem
+type Evidence struct{}
+type ExperienceRecord struct{ ... }
+type Fact struct{}
+type FactorRange struct{}
+type FactorType string
+    const FactorNumerical FactorType = "numerical" ...
+type FeatureEngineeringEngine struct{ ... }
+    func NewFeatureEngineeringEngine(logger *slog.Logger) *FeatureEngineeringEngine
+type FeatureEngineeringRule struct{}
+type FeaturePipeline struct{}
+type FeatureSelectionEngine struct{}
+type FeatureTransformationEngine struct{}
+type ForecastType string
+    const ForecastDemand ForecastType = "demand" ...
+type ForecastValue struct{ ... }
+type ForecastingEngine struct{}
+type ForecastingModel struct{ ... }
+type FusionConfidenceEngine struct{}
+type FusionDecisionEngine struct{}
+type FusionMethod struct{}
+type FusionWeightEngine struct{}
+type GoalConflictResolver struct{}
+type GoalHierarchy struct{ ... }
+    func NewGoalHierarchy(logger *slog.Logger) *GoalHierarchy
+type GoalNode struct{}
+type GoalPriorityEngine struct{}
+type GoalProgressTracker struct{}
+type HistoricalDecision struct{}
+type ImpactAssessment struct{}
+type ImportanceLevel string
+    const ImportanceCritical ImportanceLevel = "critical" ...
+type Initiative struct{}
+type IntelligenceConfig struct{ ... }
+type IntelligenceEngine struct{ ... }
+    func NewIntelligenceEngine(logger *slog.Logger, config IntelligenceConfig) (*IntelligenceEngine, error)
+type KnowledgeBase struct{ ... }
+type LearningConfig struct{}
+type LearningEvent struct{ ... }
+type LearningEventType string
+    const LearningTraining LearningEventType = "training" ...
+type LearningFeedback struct{ ... }
+type LearningInsight struct{}
+type LearningResult struct{}
+type MLModel struct{ ... }
+type MachineLearningSystem struct{ ... }
+    func NewMachineLearningSystem(logger *slog.Logger, config LearningConfig) *MachineLearningSystem
+type MetaOptimizationEngine struct{}
+    func NewMetaOptimizationEngine(logger *slog.Logger) *MetaOptimizationEngine
+type ModelMetrics struct{}
+type ModelPerformance struct{ ... }
+type ModelSelectionEngine struct{}
+    func NewModelSelectionEngine(logger *slog.Logger) *ModelSelectionEngine
+type ModelType string
+    const ModelSupervised ModelType = "supervised" ...
+type ModelValidationEngine struct{}
+type MultiCriteriaDecisionEngine struct{}
+type Objective struct{}
+type ObjectiveFunction struct{}
+type ObjectiveFunctionEngine struct{}
+    func NewObjectiveFunctionEngine(logger *slog.Logger) *ObjectiveFunctionEngine
+type OptimalSolution struct{ ... }
+type OptimizationAlgorithm string
+    const AlgorithmGradientDescent OptimizationAlgorithm = "gradient_descent" ...
+type OptimizationConfig struct{}
+type OptimizationEngine struct{ ... }
+    func NewOptimizationEngine(logger *slog.Logger, config OptimizationConfig) *OptimizationEngine
+type OptimizationPerformance struct{}
+type OptimizationRun struct{ ... }
+type OptimizationType string
+    const OptimizationLinear OptimizationType = "linear" ...
+type Optimizer struct{ ... }
+type OutcomeFeedback struct{}
+type PatternClusteringEngine struct{}
+type PatternEvolutionTracker struct{}
+type PatternMatcher struct{}
+type PatternMatchingAlgorithm struct{}
+type PatternMatchingEngine struct{ ... }
+    func NewPatternMatchingEngine(logger *slog.Logger) *PatternMatchingEngine
+type PatternRecognitionEngine struct{ ... }
+    func NewPatternRecognitionEngine(logger *slog.Logger) *PatternRecognitionEngine
+type PatternSimilarityEngine struct{}
+type PatternTemplate struct{}
+type PatternType string
+    const PatternSequential PatternType = "sequential" ...
+type PlanExecutionEngine struct{}
+    func NewPlanExecutionEngine(logger *slog.Logger) *PlanExecutionEngine
+type PlanProgress struct{}
+type PlanStatus string
+type PlanningHorizon string
+    const HorizonShortTerm PlanningHorizon = "short_term" ...
+type PlanningModel struct{ ... }
+type Prediction struct{ ... }
+type PredictiveAnalyticsEngine struct{ ... }
+    func NewPredictiveAnalyticsEngine(logger *slog.Logger, config PredictiveConfig) *PredictiveAnalyticsEngine
+type PredictiveConfig struct{}
+type Relationship struct{}
+type Resolution struct{}
+type ResourceAllocation struct{}
+type RiskAssessmentEngine struct{ ... }
+    func NewRiskAssessmentEngine(logger *slog.Logger) *RiskAssessmentEngine
+type RiskCorrelationEngine struct{}
+type RiskFactor struct{}
+type RiskMitigationEngine struct{}
+type RiskModel struct{}
+type RiskPortfolioEngine struct{}
+type RiskProfile struct{}
+type RiskType string
+    const RiskOperational RiskType = "operational" ...
+type Rule struct{}
+type ScenarioGenerator struct{}
+    func NewScenarioGenerator(logger *slog.Logger) *ScenarioGenerator
+type ScenarioPlanningEngine struct{}
+    func NewScenarioPlanningEngine(logger *slog.Logger) *ScenarioPlanningEngine
+type SensitivityAnalyzer struct{}
+type SequenceAnalyzer struct{}
+type SimilarityEngine struct{}
+type SolutionSpaceExplorer struct{}
+    func NewSolutionSpaceExplorer(logger *slog.Logger) *SolutionSpaceExplorer
+type StationarityEngine struct{}
+type StrategicConfig struct{}
+type StrategicGoal struct{}
+type StrategicPlan struct{ ... }
+type StrategicPlanningEngine struct{ ... }
+    func NewStrategicPlanningEngine(logger *slog.Logger, config StrategicConfig) *StrategicPlanningEngine
+type StrategicResourceAllocator struct{}
+    func NewStrategicResourceAllocator(logger *slog.Logger) *StrategicResourceAllocator
+type StrategicRisk struct{}
+type Theory struct{}
+type TimeSeriesAnomalyDetector struct{}
+type TimeSeriesDecompositionEngine struct{}
+type TimeSeriesEngine struct{ ... }
+    func NewTimeSeriesEngine(logger *slog.Logger) *TimeSeriesEngine
+type TimeSeriesModel struct{}
+type Tradeoff struct{}
+type TrainingEngine struct{ ... }
+    func NewTrainingEngine(logger *slog.Logger) *TrainingEngine
+type TrainingJob struct{}
+type TrainingResourceManager struct{}
+type TrainingSample struct{ ... }
+type TrainingScheduler struct{}
+type TrendAnalysisEngine struct{}
+    func NewTrendAnalysisEngine(logger *slog.Logger) *TrendAnalysisEngine
+type UnintendedEffect struct{}
+type UtilityCalculator struct{ ... }
+    func NewUtilityCalculator(logger *slog.Logger) *UtilityCalculator
+type UtilityFunction struct{}
+type UtilityType string
+    const UtilityLinear UtilityType = "linear" ...
+type Variable struct{}
+
+### github.com/naviNBRuas/APA/pkg/module
+package module // import "github.com/naviNBRuas/APA/pkg/module"
+
+type Manager struct{ ... }
+    func NewManager(ctx context.Context, logger *slog.Logger, moduleDir string, ...) (*Manager, error)
+type Manifest struct{ ... }
+type Module interface{ ... }
+type WasmModule struct{ ... }
+    func NewWasmModule(manifest *Manifest, instance api.Module, logger *slog.Logger) *WasmModule
+type WasmRuntime struct{ ... }
+    func NewWasmRuntime(ctx context.Context, logger *slog.Logger) (*WasmRuntime, error)
+
+### github.com/naviNBRuas/APA/pkg/networking
+package networking // import "github.com/naviNBRuas/APA/pkg/networking"
+
+Package networking provides P2P networking capabilities for the APA agent.
+
+Package networking provides advanced multi-protocol networking with redundancy
+and failover capabilities.
+
+Package networking provides P2P networking capabilities for the APA agent.
+
+Package networking provides reputation-based routing capabilities for the APA
+agent.
+
+const HeartbeatTopic = "apa/heartbeat/1.0.0" ...
+func ResolveFirst(ctx context.Context, r hostResolver, candidates []string) (string, []string, error)
+type AdvancedDiscovery struct{ ... }
+    func NewAdvancedDiscovery(logger *slog.Logger, host host.Host, dht *dht.IpfsDHT, serviceTag string) *AdvancedDiscovery
+type BluetoothDiscovery struct{ ... }
+    func NewBluetoothDiscovery(logger *slog.Logger, host peer.ID) *BluetoothDiscovery
+type BootstrapSources struct{ ... }
+type ChannelSynchronizer struct{ ... }
+type CommunicationProtocol interface{ ... }
+type Config struct{ ... }
+type ConnectionInfo struct{ ... }
+type ConnectionMetrics struct{ ... }
+type ConnectionStatus string
+    const ConnectionConnected ConnectionStatus = "connected" ...
+type ControllerMessage struct{ ... }
+type DGAConfig struct{ ... }
+type DNSCacheEntry struct{ ... }
+type DNSConfig struct{}
+type DNSProtocol struct{ ... }
+    func NewDNSProtocol(logger *slog.Logger) (*DNSProtocol, error)
+type DeterministicNamer struct{ ... }
+    func NewDeterministicNamer(cfg DGAConfig) *DeterministicNamer
+type DiscoveryBeacon struct{ ... }
+type DiurnalCurve struct{ ... }
+type EncryptedDiscovery struct{ ... }
+    func NewEncryptedDiscovery(seed string) (*EncryptedDiscovery, error)
+type EncryptedMessenger struct{ ... }
+    func NewEncryptedMessenger(key []byte) (*EncryptedMessenger, error)
+type FailureEvent struct{ ... }
+type FailureSeverity string
+    const SeverityLow FailureSeverity = "low" ...
+type FailureThresholds struct{ ... }
+type ForwardDecider interface{ ... }
+type ForwardPolicy struct{ ... }
+type HTTPConfig struct{}
+type HTTPProtocol struct{ ... }
+    func NewHTTPProtocol(logger *slog.Logger) (*HTTPProtocol, error)
+type IntelligentRoutingEngine struct{ ... }
+    func NewIntelligentRoutingEngine(logger *slog.Logger) *IntelligentRoutingEngine
+type InteractionResult int
+    const Success InteractionResult = iota ...
+type InteractionType int
+    const ModuleTransfer InteractionType = iota ...
+type LeaderElectionMessage struct{ ... }
+type LibP2PConfig struct{}
+type LibP2PProtocol struct{ ... }
+    func NewLibP2PProtocol(logger *slog.Logger) (*LibP2PProtocol, error)
+type LoadBalancingStrategy string
+    const StrategyRoundRobin LoadBalancingStrategy = "round_robin" ...
+type MessagePriority int
+    const PriorityLow MessagePriority = iota ...
+type MessageType string
+    const MessageTypePing MessageType = "ping" ...
+type ModuleAnnouncementMessage struct{ ... }
+type MultiProtocolConfig struct{ ... }
+type MultiProtocolManager struct{ ... }
+    func NewMultiProtocolManager(logger *slog.Logger, config MultiProtocolConfig) (*MultiProtocolManager, error)
+type NetworkMessage struct{ ... }
+type NetworkStats struct{ ... }
+type NetworkStatsManager struct{ ... }
+    func NewNetworkStatsManager(logger *slog.Logger) *NetworkStatsManager
+type NetworkStatsProvider interface{ ... }
+type OverlayConfig struct{ ... }
+type OverlayEnvelope struct{ ... }
+type OverlayMode string
+    const OverlayHTTPS OverlayMode = "https" ...
+type OverlayMux struct{ ... }
+    func NewOverlayMux(logger *slog.Logger, cfg OverlayConfig) *OverlayMux
+type P2P struct{ ... }
+    func NewP2P(ctx context.Context, logger *slog.Logger, config Config, peerID peer.ID, ...) (*P2P, error)
+type PeerConnection struct{ ... }
+type PeerReputationManager struct{ ... }
+    func NewPeerReputationManager(logger *slog.Logger) *PeerReputationManager
+type PeerScore struct{ ... }
+type PropagationPayload struct{ ... }
+type ProtocolFailureDetector struct{ ... }
+    func NewProtocolFailureDetector(logger *slog.Logger, timeout time.Duration) *ProtocolFailureDetector
+type ProtocolHealthMetrics struct{ ... }
+type ProtocolSwitchingEngine struct{ ... }
+    func NewProtocolSwitchingEngine(logger *slog.Logger, adaptive bool) *ProtocolSwitchingEngine
+type ProtocolType string
+    const ProtocolLibP2P ProtocolType = "libp2p" ...
+type QUICConfig struct{}
+type QUICProtocol struct{ ... }
+    func NewQUICProtocol(logger *slog.Logger) (*QUICProtocol, error)
+type QoSRequirements struct{ ... }
+type RedundancyManager struct{ ... }
+type RelayProxyManager struct{ ... }
+    func NewRelayProxyManager(logger *slog.Logger, h host.Host) *RelayProxyManager
+type ReputationProvider interface{ ... }
+type ReputationRoutingManager struct{ ... }
+    func NewReputationRoutingManager(logger *slog.Logger) *ReputationRoutingManager
+type RouteOption struct{ ... }
+type RoutePerformance struct{}
+type RoutingStrategy string
+    const RouteShortestPath RoutingStrategy = "shortest_path" ...
+type SecurityLevel string
+    const SecurityNone SecurityLevel = "none" ...
+type SecurityRequirements struct{ ... }
+type SelectiveForwarder struct{ ... }
+    func NewSelectiveForwarder(policy ForwardPolicy, rep ReputationProvider, net NetworkStatsProvider) *SelectiveForwarder
+type ShapingDecider struct{ ... }
+    func NewShapingDecider(inner ForwardDecider, shaper *TrafficShaper, regionLookup func(peer.ID) string) *ShapingDecider
+type StoreAndForward struct{ ... }
+    func NewStoreAndForward(logger *slog.Logger, maxCache int, ttl time.Duration) *StoreAndForward
+type SwitchEvent struct{ ... }
+type SwitchingCriteria struct{ ... }
+type SyncStrategy string
+    const SyncPrimaryOnly SyncStrategy = "primary_only" ...
+type TCPConfig struct{}
+type TCPProtocol struct{ ... }
+    func NewTCPProtocol(logger *slog.Logger) (*TCPProtocol, error)
+type TaskEnvelope struct{ ... }
+type TrafficShaper struct{ ... }
+    func NewTrafficShaper(baseBytesPerMinute int, diurnal DiurnalCurve, geo map[string]float64, ...) *TrafficShaper
+type TransportOption struct{ ... }
+    func SelectTransport(candidates []TransportOption) (TransportOption, error)
+type UDPConfig struct{}
+type UDPPacket struct{ ... }
+type UDPProtocol struct{ ... }
+    func NewUDPProtocol(logger *slog.Logger) (*UDPProtocol, error)
+type WebSocketConfig struct{}
+type WebSocketProtocol struct{ ... }
+    func NewWebSocketProtocol(logger *slog.Logger) (*WebSocketProtocol, error)
+
+### github.com/naviNBRuas/APA/pkg/obfuscation
+package obfuscation // import "github.com/naviNBRuas/APA/pkg/obfuscation"
+
+type AntiAnalysis struct{ ... }
+    func NewAntiAnalysis(logger *slog.Logger) *AntiAnalysis
+type AntiTampering struct{ ... }
+    func NewAntiTampering(logger *slog.Logger) *AntiTampering
+type Obfuscator struct{ ... }
+    func NewObfuscator(logger *slog.Logger) *Obfuscator
+
+### github.com/naviNBRuas/APA/pkg/opa
+package opa // import "github.com/naviNBRuas/APA/pkg/opa"
+
+type OPAPolicyEngine struct{ ... }
+    func NewOPAPolicyEngine() *OPAPolicyEngine
+
+### github.com/naviNBRuas/APA/pkg/patch
+package patch // import "github.com/naviNBRuas/APA/pkg/patch"
+
+type Patch struct{ ... }
+type PatchManager struct{ ... }
+    func NewPatchManager(logger *slog.Logger) *PatchManager
+
+### github.com/naviNBRuas/APA/pkg/persistence
+package persistence // import "github.com/naviNBRuas/APA/pkg/persistence"
+
+type NetworkTarget struct{ ... }
+type PropagationManager struct{ ... }
+    func NewPropagationManager(logger *slog.Logger, agentPath string, p2p *networking.P2P, peerID string) *PropagationManager
+type RemovableMedia struct{ ... }
+
+### github.com/naviNBRuas/APA/pkg/platform
+package platform // import "github.com/naviNBRuas/APA/pkg/platform"
+
+Package platform provides advanced cross-platform compatibility and
+platform-specific optimizations.
+
+const MinimalBuild = false
+const TinyGoBuild = false
+type AcceleratorInfo struct{ ... }
+type AcceleratorType string
+    const AcceleratorGPU AcceleratorType = "gpu" ...
+type AdaptationEngine struct{ ... }
+    func NewAdaptationEngine(logger *slog.Logger, thresholds AdaptationThresholds) *AdaptationEngine
+type AdaptationEvent struct{ ... }
+type AdaptationStrategy struct{ ... }
+type AdaptationThresholds struct{ ... }
+type AdaptationTrigger struct{ ... }
+type AlertLevel string
+    const AlertInfo AlertLevel = "info" ...
+type AllocationPolicy struct{ ... }
+type Architecture struct{ ... }
+type BufferSizes struct{ ... }
+type CPUInfo struct{ ... }
+type CPUOptimizationStrategy struct{ ... }
+type CompatibilityLayer struct{ ... }
+    func NewCompatibilityLayer(logger *slog.Logger, overrides CompatibilityOverrides) *CompatibilityLayer
+type CompatibilityOverrides struct{ ... }
+type CompatibilityPatch struct{ ... }
+type ContainerSupport struct{ ... }
+type DecisionNode struct{ ... }
+type DiskIOMetrics struct{ ... }
+type FileSystemCapabilities struct{ ... }
+type FileSystemHint struct{ ... }
+type GCSettings struct{ ... }
+type GPUInfo struct{ ... }
+type GovernorSettings struct{ ... }
+type HardwareSpecs struct{ ... }
+type HugePageConfig struct{ ... }
+type IOOptimizationStrategy struct{ ... }
+type LatencyProfile struct{ ... }
+type LoadAverage struct{ ... }
+type MemoryInfo struct{ ... }
+type MemoryOptimizationStrategy struct{ ... }
+type NATTraversal struct{ ... }
+type NetworkCapabilities struct{ ... }
+type NetworkInterface struct{ ... }
+type NetworkMetrics struct{ ... }
+type NetworkOptimizationStrategy struct{ ... }
+type OperatingSystem struct{ ... }
+type OptimizationModel struct{ ... }
+type OptimizationProfile struct{}
+type OptimizationStrategy struct{ ... }
+type PlatformAdapter struct{ ... }
+type PlatformConfig struct{ ... }
+type PlatformDetector struct{ ... }
+    func NewPlatformDetector(logger *slog.Logger, cacheExpiry time.Duration) *PlatformDetector
+type PlatformManager struct{ ... }
+    func NewPlatformManager(logger *slog.Logger, config PlatformConfig) (*PlatformManager, error)
+type PlatformOptimizer struct{ ... }
+    func NewPlatformOptimizer(logger *slog.Logger, strategies map[PlatformType]OptimizationStrategy) *PlatformOptimizer
+type PlatformProfile struct{ ... }
+type PlatformType string
+    const PlatformLinuxAMD64 PlatformType = "linux_amd64" ...
+type PowerManagement struct{ ... }
+type PowerOptimizationStrategy struct{ ... }
+type PowerProfile struct{ ... }
+type PriorityLimits struct{ ... }
+type ProtocolHint struct{ ... }
+type ResourceAlert struct{ ... }
+type ResourceAllocation struct{ ... }
+type ResourceAllocator struct{ ... }
+type ResourceLimits struct{ ... }
+type ResourceManager struct{ ... }
+    func NewResourceManager(logger *slog.Logger, limits ResourceLimits) *ResourceManager
+type ResourceMetrics struct{ ... }
+type ResourceMonitor struct{ ... }
+type ResourceOptimizer struct{ ... }
+type RuntimeEnvironment struct{ ... }
+type RuntimeProfile struct{ ... }
+    func Current() RuntimeProfile
+type SecurityFeatures struct{ ... }
+type SecurityOptimizationStrategy struct{ ... }
+type StorageInfo struct{ ... }
+type SuspendSupport struct{ ... }
+type ThermalProfile struct{ ... }
+type ThermalZone struct{ ... }
+type TrainingSample struct{ ... }
+type WirelessSupport struct{ ... }
+
+### github.com/naviNBRuas/APA/pkg/policy
+package policy // import "github.com/naviNBRuas/APA/pkg/policy"
+
+type Config struct{ ... }
+type PolicyEnforcer interface{ ... }
+type PolicyEnforcerImpl struct{ ... }
+    func NewPolicyEnforcer(policyPath string) (*PolicyEnforcerImpl, error)
+
+### github.com/naviNBRuas/APA/pkg/polymorphic
+package polymorphic // import "github.com/naviNBRuas/APA/pkg/polymorphic"
+
+type DataBus struct{ ... }
+    func NewDataBus() *DataBus
+type DataEvent struct{ ... }
+type Engine struct{ ... }
+    func NewEngine(logger *slog.Logger) *Engine
+type Reducer interface{ ... }
+type ReducerFunc func(map[string]interface{}, DataEvent) error
+
+### github.com/naviNBRuas/APA/pkg/rbac
+package rbac // import "github.com/naviNBRuas/APA/pkg/rbac"
+
+type Config struct{ ... }
+type OPARBAC struct{ ... }
+    func NewOPARBAC(logger *slog.Logger, config *Config) (*OPARBAC, error)
+type Permission struct{ ... }
+type Policy struct{ ... }
+type RBAC interface{ ... }
+type RBACImpl struct{ ... }
+    func NewRBAC(logger *slog.Logger, config *Config) *RBACImpl
+type Role struct{ ... }
+type User struct{ ... }
+
+### github.com/naviNBRuas/APA/pkg/recovery
+package recovery // import "github.com/naviNBRuas/APA/pkg/recovery"
+
+type BackupManagerService interface{ ... }
+type ControllerManagerService interface{ ... }
+type ExtendedRecoveryController struct{ ... }
+    func NewExtendedRecoveryController(logger *slog.Logger, config interface{}, ...) *ExtendedRecoveryController
+type ModuleManagerService interface{ ... }
+type P2PRecoveryManager struct{ ... }
+    func NewP2PRecoveryManager(logger *slog.Logger, p2p P2PService, moduleManager ModuleManagerService, ...) *P2PRecoveryManager
+type P2PService interface{ ... }
+type RecoveryController struct{ ... }
+    func NewRecoveryController(logger *slog.Logger, config any, applyConfigFunc func(configData []byte) error, ...) *RecoveryController
+type RecoveryRequest struct{ ... }
+type RecoveryResponse struct{ ... }
+type ReputationService interface{ ... }
+type SnapshotData struct{ ... }
+
+### github.com/naviNBRuas/APA/pkg/regeneration
+package regeneration // import "github.com/naviNBRuas/APA/pkg/regeneration"
+
+Package regeneration provides self-healing and regeneration capabilities for the
+APA agent
+
+type Config struct{ ... }
+type Regenerator struct{ ... }
+    func NewRegenerator(logger *slog.Logger, config *Config, p2p *networking.P2P, peerID peer.ID) *Regenerator
+
+### github.com/naviNBRuas/APA/pkg/robustness
+package robustness // import "github.com/naviNBRuas/APA/pkg/robustness"
+
+Package robustness provides advanced error handling, self-healing, and fault
+tolerance mechanisms.
+
+type ActiveEmergency struct{ ... }
+type ActiveInjection struct{ ... }
+type AlertChannel struct{}
+type AlertEscalator struct{}
+type AlertManager struct{ ... }
+    func NewAlertManager(logger *slog.Logger) *AlertManager
+type AlertRouter struct{}
+type AlertSeverity string
+    const AlertLow AlertSeverity = "low" ...
+type AlertThresholds struct{}
+type Anomaly struct{ ... }
+type AnomalyAlertEngine struct{}
+type AnomalyDetector struct{ ... }
+    func NewAnomalyDetector(logger *slog.Logger) *AnomalyDetector
+type AnomalyDetectorAlgorithm struct{}
+type BackupManager struct{}
+type BehaviorProfiler struct{}
+type CircuitBreaker struct{ ... }
+    func NewCircuitBreaker(logger *slog.Logger, config CircuitBreakerConfig) *CircuitBreaker
+type CircuitBreakerConfig struct{ ... }
+type CircuitBreakerState struct{}
+type CircuitMetrics struct{ ... }
+type CircuitState struct{ ... }
+type CircuitStateEnum string
+    const CircuitClosed CircuitStateEnum = "closed" ...
+type ClassificationRule struct{ ... }
+type DegradationConfig struct{}
+type DegradationEvent struct{ ... }
+type DegradationLevel string
+    const DegradationNone DegradationLevel = "none" ...
+type DegradationManager struct{ ... }
+    func NewDegradationManager(logger *slog.Logger, config DegradationConfig) *DegradationManager
+type DegradationMode struct{}
+type DegradationProfile struct{ ... }
+type DiagnosticEngine struct{ ... }
+    func NewDiagnosticEngine(logger *slog.Logger) *DiagnosticEngine
+type DiagnosticReporter struct{}
+type DiagnosticResult struct{ ... }
+type DiagnosticTest struct{ ... }
+type DiagnosticType string
+    const DiagnosticSystem DiagnosticType = "system" ...
+type EmergencyCommunicator struct{}
+type EmergencyConfig struct{}
+type EmergencyCoordination struct{ ... }
+    func NewEmergencyCoordination(logger *slog.Logger) *EmergencyCoordination
+type EmergencyCoordinator struct{}
+type EmergencyCoordinatorComponent struct{}
+type EmergencyExecutor struct{}
+type EmergencyMetrics struct{ ... }
+type EmergencyProtocol struct{ ... }
+type EmergencyProtocols struct{ ... }
+    func NewEmergencyProtocols(logger *slog.Logger, config EmergencyConfig) *EmergencyProtocols
+type EmergencyResponseEngine struct{ ... }
+    func NewEmergencyResponseEngine(logger *slog.Logger) *EmergencyResponseEngine
+type EmergencyResponsePlan struct{}
+type EmergencyStatus string
+    const EmergencyDetected EmergencyStatus = "detected" ...
+type EmergencyStep struct{ ... }
+type EmergencyStepExecution struct{ ... }
+type EmergencySynchronizer struct{}
+type EmergencyType string
+    const EmergencySystemCrash EmergencyType = "system_crash" ...
+type ErrorCategory string
+    const ErrorCategoryNetwork ErrorCategory = "network" ...
+type ErrorClassification struct{ ... }
+type ErrorClassifier struct{ ... }
+    func NewErrorClassifier(logger *slog.Logger, rules []ClassificationRule) *ErrorClassifier
+type ErrorEvent struct{ ... }
+type ErrorHandler struct{ ... }
+    func NewErrorHandler(logger *slog.Logger, config ErrorHandlingConfig) *ErrorHandler
+type ErrorHandlingConfig struct{ ... }
+type ErrorReporter struct{ ... }
+    func NewErrorReporter(logger *slog.Logger, config ErrorReportingConfig) *ErrorReporter
+type ErrorReportingConfig struct{}
+type ErrorSeverity string
+    const SeverityLow ErrorSeverity = "low" ...
+type EscalationManager struct{ ... }
+    func NewEscalationManager(logger *slog.Logger) *EscalationManager
+type EscalationNotifier struct{}
+type EscalationStep struct{}
+type EscalationTrigger struct{}
+type FailureAnalysis struct{ ... }
+type FailureAnalyzer struct{ ... }
+    func NewFailureAnalyzer(logger *slog.Logger) *FailureAnalyzer
+type FailureAnalyzerComponent struct{}
+type FailureCorrelator struct{}
+type FailurePredictor struct{}
+type FallbackExecutor struct{}
+type FallbackMetrics struct{ ... }
+type FallbackStrategy struct{ ... }
+type FallbackSystem struct{ ... }
+    func NewFallbackSystem(logger *slog.Logger, strategies []FallbackStrategy) *FallbackSystem
+type FaultInjection struct{ ... }
+type FaultInjectionConfig struct{}
+type FaultInjector struct{ ... }
+    func NewFaultInjector(logger *slog.Logger, config FaultInjectionConfig) *FaultInjector
+type FaultScenario struct{ ... }
+type FaultTiming struct{ ... }
+type FaultType string
+    const FaultNetwork FaultType = "network" ...
+type Finding struct{ ... }
+type HealthAlert struct{ ... }
+type HealthCheck struct{}
+type HealthChecker struct{ ... }
+    func NewHealthChecker(logger *slog.Logger) *HealthChecker
+type HealthEvaluator struct{}
+type HealthMetrics struct{ ... }
+type HealthMonitor struct{ ... }
+    func NewHealthMonitor(logger *slog.Logger, config HealthMonitoringConfig) *HealthMonitor
+type HealthMonitoringConfig struct{}
+type HealthReporter struct{}
+type HealthStatus string
+    const HealthHealthy HealthStatus = "healthy" ...
+type ImpactAssessor struct{}
+type ImprovementEngine struct{ ... }
+    func NewImprovementEngine(logger *slog.Logger) *ImprovementEngine
+type ImprovementImplementer struct{}
+type ImprovementPrioritizer struct{}
+type ImprovementRecommendation struct{ ... }
+type ImprovementStrategy struct{}
+type InjectionMetrics struct{ ... }
+type InjectionPoint struct{ ... }
+type LearningEngine struct{}
+type MetricAggregator struct{}
+type MetricCollector struct{}
+type MetricExporter struct{}
+type MetricsCollector struct{ ... }
+    func NewMetricsCollector(logger *slog.Logger) *MetricsCollector
+type MitigationEngine struct{ ... }
+    func NewMitigationEngine(logger *slog.Logger) *MitigationEngine
+type MitigationStrategy struct{}
+type MitigationType string
+type ModeSelectionAlgorithm struct{}
+type ModeSelector struct{ ... }
+    func NewModeSelector(logger *slog.Logger) *ModeSelector
+type ModeTransitionManager struct{}
+type MonitoringData struct{}
+type PreventionRule struct{}
+type PreventionSystem struct{ ... }
+    func NewPreventionSystem(logger *slog.Logger) *PreventionSystem
+type PriorityManager struct{}
+type QualityController struct{}
+type QualityManager struct{ ... }
+    func NewQualityManager(logger *slog.Logger) *QualityManager
+type QualityMetrics struct{}
+type QualityTargets struct{ ... }
+type RecoveryConfig struct{ ... }
+type RecoveryEngine struct{ ... }
+    func NewRecoveryEngine(logger *slog.Logger, config RecoveryConfig) *RecoveryEngine
+type RecoveryEvent struct{ ... }
+type RecoveryPlanner struct{}
+type RecoveryStatus string
+    const RecoveryPending RecoveryStatus = "pending" ...
+type RecoveryType string
+    const RecoveryAutomatic RecoveryType = "automatic" ...
+type RepairAction struct{ ... }
+type RepairCoordinator struct{ ... }
+    func NewRepairCoordinator(logger *slog.Logger) *RepairCoordinator
+type RepairExecutor struct{}
+type RepairScheduler struct{}
+type RepairType string
+    const RepairRestart RepairType = "restart" ...
+type RepairValidator struct{}
+type ResilienceAnalysis struct{ ... }
+type ResilienceAnalyzer struct{ ... }
+    func NewResilienceAnalyzer(logger *slog.Logger, config ResilienceConfig) *ResilienceAnalyzer
+type ResilienceConfig struct{}
+type ResilienceMetrics struct{ ... }
+type ResourceLimits struct{ ... }
+type ResourceOptimizer struct{}
+type ResourceScaler struct{ ... }
+    func NewResourceScaler(logger *slog.Logger) *ResourceScaler
+type ResourceScalerComponent struct{}
+type ResourceUsage struct{ ... }
+type RestoreManager struct{ ... }
+    func NewRestoreManager(logger *slog.Logger) *RestoreManager
+type RestorePoint struct{}
+type RetryExecutor struct{ ... }
+type RetryManager struct{ ... }
+    func NewRetryManager(logger *slog.Logger, policies map[string]RetryPolicy) *RetryManager
+type RetryMetrics struct{ ... }
+type RetryPolicy struct{ ... }
+type RiskAssessor struct{}
+type RobustnessConfig struct{ ... }
+type RobustnessManager struct{ ... }
+    func NewRobustnessManager(logger *slog.Logger, config RobustnessConfig) (*RobustnessManager, error)
+type RootCauseAnalyzer struct{}
+type ScalingController struct{}
+type ServicePrioritizer struct{}
+type ServiceType string
+    const ServiceCore ServiceType = "core" ...
+type StepStatus string
+    const StepPending StepStatus = "pending" ...
+type StressTestAnalyzer struct{}
+type StressTestExecutor struct{}
+type StressTestResults struct{ ... }
+type StressTestScenario struct{}
+type StressTester struct{ ... }
+    func NewStressTester(logger *slog.Logger) *StressTester
+type SystemHealthStatus struct{ ... }
+type TestDetail struct{ ... }
+type TestResults struct{ ... }
+type TestStatus string
+    const TestPassed TestStatus = "passed" ...
+type TimeoutConfig struct{ ... }
+
+### github.com/naviNBRuas/APA/pkg/security
+package security // import "github.com/naviNBRuas/APA/pkg/security"
+
+func CreateTLSConfig(config TLSConfig) (*tls.Config, error)
+func DecryptData(key, ciphertext []byte) ([]byte, error)
+func EncryptData(key, plaintext []byte) ([]byte, error)
+func GenerateKey(size int) ([]byte, error)
+func GenerateSelfSignedCert(commonName string, validityDays int) ([]byte, []byte, error)
+func LoadCACertificates(caFile string) (*x509.CertPool, error)
+func LoadTLSCertificate(certFile, keyFile string) (tls.Certificate, error)
+type TLSConfig struct{ ... }
+
+### github.com/naviNBRuas/APA/pkg/selfhealing
+package selfhealing // import "github.com/naviNBRuas/APA/pkg/selfhealing"
+
+type EventHandler interface{ ... }
+type HealingFramework struct{ ... }
+    func NewHealingFramework(logger *slog.Logger, healthChecker HealthChecker, eventHandler EventHandler) *HealingFramework
+type HealingResult struct{ ... }
+type HealingStrategy interface{ ... }
+type HealthChecker interface{ ... }
+type HealthIssue struct{ ... }
+type MemoryOptimizationStrategy struct{ ... }
+    func NewMemoryOptimizationStrategy() *MemoryOptimizationStrategy
+type NetworkReconnectStrategy struct{ ... }
+    func NewNetworkReconnectStrategy() *NetworkReconnectStrategy
+type QuarantineNodeStrategy struct{ ... }
+    func NewQuarantineNodeStrategy() *QuarantineNodeStrategy
+type RebuildModuleStrategy struct{ ... }
+    func NewRebuildModuleStrategy() *RebuildModuleStrategy
+type RestartProcessStrategy struct{ ... }
+    func NewRestartProcessStrategy() *RestartProcessStrategy
+
+### github.com/naviNBRuas/APA/pkg/swarm
+package swarm // import "github.com/naviNBRuas/APA/pkg/swarm"
+
+type CapacityClass string
+    const CapacityCloud CapacityClass = "cloud" ...
+type EdgeInfo struct{ ... }
+type ElasticityManager struct{ ... }
+    func NewElasticityManager(logger *slog.Logger, initial map[CapacityClass]int, targetUtil float64) *ElasticityManager
+type InteractionResult int
+    const Success InteractionResult = iota ...
+type InteractionType int
+    const ModuleTransfer InteractionType = iota ...
+type MutationPolicy struct{ ... }
+type MutationResult struct{ ... }
+type NetworkMonitor struct{ ... }
+    func NewNetworkMonitor(logger *slog.Logger) *NetworkMonitor
+type NetworkStats struct{ ... }
+type NodeInfo struct{ ... }
+type NodeRole string
+    const RoleUnknown NodeRole = "unknown" ...
+type NodeTier string
+    const NodeTierUnknown NodeTier = "unknown" ...
+type PeerConnection struct{ ... }
+type PeerScore struct{ ... }
+type RekeyFunc func()
+type ReputationSystem struct{ ... }
+    func NewReputationSystem(logger *slog.Logger) *ReputationSystem
+type ResourceAnnouncement struct{ ... }
+type ResourceInfo struct{ ... }
+type ResourceManager struct{ ... }
+    func NewResourceManager(logger *slog.Logger, reputation *ReputationSystem, routing *RoutingManager, ...) *ResourceManager
+type ResourceQuery struct{ ... }
+type RoleManager struct{ ... }
+    func NewRoleManager(logger *slog.Logger, policy RolePolicy) *RoleManager
+type RoleMetrics struct{ ... }
+type RolePolicy struct{ ... }
+type RoleProfile struct{ ... }
+type Route struct{ ... }
+type RoutingManager struct{ ... }
+    func NewRoutingManager(logger *slog.Logger, reputation *ReputationSystem) *RoutingManager
+type ScaleAction struct{ ... }
+type SinkResistance struct{ ... }
+    func NewSinkResistance(tm *TopologyManager, window time.Duration, quorum int, rekey RekeyFunc) *SinkResistance
+type SuspicionSignal struct{ ... }
+type TierPolicy struct{ ... }
+type TopologyGraph struct{ ... }
+type TopologyManager struct{ ... }
+    func NewTopologyManager(logger *slog.Logger, reputation *ReputationSystem, routing *RoutingManager) *TopologyManager
+type TopologyMutator struct{ ... }
+    func NewTopologyMutator(tm *TopologyManager, policy MutationPolicy, localID peer.ID) *TopologyMutator
+
+### github.com/naviNBRuas/APA/pkg/testing
+package testing // import "github.com/naviNBRuas/APA/pkg/testing"
+
+Package testing provides comprehensive testing framework for the enhanced agent.
+
+type ActiveTest struct{ ... }
+type AdaptationTest struct{}
+type AggregateMetrics struct{}
+type Artifact struct{ ... }
+type ArtifactType string
+    const ArtifactTypeLog ArtifactType = "log" ...
+type Assertion struct{ ... }
+type Baseline struct{}
+type BenchmarkScenario struct{ ... }
+type BenchmarkType string
+type Comparator struct{}
+type ComparisonEngine struct{ ... }
+    func NewComparisonEngine(logger *slog.Logger) *ComparisonEngine
+type CompatibilityTestsConfig struct{ ... }
+type ConfigurationTest struct{}
+type ContainerEngine struct{}
+type ContainerTest struct{}
+type CorrelationEngine struct{}
+type DecisionMakingTest struct{}
+type DegradationTest struct{}
+type EmergencyTest struct{}
+type ErrorHandlingTest struct{}
+type Expectation struct{}
+type FailoverTest struct{}
+type FailureCondition struct{}
+type FailureInjection struct{}
+type FaultScenario struct{ ... }
+type FaultType string
+type IntegrationScenario struct{ ... }
+type IntegrationTestsConfig struct{ ... }
+type IntelligenceTestsConfig struct{ ... }
+type IsolationLevel string
+    const IsolationLevelProcess IsolationLevel = "process" ...
+type Issue struct{}
+type KnowledgeBaseTest struct{}
+type LatencyTest struct{}
+type LearningAccuracyTest struct{}
+type LoadBalancingTest struct{}
+type LoadPattern struct{}
+type LoadProfile struct{}
+type Measurement struct{}
+type MetricAnalyzer struct{ ... }
+type MetricAnalyzerFunc func(interface{}) interface{}
+type MetricExporter struct{}
+type MetricType string
+type ModelValidationTest struct{}
+type NamespaceManager struct{}
+type NetworkSimulation struct{}
+type NetworkingTestsConfig struct{ ... }
+type OptimizationTest struct{}
+type PerformanceMetric string
+type PerformanceTestsConfig struct{ ... }
+type PerformanceThresholds struct{}
+type PlatformCompatTest struct{}
+type PlatformConfig struct{}
+type PlatformSpecificTest struct{}
+type PlatformTestsConfig struct{ ... }
+type PowerManagementTest struct{}
+type PredictionTest struct{}
+type ProtocolTest struct{}
+type QualityMetrics struct{}
+type QueuedTest struct{ ... }
+type RecoveryConfig struct{}
+type RecoveryStep struct{}
+type RecoveryTest struct{}
+type RedundancyTest struct{}
+type ReportExporter struct{}
+type ReportFormatter struct{}
+type ReportGenerator struct{}
+type ReportType string
+type ResilienceMetric string
+type ResourceLimits struct{}
+type ResourceQuota struct{}
+type ResourceTest struct{}
+type RobustnessTestsConfig struct{ ... }
+type SecurityTest struct{}
+type StressScenario struct{ ... }
+type StressTestsConfig struct{ ... }
+type StressType string
+type TestConfig struct{ ... }
+type TestController struct{ ... }
+    func NewTestController(logger *slog.Logger) *TestController
+type TestEnvironment struct{}
+type TestExecutor struct{ ... }
+    func NewTestExecutor(logger *slog.Logger, config TestConfig) *TestExecutor
+type TestIsolationEngine struct{ ... }
+    func NewTestIsolationEngine(logger *slog.Logger) *TestIsolationEngine
+type TestJob struct{ ... }
+type TestMetrics struct{ ... }
+type TestMetricsCollector struct{ ... }
+    func NewTestMetricsCollector(logger *slog.Logger) *TestMetricsCollector
+type TestMonitor struct{ ... }
+    func NewTestMonitor(logger *slog.Logger) *TestMonitor
+type TestReport struct{ ... }
+type TestReporter struct{ ... }
+    func NewTestReporter(logger *slog.Logger, config TestConfig) *TestReporter
+type TestResourceManager struct{}
+    func NewTestResourceManager(logger *slog.Logger) *TestResourceManager
+type TestResult struct{ ... }
+type TestRunner struct{ ... }
+    func NewTestRunner(logger *slog.Logger, config TestConfig) *TestRunner
+type TestScheduler struct{ ... }
+    func NewTestScheduler(logger *slog.Logger) *TestScheduler
+type TestStatus string
+    const StatusPending TestStatus = "pending" ...
+type TestStep struct{}
+type TestSuite struct{ ... }
+    func NewTestSuite(logger *slog.Logger, config TestConfig) (*TestSuite, error)
+type TestSummary struct{ ... }
+type TestType string
+    const TestTypeUnit TestType = "unit" ...
+type TestValidator struct{ ... }
+    func NewTestValidator(logger *slog.Logger, config TestConfig) *TestValidator
+type Thresholds struct{}
+type ThroughputTest struct{}
+type TimeoutEntry struct{ ... }
+type TimeoutManager struct{ ... }
+    func NewTimeoutManager(logger *slog.Logger) *TimeoutManager
+type Tolerance struct{}
+type ToleranceEngine struct{ ... }
+    func NewToleranceEngine(logger *slog.Logger) *ToleranceEngine
+type ToleranceLearningEngine struct{}
+type TrendAnalysisEngine struct{ ... }
+type TrendAnalysisEnginePlaceholder struct{}
+type TrendAnomalyDetector struct{}
+type TrendDetector struct{}
+type TrendPredictionEngine struct{}
+type UnitTestsConfig struct{ ... }
+type ValidationRule struct{}
+type ValidationStep struct{}
+type VersionConfig struct{}
+type Worker struct{ ... }
+type WorkerPool struct{ ... }
+    func NewWorkerPool(logger *slog.Logger, size int) *WorkerPool
+type WorkerStatus string
+    const WorkerIdle WorkerStatus = "idle" ...
+
+### github.com/naviNBRuas/APA/pkg/update
+package update // import "github.com/naviNBRuas/APA/pkg/update"
+
+func ApplyPendingUpdate()
+type ArtifactInfo struct{ ... }
+type Config struct{ ... }
+type Manager struct{ ... }
+    func NewManager(logger *slog.Logger, cfg Config, currentVersion string) (*Manager, error)
+type P2PNetworkInterface interface{ ... }
+type ReleaseInfo struct{ ... }
+
+### github.com/naviNBRuas/APA/scripts
+
+

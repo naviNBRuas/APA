@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autonomous Polymorphic Agent - Management Console</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-text">
+                <h1>Autonomous Polymorphic Agent</h1>
+                <h2>Management Console</h2>
+            </div>
+            <div class="session-controls">
+                <span id="session-status" class="badge badge-warn">Not authenticated</span>
+                <button id="login-button" type="button">Sign in</button>
+                <button id="logout-button" type="button" class="secondary">Sign out</button>
+            </div>
+        </header>
+        
+        <nav>
+            <ul>
+                <li><a href="#dashboard" class="active">Dashboard</a></li>
+                <li><a href="#modules">Modules</a></li>
+                <li><a href="#controllers">Controllers</a></li>
+                <li><a href="#policies">Policies</a></li>
+                <li><a href="#network">Network</a></li>
+                <li><a href="#settings">Settings</a></li>
+            </ul>
+        </nav>
+        
+        <main>
+            <section id="dashboard" class="tab-content active">
+                <h2>Dashboard</h2>
+                <div class="dashboard-grid">
+                    <div class="card">
+                        <h3>Agent Status</h3>
+                        <p>Status: <span id="agent-status">-</span></p>
+                        <p>Version: <span id="agent-version">-</span></p>
+                        <p>Peer ID: <span id="agent-peer">-</span></p>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Network Health</h3>
+                        <p>Connected Peers: <span id="connected-peers">-</span></p>
+                        <p>Network Status: <span id="network-status">-</span></p>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Modules</h3>
+                        <p>Loaded Modules: <span id="active-modules">-</span></p>
+                        <p>Errors: <span id="module-errors">-</span></p>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Controllers</h3>
+                        <p>Registered Controllers: <span id="active-controllers">-</span></p>
+                        <p>Errors: <span id="controller-errors">-</span></p>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="modules" class="tab-content">
+                <h2>Modules</h2>
+                <div class="actions">
+                    <input type="text" id="module-name" placeholder="module name" />
+                    <button id="load-module">Load Module</button>
+                </div>
+                
+                <table id="modules-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Version</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Module rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </section>
+            
+            <section id="controllers" class="tab-content">
+                <h2>Controllers</h2>
+                <div class="actions">
+                    <input type="text" id="controller-name" placeholder="controller name" />
+                    <button id="load-controller">Load Controller</button>
+                </div>
+                
+                <table id="controllers-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Version</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Controller rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </section>
+            
+            <section id="policies" class="tab-content">
+                <h2>Policies</h2>
+                <div class="actions">
+                    <button id="add-policy">Add Policy</button>
+                    <button id="edit-policy">Edit Policy</button>
+                    <button id="remove-policy">Remove Policy</button>
+                </div>
+                
+                <p class="muted">Policies are enforced server-side via RBAC/OPA. UI reflects authorization results returned by the API.</p>
+            </section>
+            
+            <section id="network" class="tab-content">
+                <h2>Network</h2>
+                <div class="card">
+                    <h3>Peer Information</h3>
+                    <p>Connected peers are reported from the runtime status. Additional peer telemetry can be added via the admin API.</p>
+                </div>
+            </section>
+            
+            <section id="settings" class="tab-content">
+                <h2>Settings</h2>
+                <form id="settings-form">
+                    <div class="form-group">
+                        <label for="agent-name">Agent Name:</label>
+                        <input type="text" id="agent-name" name="agent-name" value="" placeholder="From config" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="log-level">Log Level:</label>
+                        <select id="log-level" name="log-level">
+                            <option value="debug">Debug</option>
+                            <option value="info">Info</option>
+                            <option value="warn">Warning</option>
+                            <option value="error">Error</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="heartbeat-interval">Heartbeat Interval (seconds):</label>
+                        <input type="number" id="heartbeat-interval" name="heartbeat-interval" value="" min="1" max="300">
+                    </div>
+                    
+                    <button type="submit">Save Settings</button>
+                </form>
+            </section>
+        </main>
+        
+        <footer>
+            <p>&copy; 2025 Autonomous Polymorphic Agent. All rights reserved.</p>
+        </footer>
+    </div>
+    
+    <script src="script.js"></script>
+
+    <div id="auth-overlay" class="overlay hidden">
+        <div class="modal">
+            <h3>Administrator Sign-in</h3>
+            <p class="muted">Enter a valid admin bearer token. Access is enforced by the agent's RBAC/OPA policy.</p>
+            <form id="login-form">
+                <input type="password" id="token-input" placeholder="Bearer token" autocomplete="off" required />
+                <button type="submit">Authenticate</button>
+                <p id="login-error" class="error"></p>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

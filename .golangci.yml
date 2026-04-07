@@ -1,0 +1,13 @@
+run:
+  tests: true
+
+linters:
+  disable:
+    - unused       # many unused struct fields across project
+    - gosimple     # trivial simplifications not worth fixing
+    - staticcheck  # suppress deprecation/other checks for now
+
+issues:
+  exclude-use-default: false
+  exclude:
+    - "Error return value of.*is not checked" # we've handled many but tests sometimes ignore

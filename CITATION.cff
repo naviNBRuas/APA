@@ -1,0 +1,60 @@
+cff-version: 1.2.0
+title: "Autonomous Polymorphic Agent (APA)"
+authors:
+  - family-names: "Ruas"
+    given-names: "Navin B."
+    affiliation: "Independent"
+#    orcid: "https://orcid.org/0000-0000-0000-0000"  # Optional: uncomment and update if you obtain an ORCID
+keywords:
+  - go
+  - golang
+  - libp2p
+  - distributed-systems
+  - self-healing
+  - modular
+  - wasm
+  - security
+  - peer-to-peer
+  - research
+  - academic
+  - automation
+  - cloud
+  - edge-computing
+  - open-source
+  - observability
+  - audit
+  - metrics
+  - rbac
+  - opa
+  - docker
+  - container
+  - agent
+  - decentralized
+  - networking
+  - system-integration
+  - resilience
+  - artificial-intelligence
+  - machine-learning
+  - cross-platform
+  - multi-architecture
+version: 1.0.0
+date-released: 2026-04-06
+license: MIT
+repository-code: "https://github.com/naviNBRuas/APA"
+url: "https://github.com/naviNBRuas/APA"
+abstract: "Autonomous Polymorphic Agent (APA) is a cutting-edge, self-healing, and decentralized software agent platform designed for robust, secure, and autonomous operation across diverse computing environments. Built with Go, APA combines advanced networking, intelligent algorithms, and robust error handling to create a truly autonomous system with multi-protocol support, cross-platform compatibility, and advanced security features."
+message: "If you use APA in academic work, please cite this project using the metadata above. For source code, cite the repository URL."
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Ruas"
+      given-names: "Navin B."
+  title: "Autonomous Polymorphic Agent: A Self-Healing Distributed Systems Platform"
+  year: 2026
+related-identifiers:
+  - type: url
+    value: "https://navinbruas.github.io/APA/"
+    description: "Project documentation"
+  - type: url
+    value: "https://github.com/naviNBRuas/APA/releases"
+    description: "Software releases"

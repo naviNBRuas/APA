@@ -1,0 +1,52 @@
+# Default owners for all files
+* @naviNBRuas
+
+# Core architecture and runtime
+pkg/agent/ @naviNBRuas
+pkg/runtime/ @naviNBRuas
+pkg/networking/ @naviNBRuas
+
+# Intelligence and algorithms
+pkg/intelligence/ @naviNBRuas
+pkg/ml/ @naviNBRuas
+pkg/ai/ @naviNBRuas
+
+# Robustness and security
+pkg/robustness/ @naviNBRuas
+pkg/security/ @naviNBRuas
+pkg/edr/ @naviNBRuas
+
+# Platform and compatibility
+pkg/platform/ @naviNBRuas
+pkg/crossplatform/ @naviNBRuas
+
+# Testing and quality assurance
+tests/ @naviNBRuas
+pkg/testing/ @naviNBRuas
+
+# Documentation
+docs/ @naviNBRuas
+README.md @naviNBRuas
+CONTRIBUTING.md @naviNBRuas
+
+# Build and deployment
+Makefile @naviNBRuas
+.github/workflows/ @naviNBRuas
+container/ @naviNBRuas
+
+# Configuration files
+configs/ @naviNBRuas
+go.mod @naviNBRuas
+go.sum @naviNBRuas
+
+# Examples and demos
+examples/ @naviNBRuas
+payloads/ @naviNBRuas
+
+# Web interface
+web/ @naviNBRuas
+
+# Security critical files
+SECURITY.md @naviNBRuas
+pkg/security/ @naviNBRuas
+pkg/encryption/ @naviNBRuas

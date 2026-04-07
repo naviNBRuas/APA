@@ -1,0 +1,6 @@
+version: "3.9"
+
+services:
+  example:
+    image: alpine:latest
+    command: ["echo", "Hello from harness template!"]

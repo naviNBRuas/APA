@@ -1,0 +1,71 @@
+name: Documentation Generation
+
+concurrency:
+  group: docs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**.go'
+      - 'docs/**'
+      - 'README.md'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '**.go'
+      - 'docs/**'
+      - 'README.md'
+
+jobs:
+  generate-docs:
+    name: Generate Documentation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Prepare modules
+        run: |
+          # ensure dependencies are cached so tests later complete quickly
+          go mod download
+
+      - name: Generate API documentation
+        run: |
+          mkdir -p docs/api
+          : > docs/api/index.txt
+          for pkg in $(go list -f '{{if .GoFiles}}{{.ImportPath}}{{end}}' ./... | grep -v '^$' | sort); do
+            echo "### $pkg" >> docs/api/index.txt
+            go doc "$pkg" >> docs/api/index.txt 2>/dev/null || true
+            echo "" >> docs/api/index.txt
+          done
+
+      - name: Generate coverage report
+        run: |
+          go test -count=1 -coverprofile=coverage.out ./...
+          go tool cover -html=coverage.out -o docs/coverage.html
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-docs
+          path: |
+            docs/api/
+            docs/coverage.html
+
+      - name: Deploy to GitHub Pages (main branch only)
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./docs
+          keep_files: true

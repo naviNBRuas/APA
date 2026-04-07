@@ -1,0 +1,33 @@
+admin_listen_address: "0.0.0.0:8080"
+log_level: "info"
+module_path: "examples/modules"
+identity_file_path: "state/agent-identity.json"
+policy_path: "configs/policy.yaml"
+signing_priv_key_path: "configs/signing_private.key"
+controller_path: "controllers"
+admin_policy_path: "configs/admin_policy.rego"
+p2p:
+  listen_addresses:
+    - "/ip4/0.0.0.0/tcp/4001"
+    - "/ip4/0.0.0.0/udp/4001/quic-v1"
+    - "/ip4/0.0.0.0/tcp/4002/ws"
+  bootstrap_peers: []
+  heartbeat_interval: "10s"
+  # Defensive hardening options:
+  topic_rejoin_interval: "2m"   # Interval for rejoining pubsub topics
+  isolation_bootstrap_interval: "90s" # Interval for re-bootstrap if isolated
+  reconnect_backoff_min: "200ms" # Min backoff for peer reconnect
+  reconnect_backoff_max: "1200ms" # Max backoff for peer reconnect
+
+# Peer admission (trusted peers for privileged operations)
+#admitted_peers:
+#  - "QmAdminPeer1"
+#  - "QmAdminPeer2"
+
+# Admin API rate limiting (per-IP, requests per second)
+#admin_api_rate_limit: 5
+#admin_api_rate_burst: 10
+update:
+  server_url: "http://127.0.0.1:8000/release.json"
+  check_interval: "1m"
+  public_key: "234447437978db889caa7bc4115d873700d0821f0deedc0c0b03651d59fbc7f6"

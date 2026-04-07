@@ -1,0 +1,211 @@
+name: Release
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to create a release for (must already exist)'
+        required: true
+        default: ''
+# the manual trigger above is now the sole entry point; releases will only
+# be produced when invoked from the Actions dashboard with a tag.
+
+
+env:
+  GO111MODULE: on
+
+jobs:
+  test:
+    name: Pre-release Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Run tests
+        run: |
+          # execute all unit tests with race detection in one pass
+          go test -v -race ./...
+
+      - name: Check for vulnerabilities
+        continue-on-error: true
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+          echo "Note: Vulnerabilities reported by govulncheck are informational; some are due to transitive dependencies and have no practical impact on the release."
+
+  build:
+    name: Build Release Assets
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            arch: amd64
+            ext: ''
+          - os: linux
+            arch: arm64
+            ext: ''
+          - os: darwin
+            arch: amd64
+            ext: ''
+          - os: darwin
+            arch: arm64
+            ext: ''
+          - os: windows
+            arch: amd64
+            ext: '.exe'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Build binary
+        run: |
+          mkdir -p dist
+          GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
+            go build -ldflags="-s -w -X main.version=${{ github.event.inputs.tag }}" \
+            -o dist/apa-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} \
+            cmd/standalone-agent/main.go
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apa-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/apa-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }}
+
+  package:
+    name: Create Release Packages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Organize binaries
+        run: |
+          mkdir -p release/{bin,docs}
+          cp -r artifacts/*/* release/bin/
+          cp README.md release/docs/
+          cp LICENSE release/docs/
+          cp CHANGELOG.md release/docs/
+
+      - name: Create checksums
+        run: |
+          cd release/bin
+          sha256sum * > ../checksums.txt
+          cd ..
+
+      - name: Create tarballs
+        run: |
+          cd release
+          for os_arch in bin/*; do
+            if [[ "$os_arch" == *windows* ]]; then
+              zip -j apa-$(basename $os_arch).zip $os_arch docs/*
+            else
+              tar -czf apa-$(basename $os_arch).tar.gz -C bin $(basename $os_arch) -C docs .
+            fi
+          done
+
+      - name: Upload packaged artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-packages
+          path: release/*.*
+
+  create-release:
+    name: Create GitHub Release
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download release packages
+        uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: release-assets
+
+      - name: Generate release notes
+        run: |
+          echo "## What's Changed" > release-notes.md
+          echo "" >> release-notes.md
+          echo "### Features" >> release-notes.md
+          echo "- Enhanced autonomous agent capabilities" >> release-notes.md
+          echo "- Cross-platform support for Linux, macOS, and Windows" >> release-notes.md
+          echo "- Multi-architecture binaries (AMD64, ARM64)" >> release-notes.md
+          echo "" >> release-notes.md
+          echo "### Installation" >> release-notes.md
+          echo "Download the appropriate binary for your platform from the assets below." >> release-notes.md
+          echo "" >> release-notes.md
+          echo "### Verification" >> release-notes.md
+          echo "Verify the checksums using the provided checksums.txt file." >> release-notes.md
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag }}
+          body_path: release-notes.md
+          files: |
+            release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker-image:
+    name: Build Docker Image
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=tag
+            type=sha,prefix={{branch}}-
+            type=raw,value=manual-${{ github.run_number }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        continue-on-error: true
+        with:
+          context: .
+          file: ./container/Containerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

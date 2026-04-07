@@ -1,0 +1,12 @@
+{
+  "name": "simple-adder",
+  "version": "v0.1.0",
+  "arch": "wasm",
+  "os": "wasip1",
+  "wasm_file": "simple-adder.wasm",
+  "hash": "...",
+  "signatures": [],
+  "entry": "_start",
+  "capabilities": [],
+  "policy": ""
+}
