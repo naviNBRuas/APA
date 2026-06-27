@@ -98,6 +98,17 @@ lint-fix:
 check: lint test-race
 	@echo "All checks passed."
 
+docker-build:
+	@echo "Building Docker image..."
+	docker build -f container/Containerfile -t apa:latest .
+
+docker-buildx:
+	@echo "Building multi-arch Docker image..."
+	docker buildx build -f container/Containerfile \
+		--platform linux/amd64,linux/arm64 \
+		-t ghcr.io/navinbruas/apa:latest \
+		--push .
+
 ci-local:
 	@echo "Validating local GitHub workflows..."
 	bash scripts/validate-workflows-local.sh
