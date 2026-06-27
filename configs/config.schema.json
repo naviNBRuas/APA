@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/naviNBRuas/APA/configs/config.schema.json",
+  "title": "APA Agent Configuration",
+  "description": "Configuration schema for the APA agent runtime",
+  "type": "object",
+  "properties": {
+    "admin_listen_address": {
+      "type": "string",
+      "description": "Address for the admin HTTP API",
+      "default": "127.0.0.1:8080",
+      "examples": ["127.0.0.1:8080", "0.0.0.0:8443"]
+    },
+    "admin_api_key": {
+      "type": "string",
+      "description": "API key for admin endpoint authentication (can also be set via APA_ADMIN_API_KEY env var)"
+    },
+    "admin_tls_cert_path": {
+      "type": "string",
+      "description": "Path to TLS certificate for admin API"
+    },
+    "admin_tls_key_path": {
+      "type": "string",
+      "description": "Path to TLS private key for admin API"
+    },
+    "admin_tls_client_ca": {
+      "type": "string",
+      "description": "Path to client CA certificate for mTLS"
+    },
+    "admin_tls_require_client_cert": {
+      "type": "boolean",
+      "description": "Require client certificate authentication",
+      "default": false
+    },
+    "log_level": {
+      "type": "string",
+      "description": "Logging level",
+      "enum": ["debug", "info", "warn", "error"],
+      "default": "info"
+    },
+    "module_path": {
+      "type": "string",
+      "description": "Directory containing WASM modules"
+    },
+    "identity_file_path": {
+      "type": "string",
+      "description": "Path to agent identity (private key)"
+    },
+    "policy_path": {
+      "type": "string",
+      "description": "Path to OPA/Rego policy files"
+    },
+    "signing_priv_key_path": {
+      "type": "string",
+      "description": "Path to Ed25519 signing private key for module signing"
+    },
+    "controller_path": {
+      "type": "string",
+      "description": "Directory containing controller plugins"
+    },
+    "admin_policy_path": {
+      "type": "string",
+      "description": "Path to admin API RegO policy"
+    },
+    "p2p": {
+      "type": "object",
+      "description": "P2P networking configuration",
+      "properties": {
+        "listen_addrs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Multiaddresses to listen on"
+        },
+        "bootstrap_peers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Bootstrap peer multiaddresses"
+        },
+        "enable_relay": {
+          "type": "boolean",
+          "default": true
+        },
+        "heartbeat_interval": {
+          "type": "string",
+          "description": "Heartbeat broadcast interval",
+          "default": "30s"
+        }
+      }
+    },
+    "update": {
+      "type": "object",
+      "description": "Self-update configuration",
+      "properties": {
+        "enable_p2p": {
+          "type": "boolean",
+          "default": false
+        },
+        "check_interval": {
+          "type": "string",
+          "description": "Update check interval",
+          "default": "24h"
+        }
+      }
+    },
+    "control_plane": {
+      "type": "object",
+      "description": "Decentralized control plane configuration"
+    },
+    "ephemeral_identity": {
+      "type": "object",
+      "description": "Ephemeral identity rotation configuration",
+      "properties": {
+        "rotation_interval": {
+          "type": "string",
+          "description": "Identity rotation interval",
+          "default": "15m"
+        }
+      }
+    }
+  },
+  "required": [
+    "admin_listen_address",
+    "module_path",
+    "identity_file_path",
+    "policy_path",
+    "controller_path"
+  ]
+}
