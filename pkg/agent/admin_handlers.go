@@ -15,28 +15,28 @@ func (rt *Runtime) auditHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	input := rt.createAuthzInput(r)
 	if allowed, err := rt.authorizeAdminRequest(r.Context(), r, input); err != nil {
-		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		writeJSONError(w, "Authorization error", http.StatusInternalServerError)
 		return
 	} else if !allowed {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		writeJSONError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	defer rt.appendAudit("audit", input)
 
 	w.Header().Set("Content-Type", "application/json")
 	if rt.auditLogger == nil {
-		http.Error(w, "Audit logging not enabled", http.StatusNotImplemented)
+		writeJSONError(w, "Audit logging not enabled", http.StatusNotImplemented)
 		return
 	}
 	entries, err := rt.auditLogger.ReadRecent(100)
 	if err != nil {
 		rt.logger.Error("Failed to read audit log", "error", err)
-		http.Error(w, "Failed to read audit log", http.StatusInternalServerError)
+		writeJSONError(w, "Failed to read audit log", http.StatusInternalServerError)
 		return
 	}
 	if err := json.NewEncoder(w).Encode(entries); err != nil {
 		rt.logger.Error("Failed to encode audit log entries", "error", err)
-		http.Error(w, "Failed to encode audit log entries", http.StatusInternalServerError)
+		writeJSONError(w, "Failed to encode audit log entries", http.StatusInternalServerError)
 		return
 	}
 }
@@ -47,10 +47,10 @@ func (rt *Runtime) healthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	input := rt.createAuthzInput(r)
 	if allowed, err := rt.authorizeAdminRequest(r.Context(), r, input); err != nil {
-		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		writeJSONError(w, "Authorization error", http.StatusInternalServerError)
 		return
 	} else if !allowed {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		writeJSONError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	defer rt.appendAudit("health", input)
@@ -65,10 +65,10 @@ func (rt *Runtime) statusHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	input := rt.createAuthzInput(r)
 	if allowed, err := rt.authorizeAdminRequest(r.Context(), r, input); err != nil {
-		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		writeJSONError(w, "Authorization error", http.StatusInternalServerError)
 		return
 	} else if !allowed {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		writeJSONError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	defer rt.appendAudit("status", input)
@@ -93,10 +93,10 @@ func (rt *Runtime) metricsHandler(w http.ResponseWriter, r *http.Request) {
 
 	input := rt.createAuthzInput(r)
 	if allowed, err := rt.authorizeAdminRequest(r.Context(), r, input); err != nil {
-		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		writeJSONError(w, "Authorization error", http.StatusInternalServerError)
 		return
 	} else if !allowed {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		writeJSONError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	defer rt.appendAudit("metrics", input)
@@ -118,7 +118,7 @@ func (rt *Runtime) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(metrics); err != nil {
 		rt.logger.Error("Failed to encode metrics", "error", err)
-		http.Error(w, "Failed to encode metrics", http.StatusInternalServerError)
+		writeJSONError(w, "Failed to encode metrics", http.StatusInternalServerError)
 		return
 	}
 }
@@ -129,10 +129,10 @@ func (rt *Runtime) modulesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	input := rt.createAuthzInput(r)
 	if allowed, err := rt.authorizeAdminRequest(r.Context(), r, input); err != nil {
-		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		writeJSONError(w, "Authorization error", http.StatusInternalServerError)
 		return
 	} else if !allowed {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		writeJSONError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	defer rt.appendAudit("modules", input)
@@ -150,22 +150,22 @@ func (rt *Runtime) modulesHandler(w http.ResponseWriter, r *http.Request) {
 			Name string `json:"name"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 		if req.Name == "" {
-			http.Error(w, "Missing module name", http.StatusBadRequest)
+			writeJSONError(w, "Missing module name", http.StatusBadRequest)
 			return
 		}
 		if err := rt.moduleManager.LoadModule(req.Name); err != nil {
 			rt.logger.Error("Failed to load module", "name", req.Name, "error", err)
-			http.Error(w, "Failed to load module: "+err.Error(), http.StatusInternalServerError)
+			writeJSONError(w, "Failed to load module: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "Module %s loaded successfully.\n", req.Name)
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -175,10 +175,10 @@ func (rt *Runtime) controllersHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	input := rt.createAuthzInput(r)
 	if allowed, err := rt.authorizeAdminRequest(r.Context(), r, input); err != nil {
-		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		writeJSONError(w, "Authorization error", http.StatusInternalServerError)
 		return
 	} else if !allowed {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		writeJSONError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	defer rt.appendAudit("controllers", input)
@@ -196,22 +196,22 @@ func (rt *Runtime) controllersHandler(w http.ResponseWriter, r *http.Request) {
 			Name string `json:"name"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 		if req.Name == "" {
-			http.Error(w, "Missing controller name", http.StatusBadRequest)
+			writeJSONError(w, "Missing controller name", http.StatusBadRequest)
 			return
 		}
 		if err := rt.controllerManager.LoadController(req.Name); err != nil {
 			rt.logger.Error("Failed to load controller", "name", req.Name, "error", err)
-			http.Error(w, "Failed to load controller: "+err.Error(), http.StatusInternalServerError)
+			writeJSONError(w, "Failed to load controller: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "Controller %s loaded successfully.\n", req.Name)
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -221,10 +221,10 @@ func (rt *Runtime) configHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	input := rt.createAuthzInput(r)
 	if allowed, err := rt.authorizeAdminRequest(r.Context(), r, input); err != nil {
-		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		writeJSONError(w, "Authorization error", http.StatusInternalServerError)
 		return
 	} else if !allowed {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		writeJSONError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	defer rt.appendAudit("config", input)
@@ -239,24 +239,24 @@ func (rt *Runtime) configHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		var newConfig Config
 		if err := json.NewDecoder(r.Body).Decode(&newConfig); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest)
+			writeJSONError(w, "Invalid request body", http.StatusBadRequest)
 			return
 		}
 		configData, err := yaml.Marshal(newConfig)
 		if err != nil {
 			rt.logger.Error("Failed to marshal config", "error", err)
-			http.Error(w, "Failed to process config: "+err.Error(), http.StatusInternalServerError)
+			writeJSONError(w, "Failed to process config: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		if err := rt.ApplyConfig(configData); err != nil {
 			rt.logger.Error("Failed to apply config", "error", err)
-			http.Error(w, "Failed to apply config: "+err.Error(), http.StatusInternalServerError)
+			writeJSONError(w, "Failed to apply config: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintln(w, "Config updated successfully.")
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -266,10 +266,10 @@ func (rt *Runtime) updateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	input := rt.createAuthzInput(r)
 	if allowed, err := rt.authorizeAdminRequest(r.Context(), r, input); err != nil {
-		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		writeJSONError(w, "Authorization error", http.StatusInternalServerError)
 		return
 	} else if !allowed {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		writeJSONError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	defer rt.appendAudit("update", input)
@@ -280,7 +280,7 @@ func (rt *Runtime) updateHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 		fmt.Fprintln(w, "Update check initiated.")
 	default:
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -290,10 +290,10 @@ func (rt *Runtime) peerCopyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	input := rt.createAuthzInput(r)
 	if allowed, err := rt.authorizeAdminRequest(r.Context(), r, input); err != nil {
-		http.Error(w, "Authorization error", http.StatusInternalServerError)
+		writeJSONError(w, "Authorization error", http.StatusInternalServerError)
 		return
 	} else if !allowed {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		writeJSONError(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 	defer rt.appendAudit("peer_copy", input)
@@ -301,13 +301,13 @@ func (rt *Runtime) peerCopyHandler(w http.ResponseWriter, r *http.Request) {
 	peerID := r.URL.Query().Get("peer_id")
 	moduleName := r.URL.Query().Get("module_name")
 	if peerID == "" || moduleName == "" {
-		http.Error(w, "Missing peer_id or module_name parameter", http.StatusBadRequest)
+		writeJSONError(w, "Missing peer_id or module_name parameter", http.StatusBadRequest)
 		return
 	}
 
 	if err := rt.recoveryController.RequestPeerCopy(r.Context(), peerID, moduleName); err != nil {
 		rt.logger.Error("Failed to request peer copy", "peer_id", peerID, "module_name", moduleName, "error", err)
-		http.Error(w, "Failed to request peer copy: "+err.Error(), http.StatusInternalServerError)
+		writeJSONError(w, "Failed to request peer copy: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -329,7 +329,7 @@ func (rt *Runtime) triggerRegenerationHandler(w http.ResponseWriter, r *http.Req
 
 	if err := rt.regenerator.TriggerRegeneration(r.Context()); err != nil {
 		rt.logger.Error("Failed to trigger regeneration", "error", err)
-		http.Error(w, "Failed to trigger regeneration: "+err.Error(), http.StatusInternalServerError)
+		writeJSONError(w, "Failed to trigger regeneration: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -351,7 +351,7 @@ func (rt *Runtime) triggerPropagationHandler(w http.ResponseWriter, r *http.Requ
 
 	if err := rt.propagationManager.TriggerPropagation(r.Context()); err != nil {
 		rt.logger.Error("Failed to trigger propagation", "error", err)
-		http.Error(w, "Failed to trigger propagation: "+err.Error(), http.StatusInternalServerError)
+		writeJSONError(w, "Failed to trigger propagation: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
