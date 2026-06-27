@@ -2,7 +2,6 @@ package swarm
 
 import (
 	"context"
-	"log/slog"
 	"sort"
 	"time"
 

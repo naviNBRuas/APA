@@ -40,7 +40,7 @@ func TestLoadPolicyAndAuthorize(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if _, err := f.WriteString(`package apa.authz
+		_, err = f.WriteString(`package apa.authz
 
 default allow = false
 
@@ -50,7 +50,7 @@ allow {
 
 allow {
 	input.user == "admin"
-}`);
+}`)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -140,9 +140,9 @@ func TestPolicyDecisionFormat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.WriteString(`package apa.authz
+	_, err = f.WriteString(`package apa.authz
 
-default allow = "maybe"`);
+default allow = "maybe"`)
 	if err != nil {
 		t.Fatal(err)
 	}
