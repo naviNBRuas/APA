@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"runtime"
 	"testing"
 	"time"
 
@@ -51,7 +52,7 @@ func TestShouldTargetLibrary(t *testing.T) {
 	}
 
 	// Test different library names based on OS
-	switch os := os.Getenv("GOOS"); os {
+	switch runtime.GOOS {
 	case "windows":
 		assert.True(t, embedder.shouldTargetLibrary("test.dll"))
 		assert.False(t, embedder.shouldTargetLibrary("test.exe"))
