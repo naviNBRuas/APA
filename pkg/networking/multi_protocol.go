@@ -1,3 +1,5 @@
+//go:build enhanced
+
 // Package networking provides advanced multi-protocol networking with redundancy and failover capabilities.
 package networking
 

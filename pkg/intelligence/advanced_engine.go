@@ -1,3 +1,5 @@
+//go:build enhanced
+
 // Package intelligence provides advanced adaptive algorithms and decision-making capabilities.
 package intelligence
 
