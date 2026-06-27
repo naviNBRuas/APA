@@ -36,12 +36,16 @@ func (hc *HealthController) StartHealthChecks(ctx context.Context, interval time
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	hc.logger.Info("Health checks started", "interval", interval)
+	if hc.logger != nil {
+		hc.logger.Info("Health checks started", "interval", interval)
+	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			hc.logger.Info("Health checks stopped.")
+			if hc.logger != nil {
+				hc.logger.Info("Health checks stopped.")
+			}
 			return
 		case <-ticker.C:
 			hc.runChecks(ctx)
@@ -52,9 +56,13 @@ func (hc *HealthController) StartHealthChecks(ctx context.Context, interval time
 func (hc *HealthController) runChecks(ctx context.Context) {
 	for _, check := range hc.checks {
 		if err := check.Check(ctx); err != nil {
-			hc.logger.Error("Health check failed", "check", check.Name(), "error", err)
+			if hc.logger != nil {
+				hc.logger.Error("Health check failed", "check", check.Name(), "error", err)
+			}
 		} else {
-			hc.logger.Debug("Health check passed", "check", check.Name())
+			if hc.logger != nil {
+				hc.logger.Debug("Health check passed", "check", check.Name())
+			}
 		}
 	}
 }

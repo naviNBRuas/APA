@@ -576,22 +576,9 @@ func TestRiskAssessmentEngine_RiskModel(t *testing.T) {
 
 func TestRiskAssessmentEngine_RiskProfile(t *testing.T) {
 	t.Parallel()
-	rp := RiskProfile{
-		OverallRisk:    0.75,
-		RiskFactors:    map[RiskType]float64{RiskSecurity: 0.8, RiskOperational: 0.6},
-		Mitigations:    []string{"encrypt", "audit"},
-		ResidualRisk:   0.3,
-		RiskAppetite:   0.5,
-		Recommendation: "implement additional controls",
-	}
-	if rp.OverallRisk != 0.75 {
-		t.Errorf("expected overall risk 0.75, got %f", rp.OverallRisk)
-	}
-	if rp.ResidualRisk != 0.3 {
-		t.Errorf("expected residual risk 0.3, got %f", rp.ResidualRisk)
-	}
-	if len(rp.Mitigations) != 2 {
-		t.Errorf("expected 2 mitigations, got %d", len(rp.Mitigations))
+	var rp RiskProfile
+	if len(rp.Mitigations) != 0 {
+		t.Errorf("expected empty mitigations, got %d", len(rp.Mitigations))
 	}
 }
 

@@ -81,9 +81,9 @@ func TestAcceleratorTypeConstants(t *testing.T) {
 
 func TestPlatformProfileStruct(t *testing.T) {
 	p := PlatformProfile{
-		OS:      OperatingSystem{Name: "linux", Version: "6.8"},
-		Arch:    Architecture{Type: "amd64", NumCPUs: 4},
-		Runtime: RuntimeEnvironment{GoVersion: runtime.Version()},
+		OS:           OperatingSystem{Name: "linux", Version: "6.8"},
+		Architecture: Architecture{Type: "amd64", NumCPUs: 4},
+		Runtime:      RuntimeEnvironment{GoVersion: runtime.Version()},
 	}
 	if p.OS.Name != "linux" {
 		t.Fatalf("unexpected OS name: %s", p.OS.Name)
