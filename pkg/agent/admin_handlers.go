@@ -232,7 +232,7 @@ func (rt *Runtime) configHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(rt.config); err != nil {
+		if err := json.NewEncoder(w).Encode(rt.sanitizedConfig()); err != nil {
 			rt.logger.Error("Failed to encode config response", "error", err)
 			w.WriteHeader(http.StatusInternalServerError)
 		}
