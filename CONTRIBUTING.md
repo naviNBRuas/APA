@@ -83,16 +83,33 @@ Look for issues tagged with [`good first issue`](https://github.com/naviNBRuas/A
 4. Update documentation as needed
 5. Run all tests:
    ```bash
-   go test -v -race ./...
+   make check
    ```
 6. Ensure code quality:
    ```bash
-   go fmt ./...
-   go vet ./...
+   make lint
    ```
 7. Commit your changes with descriptive messages
 8. Push to your fork
 9. Create a pull request
+
+### Pre-commit Hooks
+
+Install pre-commit hooks to catch issues before CI:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+This runs go-fmt, go-vet, go-imports, go-build, and go-test on every commit.
+
+### Build Tags
+
+- `enhanced` — multi-protocol networking stack and enhanced agent entry point
+  ```bash
+  go build -tags enhanced ./cmd/enhanced-agent
+  ```
 
 ## 📝 Coding Standards
 
@@ -147,6 +164,15 @@ go tool cover -html=coverage.out
 
 # Run specific package
 go test ./pkg/agent/...
+
+# Using Makefile targets
+make test             # All tests
+make test-race        # With race detector
+make test-pkg         # Package tests with coverage
+make test-integration # Integration tests
+make coverage         # Generate HTML coverage report
+make lint             # Run golangci-lint
+make check            # Lint + race-detector tests
 ```
 
 ### Writing Good Tests
