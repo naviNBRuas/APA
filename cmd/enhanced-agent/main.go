@@ -1,3 +1,5 @@
+//go:build enhanced
+
 // Package main provides the enhanced autonomous agent demonstration.
 package main
 

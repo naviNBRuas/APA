@@ -1,3 +1,5 @@
+//go:build enhanced
+
 // Package agent provides the enhanced autonomous agent runtime with advanced capabilities.
 package agent
 
