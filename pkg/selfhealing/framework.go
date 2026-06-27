@@ -10,49 +10,6 @@ import (
 	"github.com/naviNBRuas/APA/pkg/health"
 )
 
-// HealingStrategy defines the interface for self-healing strategies
-type HealingStrategy interface {
-	// Name returns the name of the healing strategy
-	Name() string
-
-	// Description returns a description of what the strategy does
-	Description() string
-
-	// CanHandle determines if this strategy can handle the given health issue
-	CanHandle(issue *HealthIssue) bool
-
-	// Apply applies the healing strategy to resolve the health issue
-	Apply(ctx context.Context, issue *HealthIssue) (*HealingResult, error)
-
-	// Priority returns the priority of this strategy (higher values are applied first)
-	Priority() int
-
-	// Configure configures the strategy with the provided configuration
-	Configure(config map[string]interface{}) error
-}
-
-// HealthIssue represents a health problem detected in the system
-type HealthIssue struct {
-	ID          string                 `json:"id"`
-	Type        string                 `json:"type"`     // process, network, disk, memory, module, controller, etc.
-	Severity    string                 `json:"severity"` // low, medium, high, critical
-	Description string                 `json:"description"`
-	Component   string                 `json:"component"` // specific component affected
-	Timestamp   time.Time              `json:"timestamp"`
-	Metrics     map[string]interface{} `json:"metrics"`
-	Context     map[string]interface{} `json:"context"`
-}
-
-// HealingResult represents the result of applying a healing strategy
-type HealingResult struct {
-	Success     bool                   `json:"success"`
-	ActionTaken string                 `json:"action_taken"`
-	Message     string                 `json:"message"`
-	Duration    time.Duration          `json:"duration"`
-	Metrics     map[string]interface{} `json:"metrics"`
-	RetryNeeded bool                   `json:"retry_needed"`
-}
-
 // HealingFramework manages self-healing strategies
 type HealingFramework struct {
 	logger        *slog.Logger
@@ -149,7 +106,6 @@ func (hf *HealingFramework) ConfigureStrategy(name string, config map[string]int
 func (hf *HealingFramework) DetectAndHeal(ctx context.Context) error {
 	hf.logger.Info("Starting health detection and healing cycle")
 
-	// Check system health
 	results, err := hf.healthChecker.CheckHealth(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to check health: %w", err)
@@ -157,10 +113,8 @@ func (hf *HealingFramework) DetectAndHeal(ctx context.Context) error {
 
 	hf.logger.Info("Health check completed", "result_count", len(results))
 
-	// Convert health check results to health issues
 	issues := hf.convertCheckResultsToIssues(results)
 
-	// Apply healing strategies for each issue
 	for _, issue := range issues {
 		if err := hf.applyHealingStrategies(ctx, issue); err != nil {
 			hf.logger.Error("Failed to apply healing strategies for issue",
@@ -178,7 +132,6 @@ func (hf *HealingFramework) convertCheckResultsToIssues(results []*health.CheckR
 	var issues []*HealthIssue
 
 	for _, result := range results {
-		// Only create issues for failed or warning health checks
 		if result.Status == health.StatusFailed || result.Status == health.StatusWarning {
 			issue := &HealthIssue{
 				ID:          fmt.Sprintf("issue-%d", time.Now().UnixNano()),
@@ -219,7 +172,6 @@ func (hf *HealingFramework) applyHealingStrategies(ctx context.Context, issue *H
 		"type", issue.Type,
 		"severity", issue.Severity)
 
-	// Get applicable strategies sorted by priority
 	applicableStrategies := hf.getApplicableStrategies(issue)
 
 	if len(applicableStrategies) == 0 {
@@ -233,7 +185,6 @@ func (hf *HealingFramework) applyHealingStrategies(ctx context.Context, issue *H
 		"issue_id", issue.ID,
 		"strategy_count", len(applicableStrategies))
 
-	// Try each strategy in order of priority
 	for _, strategy := range applicableStrategies {
 		hf.logger.Info("Attempting to apply healing strategy",
 			"issue_id", issue.ID,
@@ -254,12 +205,10 @@ func (hf *HealingFramework) applyHealingStrategies(ctx context.Context, issue *H
 				"error", err,
 				"duration", duration)
 
-			// Notify event handler of failure
 			if hf.eventHandler != nil {
 				hf.eventHandler.OnHealingFailure(issue, strategy, err)
 			}
 
-			// Continue to next strategy if this one failed
 			continue
 		}
 
@@ -270,20 +219,16 @@ func (hf *HealingFramework) applyHealingStrategies(ctx context.Context, issue *H
 				"action", result.ActionTaken,
 				"duration", duration)
 
-			// Notify event handler of success
 			if hf.eventHandler != nil {
 				hf.eventHandler.OnHealingSuccess(issue, strategy, result)
 			}
 
-			// If retry is needed, we might want to schedule another attempt
 			if result.RetryNeeded {
 				hf.logger.Info("Healing strategy indicates retry is needed",
 					"issue_id", issue.ID,
 					"strategy", strategy.Name())
-				// In a real implementation, this would schedule a retry
 			}
 
-			// Success - we can stop trying other strategies for this issue
 			return nil
 		} else {
 			hf.logger.Warn("Healing strategy reported failure",
@@ -292,12 +237,9 @@ func (hf *HealingFramework) applyHealingStrategies(ctx context.Context, issue *H
 				"message", result.Message,
 				"duration", duration)
 
-			// Notify event handler of attempt
 			if hf.eventHandler != nil {
 				hf.eventHandler.OnHealingAttempt(issue, strategy, result)
 			}
-
-			// Continue to next strategy if this one didn't succeed
 		}
 	}
 
@@ -313,7 +255,6 @@ func (hf *HealingFramework) getApplicableStrategies(issue *HealthIssue) []Healin
 	hf.strategyMutex.RLock()
 	defer hf.strategyMutex.RUnlock()
 
-	// Filter strategies that can handle this issue
 	var applicable []HealingStrategy
 	for _, strategy := range hf.strategies {
 		if strategy.CanHandle(issue) {
@@ -321,8 +262,6 @@ func (hf *HealingFramework) getApplicableStrategies(issue *HealthIssue) []Healin
 		}
 	}
 
-	// Sort by priority (higher priority first)
-	// Simple bubble sort for small number of strategies
 	for i := 0; i < len(applicable)-1; i++ {
 		for j := 0; j < len(applicable)-i-1; j++ {
 			if applicable[j].Priority() < applicable[j+1].Priority() {
