@@ -1,139 +1,118 @@
 package tests
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
-	"time"
+
+	"github.com/naviNBRuas/APA/pkg/agent"
 )
 
-// TestBasicFunctionality tests core functionality without external dependencies.
-func TestBasicFunctionality(t *testing.T) {
-	t.Run("Time Operations", func(t *testing.T) {
-		start := time.Now()
-		time.Sleep(10 * time.Millisecond)
-		duration := time.Since(start)
+func writeMinimalConfig(t *testing.T, dir string) string {
+	t.Helper()
 
-		if duration < 10*time.Millisecond {
-			t.Errorf("Sleep duration too short: got %v, expected at least 10ms", duration)
+	dirs := []string{"modules", "policies", "controllers", "identities"}
+	for _, d := range dirs {
+		if err := os.MkdirAll(filepath.Join(dir, d), 0755); err != nil {
+			t.Fatalf("mkdir %s: %v", d, err)
 		}
-
-		t.Logf("Time measurement working correctly: %v", duration)
-	})
-
-	t.Run("String Operations", func(t *testing.T) {
-		testCases := []struct {
-			input    string
-			expected bool
-		}{
-			{"hello", true},
-			{"", false},
-			{"test123", true},
-		}
-
-		for _, tc := range testCases {
-			result := len(tc.input) > 0
-			if result != tc.expected {
-				t.Errorf("String length check failed for '%s': got %v, expected %v",
-					tc.input, result, tc.expected)
-			}
-		}
-
-		t.Log("String operations working correctly")
-	})
-
-	t.Run("Math Operations", func(t *testing.T) {
-		tests := []struct {
-			a, b, expected int
-		}{
-			{2, 3, 5},
-			{10, 5, 15},
-			{0, 0, 0},
-			{-1, 1, 0},
-		}
-
-		for _, test := range tests {
-			result := test.a + test.b
-			if result != test.expected {
-				t.Errorf("Addition failed: %d + %d = %d, expected %d",
-					test.a, test.b, result, test.expected)
-			}
-		}
-
-		t.Log("Math operations working correctly")
-	})
-}
-
-// TestConfiguration validates basic configuration handling.
-func TestConfiguration(t *testing.T) {
-	type Config struct {
-		Name    string
-		Enabled bool
-		Timeout time.Duration
 	}
 
-	t.Run("Default Configuration", func(t *testing.T) {
-		config := Config{
-			Name:    "test-agent",
-			Enabled: true,
-			Timeout: 30 * time.Second,
-		}
+	identityFile := filepath.Join(dir, "identities", "key.pem")
+	if err := os.WriteFile(identityFile, []byte("placeholder"), 0644); err != nil {
+		t.Fatalf("write identity: %v", err)
+	}
 
-		if config.Name == "" {
-			t.Error("Config name should not be empty")
-		}
+	policyFile := filepath.Join(dir, "policies", "policy.rego")
+	if err := os.WriteFile(policyFile, []byte("package apa\n"), 0644); err != nil {
+		t.Fatalf("write policy: %v", err)
+	}
 
-		if !config.Enabled {
-			t.Error("Config should be enabled by default")
-		}
-
-		if config.Timeout <= 0 {
-			t.Error("Config timeout should be positive")
-		}
-
-		t.Logf("Default configuration: %+v", config)
-	})
-
-	t.Run("Configuration Validation", func(t *testing.T) {
-		validConfigs := []Config{
-			{Name: "valid1", Enabled: true, Timeout: time.Second},
-			{Name: "valid2", Enabled: false, Timeout: time.Minute},
-		}
-
-		for i, config := range validConfigs {
-			if config.Name == "" {
-				t.Errorf("Valid config %d has empty name", i)
-			}
-			if config.Timeout <= 0 {
-				t.Errorf("Valid config %d has invalid timeout", i)
-			}
-		}
-
-		t.Log("Configuration validation working correctly")
-	})
+	configPath := filepath.Join(dir, "config.yaml")
+	configContent := `
+admin_listen_address: 127.0.0.1:0
+module_path: ` + dir + `/modules
+identity_file_path: ` + identityFile + `
+policy_path: ` + policyFile + `
+controller_path: ` + dir + `/controllers
+`
+	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	return configPath
 }
 
-// BenchmarkBasicOperations benchmarks fundamental operations.
-func BenchmarkBasicOperations(b *testing.B) {
-	b.Run("StringConcatenation", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			_ = "hello" + "world" + string(rune(i%256))
-		}
-	})
+func TestNewRuntime(t *testing.T) {
+	dir := t.TempDir()
+	configPath := writeMinimalConfig(t, dir)
 
-	b.Run("MathOperations", func(b *testing.B) {
-		b.ReportAllocs()
-		total := 0
-		for i := 0; i < b.N; i++ {
-			total += i * 2
-		}
-		_ = total
-	})
+	rt, err := agent.NewRuntime(configPath, "test")
+	if err != nil {
+		t.Fatalf("NewRuntime failed: %v", err)
+	}
+	if rt == nil {
+		t.Fatal("NewRuntime returned nil")
+	}
+}
 
-	b.Run("TimeMeasurement", func(b *testing.B) {
-		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
-			start := time.Now()
-			_ = time.Since(start)
-		}
-	})
+func TestNewRuntimeInvalidConfig(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "bad.yaml")
+	if err := os.WriteFile(configPath, []byte("{invalid: yaml: ["), 0644); err != nil {
+		t.Fatalf("write bad config: %v", err)
+	}
+
+	if _, err := agent.NewRuntime(configPath, "test"); err == nil {
+		t.Error("expected error for invalid YAML")
+	}
+}
+
+func TestNewRuntimeMissingConfig(t *testing.T) {
+	if _, err := agent.NewRuntime("/nonexistent/path/config.yaml", "test"); err == nil {
+		t.Error("expected error for nonexistent config")
+	}
+}
+
+func TestApplyConfig(t *testing.T) {
+	dir := t.TempDir()
+	configPath := writeMinimalConfig(t, dir)
+
+	rt, err := agent.NewRuntime(configPath, "test")
+	if err != nil {
+		t.Fatalf("NewRuntime failed: %v", err)
+	}
+
+	newConfig := "admin_listen_address: 127.0.0.1:0\nlog_level: debug\n"
+	if err := rt.ApplyConfig([]byte(newConfig)); err != nil {
+		t.Errorf("ApplyConfig failed: %v", err)
+	}
+}
+
+func TestStopWithoutStart(t *testing.T) {
+	dir := t.TempDir()
+	configPath := writeMinimalConfig(t, dir)
+
+	rt, err := agent.NewRuntime(configPath, "test")
+	if err != nil {
+		t.Fatalf("NewRuntime failed: %v", err)
+	}
+	rt.Stop()
+}
+
+func TestGetCurrentRelease(t *testing.T) {
+	dir := t.TempDir()
+	configPath := writeMinimalConfig(t, dir)
+
+	rt, err := agent.NewRuntime(configPath, "test")
+	if err != nil {
+		t.Fatalf("NewRuntime failed: %v", err)
+	}
+
+	release, data, err := rt.GetCurrentRelease()
+	if err == nil {
+		t.Logf("release: %+v", release)
+		_ = data
+	} else {
+		t.Logf("GetCurrentRelease returned expected error: %v", err)
+	}
 }
