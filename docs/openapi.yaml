@@ -1,0 +1,317 @@
+openapi: "3.0.3"
+info:
+  title: APA Admin API
+  description: Admin HTTP API for the Autonomous Polymorphic Agent runtime
+  version: "1.0.0"
+  contact:
+    name: NBR. Company
+    url: https://github.com/naviNBRuas/APA
+
+servers:
+  - url: http://localhost:8080
+    description: Local agent admin endpoint
+
+paths:
+  /admin/health:
+    get:
+      summary: Health check
+      operationId: healthCheck
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Agent is healthy
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: OK
+
+  /admin/status:
+    get:
+      summary: Agent status
+      operationId: getStatus
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Status information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+
+  /admin/metrics:
+    get:
+      summary: Operational metrics
+      operationId: getMetrics
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Metrics data
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetricsResponse"
+
+  /admin/audit:
+    get:
+      summary: Read recent audit log entries
+      operationId: getAuditLog
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEntry"
+
+  /admin/modules:
+    get:
+      summary: List loaded modules
+      operationId: listModules
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Module list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ModuleManifest"
+    post:
+      summary: Load a module
+      operationId: loadModule
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        "200":
+          description: Module loaded
+
+  /admin/controllers:
+    get:
+      summary: List loaded controllers
+      operationId: listControllers
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Controller list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ControllerManifest"
+    post:
+      summary: Load a controller
+      operationId: loadController
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        "200":
+          description: Controller loaded
+
+  /admin/config:
+    get:
+      summary: Get agent configuration (sensitive fields redacted)
+      operationId: getConfig
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Sanitized configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentConfig"
+    post:
+      summary: Update agent configuration
+      operationId: updateConfig
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentConfig"
+      responses:
+        "200":
+          description: Configuration updated
+
+  /admin/update:
+    post:
+      summary: Trigger update check
+      operationId: triggerUpdate
+      security:
+        - BearerAuth: []
+      responses:
+        "202":
+          description: Update check initiated
+
+  /admin/peer-copy:
+    get:
+      summary: Copy a module from a peer
+      operationId: peerCopyModule
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: peer_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: module_name
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Module copied from peer
+
+  /admin/regenerate:
+    post:
+      summary: Trigger agent regeneration
+      operationId: triggerRegeneration
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Regeneration triggered
+
+  /admin/propagate:
+    post:
+      summary: Trigger agent propagation
+      operationId: triggerPropagation
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Propagation triggered
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Admin API key as Bearer token, or X-Peer-ID header for peer auth
+
+  schemas:
+    StatusResponse:
+      type: object
+      properties:
+        version:
+          type: string
+        peer_id:
+          type: string
+        loaded_modules:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModuleManifest"
+
+    MetricsResponse:
+      type: object
+      properties:
+        uptime_seconds:
+          type: number
+        audit_enabled:
+          type: boolean
+        peer_count:
+          type: integer
+        topics_health:
+          type: object
+          additionalProperties:
+            type: boolean
+
+    AuditEntry:
+      type: object
+      properties:
+        actor:
+          type: string
+        action:
+          type: string
+        path:
+          type: string
+        method:
+          type: string
+        peer_id:
+          type: string
+        details:
+          type: object
+
+    AgentConfig:
+      type: object
+      properties:
+        admin_listen_address:
+          type: string
+        log_level:
+          type: string
+          enum: [debug, info, warn, error]
+        module_path:
+          type: string
+        identity_file_path:
+          type: string
+        policy_path:
+          type: string
+        controller_path:
+          type: string
+        p2p:
+          type: object
+        update:
+          type: object
+        control_plane:
+          type: object
+      description: >
+        Note: admin_api_key, signing_priv_key_path, admin_tls_cert_path,
+        admin_tls_key_path, and admin_tls_client_ca are redacted in GET
+        responses for security.
+
+    ModuleManifest:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
+
+    ControllerManifest:
+      type: object
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        description:
+          type: string
