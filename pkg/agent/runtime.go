@@ -306,8 +306,11 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 		logger.Warn("No admin policy path configured; admin API will default to allow-all")
 	}
 
-	// Capture admin API key (optional)
+	// Capture admin API key (optional; env var overrides config file)
 	rt.adminAPIKey = config.AdminAPIKey
+	if envKey := os.Getenv("APA_ADMIN_API_KEY"); envKey != "" {
+		rt.adminAPIKey = envKey
+	}
 	rt.adminTLSCertPath = config.AdminTLSCertPath
 	rt.adminTLSKeyPath = config.AdminTLSKeyPath
 	rt.adminTLSClientCA = config.AdminTLSClientCA
@@ -711,6 +714,20 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 
 	// Wait for shutdown signal
 	rt.waitForShutdown(cancel)
+}
+
+// sanitizedConfig returns a copy of the config with sensitive fields zeroed for external display.
+func (rt *Runtime) sanitizedConfig() *Config {
+	if rt.config == nil {
+		return nil
+	}
+	c := *rt.config
+	c.AdminAPIKey = ""
+	c.SigningPrivKeyPath = ""
+	c.AdminTLSCertPath = ""
+	c.AdminTLSKeyPath = ""
+	c.AdminTLSClientCA = ""
+	return &c
 }
 
 // GetCurrentRelease returns the current release information.
