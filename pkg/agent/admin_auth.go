@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -12,6 +13,17 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"golang.org/x/time/rate"
 )
+
+type apiError struct {
+	Error string `json:"error"`
+	Code  int    `json:"code"`
+}
+
+func writeJSONError(w http.ResponseWriter, message string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(apiError{Error: message, Code: code})
+}
 
 func (rt *Runtime) authorizeAdminRequest(ctx context.Context, r *http.Request, input map[string]interface{}) (bool, error) {
 	if rt.adminAPIKey != "" {
