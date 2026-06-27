@@ -1,19 +1,27 @@
 # Makefile for APA Agent
 
 BINARY_NAME=agentd
+STANDALONE_NAME=standalone-agent
 BUILD_DIR=bin
 CMD_PATH=./cmd/agentd/main.go
+STANDALONE_PATH=./cmd/standalone-agent/main.go
 MATRIX_PLATFORMS?=linux/amd64 linux/arm64 linux/arm linux/386 linux/riscv64 windows/amd64 windows/arm64 darwin/amd64 darwin/arm64 freebsd/amd64
 GOFLAGS?=
 DIST_DIR=dist
 
-.PHONY: all build clean test build-linux build-windows build-darwin build-matrix build-matrix-minimal ci-local
+.PHONY: all build build-standalone build-linux build-windows build-darwin build-matrix build-matrix-minimal
+.PHONY: test test-race test-pkg test-integration lint lint-fix coverage clean check ci-local
+.PHONY: dist package-matrix checksums
 
-all: build
+all: build build-standalone
 
 build:
-	@echo "Building for current OS..."
+	@echo "Building agentd..."
 	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) $(CMD_PATH)
+
+build-standalone:
+	@echo "Building standalone-agent..."
+	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BUILD_DIR)/$(STANDALONE_NAME) $(STANDALONE_PATH)
 
 build-linux:
 	@echo "Building for Linux (amd64)..."
@@ -58,8 +66,37 @@ build-matrix-minimal:
 	done
 
 test:
-	@echo "Running tests..."
-	go test -v ./...
+	@echo "Running all tests..."
+	go test -count=1 ./...
+
+test-race:
+	@echo "Running tests with race detector..."
+	go test -race -count=1 ./...
+
+test-pkg:
+	@echo "Running package unit tests..."
+	go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./pkg/...
+
+test-integration:
+	@echo "Running integration tests..."
+	go test -count=1 ./tests/...
+
+coverage:
+	@echo "Running tests with coverage..."
+	go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./pkg/...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: coverage.html"
+
+lint:
+	@echo "Running golangci-lint..."
+	golangci-lint run --timeout=5m
+
+lint-fix:
+	@echo "Running golangci-lint with auto-fix..."
+	golangci-lint run --timeout=5m --fix
+
+check: lint test-race
+	@echo "All checks passed."
 
 ci-local:
 	@echo "Validating local GitHub workflows..."

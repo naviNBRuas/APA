@@ -1,5 +1,6 @@
 run:
   tests: true
+  timeout: 5m
 
 linters:
   enable:
@@ -11,8 +12,36 @@ linters:
     - staticcheck
     - ineffassign
     - typecheck
+    - gosec
+    - gocritic
+    - misspell
+    - bodyclose
+    - whitespace
+    - thelper
+    - goconst
+    - noctx
+    - prealloc
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  gosec:
+    excludes:
+      - G115
+      - G204
+  gocritic:
+    enabled-tags:
+      - style
+      - performance
+    disabled-checks:
+      - ifElseChain
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: true
 
 issues:
   exclude-use-default: false
-  exclude:
-    - "Error return value of.*is not checked"
+  max-issues-per-linter: 0
+  max-same-issues: 0
