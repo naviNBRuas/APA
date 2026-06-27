@@ -1,5 +1,3 @@
-//go:build enhanced
-
 // Package robustness provides advanced error handling, self-healing, and fault tolerance mechanisms.
 package robustness
 
