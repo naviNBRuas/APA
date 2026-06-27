@@ -741,7 +741,7 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 		}
 		if err != nil && err != http.ErrServerClosed {
 			rt.logger.Error("Admin API server failed", "error", err)
-			os.Exit(1)
+			cancel()
 		}
 	}()
 
@@ -764,11 +764,13 @@ func (rt *Runtime) Stop() {
 
 	// Stop all registered controllers
 	for _, ctrl := range rt.controllers {
-		ctrlCtx, ctrlCancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer ctrlCancel()
-		if err := ctrl.Stop(ctrlCtx); err != nil {
-			rt.logger.Error("Failed to stop controller", "name", ctrl.Name(), "error", err)
-		}
+		func() {
+			ctrlCtx, ctrlCancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer ctrlCancel()
+			if err := ctrl.Stop(ctrlCtx); err != nil {
+				rt.logger.Error("Failed to stop controller", "name", ctrl.Name(), "error", err)
+			}
+		}()
 	}
 
 	if rt.controlPlane != nil {
