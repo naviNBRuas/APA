@@ -80,15 +80,9 @@ jobs:
       - name: Build standalone agent
         run: go build -o standalone-agent cmd/standalone-agent/main.go
 
-      - name: Test standalone agent
+      - name: Verify standalone agent binary
         if: matrix.os != 'windows-latest'
-        shell: bash
-        run: |
-          ./standalone-agent --demo-delay=1s &
-          AGENT_PID=$!
-          sleep 10
-          kill "$AGENT_PID" 2>/dev/null || true
-          wait "$AGENT_PID" 2>/dev/null || true
+        run: ./standalone-agent --version
 
   cross-platform-build:
     name: Cross-Platform Build Matrix
