@@ -272,9 +272,9 @@ func (gbc *GoBinaryController) HandleMessage(ctx context.Context, message networ
 
 	// Send SIGUSR1 to the process to signal it to read the new message
 	if gbc.cmd != nil && gbc.cmd.Process() != nil {
-		gbc.logger.Info("Sending SIGUSR1 to GoBinaryController for message", "name", gbc.name, "pid", gbc.cmd.Process().Pid)
-		if err := gbc.cmd.Process().Signal(syscall.SIGUSR1); err != nil {
-			return fmt.Errorf("failed to send SIGUSR1 to controller '%s': %w", gbc.name, err)
+		gbc.logger.Info("Sending signal to GoBinaryController for message", "name", gbc.name, "pid", gbc.cmd.Process().Pid)
+		if err := gbc.cmd.Process().Signal(notifySignal()); err != nil {
+			return fmt.Errorf("failed to send signal to controller '%s': %w", gbc.name, err)
 		}
 	} else {
 		return fmt.Errorf("controller '%s' not running, cannot handle message", gbc.name)
