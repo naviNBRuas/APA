@@ -778,10 +778,12 @@ func (rt *Runtime) Stop() {
 	}
 
 	// Shutdown the admin API server
-	serverCtx, serverCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer serverCancel()
-	if err := rt.server.Shutdown(serverCtx); err != nil {
-		rt.logger.Error("Admin API server shutdown failed", "error", err)
+	if rt.server != nil {
+		serverCtx, serverCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer serverCancel()
+		if err := rt.server.Shutdown(serverCtx); err != nil {
+			rt.logger.Error("Admin API server shutdown failed", "error", err)
+		}
 	}
 	rt.logger.Info("Agent runtime shut down gracefully.")
 }
