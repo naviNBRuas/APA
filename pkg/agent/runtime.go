@@ -172,17 +172,20 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 	}
 
 	// Initialize Module Manager
-	// Load signing private key
-	signingPrivKeyBytes, err := os.ReadFile(config.SigningPrivKeyPath)
-	if err != nil {
-		return fmt.Errorf("failed to read signing private key: %w", err)
+	// Load signing private key (optional)
+	var signingPrivKey ed25519.PrivateKey
+	if config.SigningPrivKeyPath != "" {
+		signingPrivKeyBytes, err := os.ReadFile(config.SigningPrivKeyPath)
+		if err != nil {
+			return fmt.Errorf("failed to read signing private key: %w", err)
+		}
+		signingPrivKeyHex := string(signingPrivKeyBytes)
+		signingPrivKeyDecoded, err := hex.DecodeString(signingPrivKeyHex)
+		if err != nil {
+			return fmt.Errorf("failed to decode signing private key: %w", err)
+		}
+		signingPrivKey = ed25519.PrivateKey(signingPrivKeyDecoded)
 	}
-	signingPrivKeyHex := string(signingPrivKeyBytes)
-	signingPrivKeyDecoded, err := hex.DecodeString(signingPrivKeyHex)
-	if err != nil {
-		return fmt.Errorf("failed to decode signing private key: %w", err)
-	}
-	signingPrivKey := ed25519.PrivateKey(signingPrivKeyDecoded)
 
 	// Initialize Policy Enforcer
 	policyEnforcer, err := policy.NewPolicyEnforcer(config.PolicyPath)

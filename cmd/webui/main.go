@@ -230,7 +230,7 @@ func (s *server) apiProxy(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "upstream error", http.StatusBadGateway)
 		return
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	copyHeaders(w.Header(), resp.Header)
 	w.WriteHeader(resp.StatusCode)
@@ -259,7 +259,7 @@ func (s *server) checkHealth(ctx context.Context, token string) error {
 	if err != nil {
 		return err
 	}
-	resp.Body.Close()
+	resp.Body.Close() //nolint:errcheck
 	if resp.StatusCode != http.StatusOK {
 		return errors.New("unauthorized")
 	}

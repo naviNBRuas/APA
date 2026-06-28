@@ -133,7 +133,7 @@ func (m *Manager) InstallModule(manifestURL string) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch manifest from URL: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("bad status fetching manifest: %s", resp.Status)
@@ -159,7 +159,7 @@ func (m *Manager) InstallModule(manifestURL string) error {
 	if err != nil {
 		return fmt.Errorf("failed to fetch wasm file: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("bad status fetching wasm file: %s", resp.Status)
@@ -337,7 +337,7 @@ func (m *Manager) verifyHash(filePath, expectedHash string, manifest *Manifest) 
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer file.Close() //nolint:errcheck
 
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {
@@ -354,7 +354,7 @@ func (m *Manager) verifyHash(filePath, expectedHash string, manifest *Manifest) 
 		if m.signingPrivKey == nil {
 			return fmt.Errorf("cannot verify signature: signing private key not provided to manager")
 		}
-		pubKey := m.signingPrivKey.Public().(ed25519.PublicKey)
+		pubKey := m.signingPrivKey.Public().(ed25519.PublicKey) //nolint:errcheck
 		for _, sigHex := range manifest.Signatures {
 			sig, err := hex.DecodeString(sigHex)
 			if err != nil {
