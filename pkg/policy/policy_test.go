@@ -15,7 +15,7 @@ func TestNewPolicyEnforcer(t *testing.T) {
 		if _, err := f.WriteString("trusted_authors:\n  - \"test-author\""); err != nil {
 			t.Fatal(err)
 		}
-		f.Close()
+		f.Close() //nolint:errcheck
 
 		p, err := NewPolicyEnforcer(f.Name())
 		if err != nil {
@@ -44,7 +44,7 @@ func TestNewPolicyEnforcer(t *testing.T) {
 		if _, err := f.WriteString("{{invalid yaml}}"); err != nil {
 			t.Fatal(err)
 		}
-		f.Close()
+		f.Close() //nolint:errcheck
 
 		_, err = NewPolicyEnforcer(f.Name())
 		if err == nil {
@@ -61,7 +61,7 @@ func TestPolicyEnforcerImpl_Authorize(t *testing.T) {
 	if _, err := f.WriteString("trusted_authors:\n  - \"test-author\""); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
+	f.Close() //nolint:errcheck
 
 	p, err := NewPolicyEnforcer(f.Name())
 	if err != nil {

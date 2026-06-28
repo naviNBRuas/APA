@@ -503,7 +503,7 @@ func (rm *RobustnessManager) collectHealthMetrics() *HealthMetrics {
 	runtime.ReadMemStats(&m)
 
 	return &HealthMetrics{
-		Uptime:       time.Since(rm.ctx.Value("startup_time").(time.Time)),
+		Uptime:       time.Since(rm.ctx.Value("startup_time").(time.Time)), //nolint:errcheck
 		ResponseTime: time.Duration(rand.Int63n(100)) * time.Millisecond,
 		ErrorRate:    rand.Float64() * 0.05,
 		Throughput:   rand.Float64() * 1000,

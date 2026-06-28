@@ -78,7 +78,7 @@ func runHeartbeat(ctx context.Context) {
 				Status:     "ok",
 				Details:    "controller alive",
 			}
-			b, _ := json.Marshal(status)
+			b, _ := json.Marshal(status) //nolint:errcheck
 			log.Printf("Health-monitor heartbeat: %s", string(b))
 		}
 	}

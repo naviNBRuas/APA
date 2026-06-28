@@ -64,7 +64,12 @@ func NewRiskAssessmentEngine(logger *slog.Logger) *RiskAssessmentEngine {
 }
 
 func NewUtilityCalculator(logger *slog.Logger) *UtilityCalculator {
-	return &UtilityCalculator{logger: logger, utilityFunctions: make(map[UtilityType]*UtilityFunction)}
+	return &UtilityCalculator{
+		logger:              logger,
+		utilityFunctions:    make(map[UtilityType]*UtilityFunction),
+		multiCriteriaEngine: &MultiCriteriaDecisionEngine{},
+		sensitivityAnalyzer: &SensitivityAnalyzer{},
+	}
 }
 
 func NewConsensusBuilder(logger *slog.Logger) *ConsensusBuilder {
