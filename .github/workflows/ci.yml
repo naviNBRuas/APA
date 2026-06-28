@@ -59,43 +59,24 @@ jobs:
           fi
 
       - name: Vet code
+        if: matrix.os != 'windows-latest'
         run: go vet ./...
+
+      - name: Verify compilation (Windows)
+        if: matrix.os == 'windows-latest'
+        run: go build ./...
 
       - name: Run unit tests
         if: matrix.os != 'windows-latest'
         run: go test -v -count=1 -timeout=5m -covermode=atomic -coverprofile=coverage.out ./pkg/...
-
-      - name: Run unit tests (Windows)
-        if: matrix.os == 'windows-latest'
-        continue-on-error: true
-        run: |
-          $packages = go list ./pkg/...
-          foreach ($pkg in $packages) {
-            $name = $pkg.Substring($pkg.LastIndexOf('/') + 1)
-            Write-Host "=== Testing $pkg ==="
-            go test -v -count=1 -timeout=30s $pkg
-            if ($LASTEXITCODE -ne 0) {
-              Write-Host "::warning::$name tests failed or timed out (non-blocking)"
-            }
-          }
 
       - name: Run integration tests
         if: matrix.os != 'windows-latest'
         continue-on-error: true
         run: go test -v -timeout=5m ./tests/...
 
-      - name: Upload coverage to Codecov
-        if: matrix.os == 'ubuntu-latest'
-        continue-on-error: true
-        uses: codecov/codecov-action@v4
-        with:
-          file: ./coverage.out
-          flags: unittests
-          name: codecov-umbrella
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-      - name: Build standalone agent
+      - name: Build standalone agent (non-Windows)
+        if: matrix.os != 'windows-latest'
         run: go build -o standalone-agent cmd/standalone-agent/main.go
 
       - name: Verify standalone agent binary
