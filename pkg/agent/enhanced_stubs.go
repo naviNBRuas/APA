@@ -1,3 +1,5 @@
+//go:build !enhanced
+
 package agent
 
 import (
