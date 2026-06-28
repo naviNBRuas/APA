@@ -1,3 +1,5 @@
+//go:build enhanced
+
 // Package testing provides comprehensive testing framework for the enhanced agent.
 package testing
 
