@@ -91,6 +91,11 @@ log_level: debug
 update:
   check_interval: 10m
   public_key: "92aaba2155699b6691c41270c98d4570a96716a1d5f98e44b556958e352270a0"
+p2p:
+  heartbeat_interval: 30s
+  listen_addresses:
+    - /ip4/0.0.0.0/tcp/0
+    - /ip4/0.0.0.0/udp/0/quic-v1
 `
 	if err := rt.ApplyConfig([]byte(newConfig)); err != nil {
 		t.Errorf("ApplyConfig failed: %v", err)
