@@ -89,6 +89,7 @@ policy_path: ` + dir + `/policies/policy.yaml
 controller_path: ` + dir + `/controllers
 log_level: debug
 update:
+  check_interval: 10m
   public_key: "92aaba2155699b6691c41270c98d4570a96716a1d5f98e44b556958e352270a0"
 `
 	if err := rt.ApplyConfig([]byte(newConfig)); err != nil {
