@@ -1172,8 +1172,8 @@ func TestEngineLearnFromOutcome(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected *LearningFeedback, got %T", fb)
 	}
-	if lf.Reinforcement != 0.3 {
-		t.Errorf("expected reinforcement 0.3, got %f", lf.Reinforcement)
+	if math.Abs(lf.Reinforcement-0.3) > 1e-9 {
+		t.Errorf("expected reinforcement ~0.3, got %.15f", lf.Reinforcement)
 	}
 	expectedKG := decimal.NewFromFloat(math.Abs(0.8 - 0.5))
 	if !lf.KnowledgeGain.Equal(expectedKG) {
@@ -1763,7 +1763,7 @@ func TestEngineConcurrentAccess(t *testing.T) {
 
 	done := make(chan bool)
 	go func() {
-		_ = eng.Start()
+		_ = eng.Start() //nolint:errcheck
 		done <- true
 	}()
 	go func() {

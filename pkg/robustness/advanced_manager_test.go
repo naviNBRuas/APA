@@ -1906,7 +1906,7 @@ func TestRobustnessManager_ConcurrentStop(t *testing.T) {
 func TestRobustnessManager_GetErrorPolicyName(t *testing.T) {
 	t.Parallel()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	rm, _ := NewRobustnessManager(logger, RobustnessConfig{})
+	rm, _ := NewRobustnessManager(logger, RobustnessConfig{}) //nolint:errcheck
 
 	tests := []struct {
 		name        string
@@ -2168,7 +2168,7 @@ func TestRobustnessManager_ProcessErrors(t *testing.T) {
 func TestRobustnessManager_TryFallback(t *testing.T) {
 	t.Parallel()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	rm, _ := NewRobustnessManager(logger, RobustnessConfig{
+	rm, _ := NewRobustnessManager(logger, RobustnessConfig{ //nolint:errcheck
 		EnableErrorHandling: true,
 		ErrorHandlingConfig: ErrorHandlingConfig{
 			FallbackStrategies: []FallbackStrategy{
@@ -2190,7 +2190,7 @@ func TestRobustnessManager_TryFallback(t *testing.T) {
 
 func TestRobustnessManager_TriggerRecovery(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	rm, _ := NewRobustnessManager(logger, RobustnessConfig{})
+	rm, _ := NewRobustnessManager(logger, RobustnessConfig{}) //nolint:errcheck
 
 	err := &ErrorEvent{
 		ID:    "test-recovery",
@@ -2208,7 +2208,7 @@ func TestRobustnessManager_TriggerRecovery(t *testing.T) {
 
 func TestRobustnessManager_PerformRecovery(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	rm, _ := NewRobustnessManager(logger, RobustnessConfig{})
+	rm, _ := NewRobustnessManager(logger, RobustnessConfig{}) //nolint:errcheck
 
 	rm.performRecovery()
 
@@ -2218,7 +2218,7 @@ func TestRobustnessManager_PerformRecovery(t *testing.T) {
 
 func TestRobustnessManager_MonitorHealth(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	rm, _ := NewRobustnessManager(logger, RobustnessConfig{})
+	rm, _ := NewRobustnessManager(logger, RobustnessConfig{}) //nolint:errcheck
 
 	rm.monitorHealth()
 }
@@ -2226,7 +2226,7 @@ func TestRobustnessManager_MonitorHealth(t *testing.T) {
 func TestRobustnessManager_HandleAlert(t *testing.T) {
 	t.Parallel()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	rm, _ := NewRobustnessManager(logger, RobustnessConfig{
+	rm, _ := NewRobustnessManager(logger, RobustnessConfig{ //nolint:errcheck
 		EnableEmergencyProtocols: true,
 	})
 
@@ -2246,7 +2246,7 @@ func TestRobustnessManager_HandleAlert(t *testing.T) {
 
 func TestRobustnessManager_ManageDegradation(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
-	rm, _ := NewRobustnessManager(logger, RobustnessConfig{})
+	rm, _ := NewRobustnessManager(logger, RobustnessConfig{}) //nolint:errcheck
 
 	rm.manageDegradation()
 

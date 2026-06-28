@@ -13,7 +13,7 @@ func TestBackupManager(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	logger := slog.Default()
 	passphrase := "test-passphrase"
@@ -40,7 +40,7 @@ func TestCreateRestoreBackup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	logger := slog.Default()
 	passphrase := "test-passphrase"
@@ -116,7 +116,7 @@ func TestListBackups(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	logger := slog.Default()
 	passphrase := "test-passphrase"
@@ -167,7 +167,7 @@ func TestEncryptionDecryption(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	logger := slog.Default()
 	passphrase := "test-passphrase"

@@ -5,7 +5,7 @@ import "testing"
 func TestDataBusAppliesEvents(t *testing.T) {
 	bus := NewDataBus()
 	bus.RegisterReducer("inc", ReducerFunc(func(state map[string]interface{}, ev DataEvent) error {
-		cur, _ := state["counter"].(int)
+		cur, _ := state["counter"].(int) //nolint:errcheck
 		state["counter"] = cur + 1
 		return nil
 	}))
@@ -18,7 +18,7 @@ func TestDataBusAppliesEvents(t *testing.T) {
 	}
 
 	snap := bus.Snapshot()
-	if snap["counter"].(int) != 2 {
+	if snap["counter"].(int) != 2 { //nolint:errcheck
 		t.Fatalf("expected counter 2, got %v", snap["counter"])
 	}
 }

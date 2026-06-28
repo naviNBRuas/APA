@@ -227,8 +227,8 @@ func TestGetAvailableActions(t *testing.T) {
 	}
 
 	// Add actions
-	responseManager.AddAction(action1)
-	responseManager.AddAction(action2)
+	responseManager.AddAction(action1) //nolint:errcheck
+	responseManager.AddAction(action2) //nolint:errcheck
 
 	// Test getting available actions
 	actions := responseManager.GetAvailableActions()
