@@ -32,6 +32,8 @@ module_path: ` + dir + `/modules
 identity_file_path: ` + identityFile + `
 policy_path: ` + policyFile + `
 controller_path: ` + dir + `/controllers
+update:
+  public_key: "b75a3110d25e593d2466ec55a4bb5556d7ef8fd99266e3e13ea519ee8a1f9b05a570c192517c0585887ff45e41f46d2ca0073aeb841c121912ba0533da71f446"
 `
 	if err := os.WriteFile(configPath, []byte(configContent), 0644); err != nil {
 		t.Fatalf("write config: %v", err)
