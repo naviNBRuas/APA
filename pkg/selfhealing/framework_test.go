@@ -274,7 +274,7 @@ func TestStrategiesPriorityOrdering(t *testing.T) {
 	mediumPriority := &MockStrategy{name: "medium", priority: 50}
 	highPriority := &MockStrategy{name: "high", priority: 90}
 
-	framework.RegisterStrategy(lowPriority)   //nolint:errcheck
+	framework.RegisterStrategy(lowPriority)    //nolint:errcheck
 	framework.RegisterStrategy(mediumPriority) //nolint:errcheck
 	framework.RegisterStrategy(highPriority)   //nolint:errcheck
 

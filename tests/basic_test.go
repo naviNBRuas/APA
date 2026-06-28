@@ -20,8 +20,8 @@ func writeMinimalConfig(t *testing.T, dir string) string {
 
 	identityFile := filepath.Join(dir, "identities", "key.pem")
 
-	policyFile := filepath.Join(dir, "policies", "policy.rego")
-	if err := os.WriteFile(policyFile, []byte("package apa\n"), 0644); err != nil {
+	policyFile := filepath.Join(dir, "policies", "policy.yaml")
+	if err := os.WriteFile(policyFile, []byte("trusted_authors: []\n"), 0644); err != nil {
 		t.Fatalf("write policy: %v", err)
 	}
 

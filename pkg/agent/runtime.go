@@ -48,7 +48,6 @@ type StatusResponse struct {
 
 // Config holds the configuration for the agent runtime.
 
-
 // Config holds the configuration for the agent runtime.
 type Config struct {
 	AdminListenAddress        string              `yaml:"admin_listen_address"`
@@ -899,5 +898,3 @@ func (rt *Runtime) monitorBinaryIntegrity(ctx context.Context, interval time.Dur
 		}
 	}
 }
-
-
