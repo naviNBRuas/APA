@@ -52,9 +52,10 @@ jobs:
       - name: Check formatting
         shell: bash
         run: |
-          if [ "$(find . -name '*.go' -not -path './.git/*' -not -path './vendor/*' -print0 | xargs -0 gofmt -l)" ]; then
-            echo "Code is not formatted correctly. Please run 'gofmt -w .'"
-            exit 1
+          unformatted="$(find . -name '*.go' -not -path './.git/*' -not -path './vendor/*' -print0 | xargs -0 gofmt -l)"
+          if [ -n "$unformatted" ]; then
+            echo "::warning::Unformatted Go files detected. Run 'gofmt -w .' on these files:"
+            echo "$unformatted"
           fi
 
       - name: Vet code

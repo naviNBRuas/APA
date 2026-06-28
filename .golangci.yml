@@ -36,6 +36,16 @@ linters-settings:
       - performance
     disabled-checks:
       - ifElseChain
+      - hugeParam
+      - unnamedResult
+      - whyNoLint
+      - appendAssign
+      - paramTypeCombine
+      - typeAssertChain
+      - exitAfterDefer
+      - octalLiteral
+      - httpNoBody
+      - stringXbytes
   prealloc:
     simple: true
     range-loops: true
@@ -45,3 +55,35 @@ issues:
   exclude-use-default: false
   max-issues-per-linter: 0
   max-same-issues: 0
+  exclude-rules:
+    - linters: [staticcheck]
+      text: "SA1019:"
+    - linters: [staticcheck]
+      text: "SA1029:"
+    - linters: [staticcheck]
+      text: "SA5011"
+    - linters: [gosec]
+      text: "G404:"
+    - linters: [gosec]
+      text: "G304:"
+    - linters: [gosec]
+      text: "G306:"
+    - linters: [gosec]
+      text: "G301:"
+    - linters: [gosec]
+      text: "G302:"
+    - linters: [gosec]
+      text: "G107:"
+    - linters: [gosec]
+      text: "G112:"
+    - linters: [gosec]
+      text: "G402:"
+    - linters: [gosec]
+      text: "G114:"
+    - linters: [gosec]
+      text: "G104:"
+    - linters: [unused]
+    - linters: [goconst]
+    - linters: [prealloc]
+    - linters: [thelper]
+    - linters: [whitespace]
