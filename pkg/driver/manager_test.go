@@ -21,7 +21,7 @@ func TestDriverManager(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	// Create a logger
 	logger := slog.Default()
@@ -158,7 +158,7 @@ func TestDriverManagerInvalidSignature(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	// Create a logger
 	logger := slog.Default()

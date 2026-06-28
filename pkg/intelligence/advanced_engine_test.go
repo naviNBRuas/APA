@@ -1175,7 +1175,10 @@ func TestEngineLearnFromOutcome(t *testing.T) {
 	if math.Abs(lf.Reinforcement-0.3) > 1e-9 {
 		t.Errorf("expected reinforcement ~0.3, got %.15f", lf.Reinforcement)
 	}
-	expectedKG := decimal.NewFromFloat(math.Abs(0.8 - 0.5))
+	expectedKG, err := decimal.NewFromString("0.3")
+	if err != nil {
+		t.Fatalf("decimal parse error: %v", err)
+	}
 	if !lf.KnowledgeGain.Equal(expectedKG) {
 		t.Errorf("expected knowledge gain %s, got %s", expectedKG.String(), lf.KnowledgeGain.String())
 	}

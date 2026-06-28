@@ -94,7 +94,7 @@ func processAndForward(messageFile, sink string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	log.Printf("Telemetry-forwarder posted telemetry: status=%d bytes=%d", resp.StatusCode, len(body))
 	return nil

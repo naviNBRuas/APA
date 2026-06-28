@@ -73,7 +73,7 @@ func (m *Manager) FetchAndVerify(ctx context.Context, manifestURL string) (*Mani
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to fetch manifest: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, nil, fmt.Errorf("bad status fetching manifest: %s", resp.Status)
@@ -246,7 +246,7 @@ func (m *Manager) downloadFile(ctx context.Context, url string) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("bad status from driver server: %s", resp.Status)

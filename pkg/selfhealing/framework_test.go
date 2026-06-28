@@ -18,7 +18,7 @@ type MockHealthChecker struct {
 
 func (m *MockHealthChecker) CheckHealth(ctx context.Context) ([]*health.CheckResult, error) {
 	args := m.Called(ctx)
-	return args.Get(0).([]*health.CheckResult), args.Error(1)
+	return args.Get(0).([]*health.CheckResult), args.Error(1) //nolint:errcheck
 }
 
 // MockEventHandler is a mock implementation of the EventHandler interface
@@ -171,10 +171,10 @@ func TestGetApplicableStrategies(t *testing.T) {
 	networkStrategy := NewNetworkReconnectStrategy()
 	quarantineStrategy := NewQuarantineNodeStrategy()
 
-	framework.RegisterStrategy(restartStrategy)
-	framework.RegisterStrategy(rebuildStrategy)
-	framework.RegisterStrategy(networkStrategy)
-	framework.RegisterStrategy(quarantineStrategy)
+	framework.RegisterStrategy(restartStrategy)    //nolint:errcheck
+	framework.RegisterStrategy(rebuildStrategy)    //nolint:errcheck
+	framework.RegisterStrategy(networkStrategy)    //nolint:errcheck
+	framework.RegisterStrategy(quarantineStrategy) //nolint:errcheck
 
 	// Create a process-related issue
 	processIssue := &HealthIssue{
@@ -219,7 +219,7 @@ func TestApplyHealingStrategies(t *testing.T) {
 
 	// Register a lightweight mock strategy that always succeeds
 	strategy := &MockStrategy{name: "mock-success", priority: 50}
-	framework.RegisterStrategy(strategy)
+	framework.RegisterStrategy(strategy) //nolint:errcheck
 
 	// Create a process issue
 	processIssue := &HealthIssue{
@@ -274,9 +274,9 @@ func TestStrategiesPriorityOrdering(t *testing.T) {
 	mediumPriority := &MockStrategy{name: "medium", priority: 50}
 	highPriority := &MockStrategy{name: "high", priority: 90}
 
-	framework.RegisterStrategy(lowPriority)
-	framework.RegisterStrategy(mediumPriority)
-	framework.RegisterStrategy(highPriority)
+	framework.RegisterStrategy(lowPriority)   //nolint:errcheck
+	framework.RegisterStrategy(mediumPriority) //nolint:errcheck
+	framework.RegisterStrategy(highPriority)   //nolint:errcheck
 
 	// Create an issue that all strategies can handle
 	issue := &HealthIssue{
