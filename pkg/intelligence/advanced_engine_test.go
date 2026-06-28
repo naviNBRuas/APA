@@ -657,10 +657,10 @@ func TestPredictiveAnalyticsEngine_ForecastValue(t *testing.T) {
 func TestPredictiveAnalyticsEngine_AccuracyMetrics(t *testing.T) {
 	t.Parallel()
 	am := &AccuracyMetrics{
-		MAE:      1.5,
-		RMSE:     2.0,
-		MAPE:     3.5,
-		RSquared: 0.94,
+		MAE:        1.5,
+		RMSE:       2.0,
+		MAPE:       3.5,
+		RSquared:   0.94,
 		Confidence: 0.90,
 	}
 	if am.MAE != 1.5 {
@@ -755,16 +755,16 @@ func TestAdvancedAnomalyDetector_UpdateModels(t *testing.T) {
 func TestAdvancedAnomalyDetector_DetectedAnomaly(t *testing.T) {
 	t.Parallel()
 	a := &DetectedAnomaly{
-		ID:          "anomaly-test-1",
-		Timestamp:   time.Now(),
-		Type:        AnomalyContextual,
-		Entity:      "server-01",
-		Severity:    AnomalySeverityCritical,
-		Confidence:  0.99,
-		Description: "Memory leak detected in process X",
-		Context:     map[string]interface{}{"memory_growth_rate": "2.5MB/min"},
-		Evidence:    []Evidence{{}, {}},
-		Impact:      ImpactAssessment{},
+		ID:              "anomaly-test-1",
+		Timestamp:       time.Now(),
+		Type:            AnomalyContextual,
+		Entity:          "server-01",
+		Severity:        AnomalySeverityCritical,
+		Confidence:      0.99,
+		Description:     "Memory leak detected in process X",
+		Context:         map[string]interface{}{"memory_growth_rate": "2.5MB/min"},
+		Evidence:        []Evidence{{}, {}},
+		Impact:          ImpactAssessment{},
 		Recommendations: []string{"restart process", "increase memory limit"},
 	}
 	if a.Severity != AnomalySeverityCritical {
@@ -1175,10 +1175,7 @@ func TestEngineLearnFromOutcome(t *testing.T) {
 	if math.Abs(lf.Reinforcement-0.3) > 1e-9 {
 		t.Errorf("expected reinforcement ~0.3, got %.15f", lf.Reinforcement)
 	}
-	expectedKG, err := decimal.NewFromString("0.3")
-	if err != nil {
-		t.Fatalf("decimal parse error: %v", err)
-	}
+	expectedKG := decimal.NewFromFloat(math.Abs(outcome.ActualUtility - alt.ExpectedUtility))
 	if !lf.KnowledgeGain.Equal(expectedKG) {
 		t.Errorf("expected knowledge gain %s, got %s", expectedKG.String(), lf.KnowledgeGain.String())
 	}
@@ -1303,10 +1300,10 @@ func TestPlanningHorizons(t *testing.T) {
 func TestExperienceRecord(t *testing.T) {
 	t.Parallel()
 	exp := &ExperienceRecord{
-		ID:      "exp-1",
-		Action:  "scale_up",
-		Reward:  0.85,
-		Success: true,
+		ID:       "exp-1",
+		Action:   "scale_up",
+		Reward:   0.85,
+		Success:  true,
 		Learning: &LearningInsight{},
 	}
 	if exp.Reward != 0.85 {
@@ -1397,12 +1394,12 @@ func TestMachineLearningSystem_Shutdown(t *testing.T) {
 func TestMachineLearningSystem_MLModel(t *testing.T) {
 	t.Parallel()
 	model := &MLModel{
-		Name:      "resource-predictor",
-		Type:      ModelSupervised,
-		Algorithm: AlgorithmRandomForest,
-		Features:  []string{"cpu", "memory", "disk_io"},
-		Target:    "load",
-		TrainingMetrics: &ModelMetrics{},
+		Name:              "resource-predictor",
+		Type:              ModelSupervised,
+		Algorithm:         AlgorithmRandomForest,
+		Features:          []string{"cpu", "memory", "disk_io"},
+		Target:            "load",
+		TrainingMetrics:   &ModelMetrics{},
 		ValidationMetrics: &ModelMetrics{},
 		DeploymentStatus:  DeploymentDevelopment,
 		Version:           "0.1.0",
@@ -1493,8 +1490,8 @@ func TestBehavioralAnalysisSystem_Shutdown(t *testing.T) {
 func TestBehavioralAnalysisSystem_BehaviorProfile(t *testing.T) {
 	t.Parallel()
 	bp := &BehaviorProfile{
-		Entity: "server-01",
-		Type:   BehaviorSystem,
+		Entity:   "server-01",
+		Type:     BehaviorSystem,
 		Baseline: &BehaviorBaseline{},
 		Patterns: []BehaviorPattern{
 			{
@@ -1654,9 +1651,9 @@ func TestStrategicPlanningEngine_StrategicPlan(t *testing.T) {
 		Goals: []StrategicGoal{
 			{},
 		},
-		Timeline:    365 * 24 * time.Hour,
-		Budget:      500000,
-		Status:      PlanStatus("active"),
+		Timeline: 365 * 24 * time.Hour,
+		Budget:   500000,
+		Status:   PlanStatus("active"),
 	}
 	if plan.Horizon != HorizonLongTerm {
 		t.Errorf("expected long-term horizon, got %s", plan.Horizon)

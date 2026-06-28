@@ -71,7 +71,7 @@ type HealthReport struct {
 }
 
 type AdaptiveOrchestrationLayer struct {
-	logger     *slog.Logger
+	logger      *slog.Logger
 	activeTasks map[string]*OrchestratedTask
 }
 

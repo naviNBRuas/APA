@@ -1909,9 +1909,9 @@ func TestRobustnessManager_GetErrorPolicyName(t *testing.T) {
 	rm, _ := NewRobustnessManager(logger, RobustnessConfig{}) //nolint:errcheck
 
 	tests := []struct {
-		name        string
-		categories  []ErrorCategory
-		expected    string
+		name       string
+		categories []ErrorCategory
+		expected   string
 	}{
 		{"network", []ErrorCategory{ErrorCategoryNetwork}, "network_retry"},
 		{"database", []ErrorCategory{ErrorCategoryDatabase}, "database_retry"},
@@ -2846,9 +2846,9 @@ func TestRobustnessConfig_DeepCopy(t *testing.T) {
 	t.Parallel()
 
 	cfg1 := RobustnessConfig{
-		EnableErrorHandling:    true,
-		EnableSelfHealing:      true,
-		EnableFaultInjection:   true,
+		EnableErrorHandling:  true,
+		EnableSelfHealing:    true,
+		EnableFaultInjection: true,
 		ErrorHandlingConfig: ErrorHandlingConfig{
 			CircuitBreakerConfig: CircuitBreakerConfig{
 				FailureThreshold: 10,
