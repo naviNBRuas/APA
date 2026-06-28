@@ -1,2 +1,8 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+* text=auto eol=lf
+*.go text eol=lf
+Makefile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
