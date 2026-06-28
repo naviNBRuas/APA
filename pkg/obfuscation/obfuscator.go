@@ -14,8 +14,6 @@ import (
 	"runtime"
 	"strings"
 	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 // Obfuscator provides code obfuscation capabilities
@@ -233,21 +231,6 @@ func (a *AntiTampering) VerifyIntegrity(code []byte) bool {
 		a.logger.Error("Code integrity check failed", "expected", hex.EncodeToString(a.baselineHash), "actual", hex.EncodeToString(hash[:]))
 	}
 	return match
-}
-
-// ProtectMemory protects memory from unauthorized access
-func (a *AntiTampering) ProtectMemory() error {
-	// Best-effort mlockall on supported Unix platforms to reduce swapping and scraping.
-	if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
-		if err := unix.Mlockall(unix.MCL_CURRENT | unix.MCL_FUTURE); err != nil {
-			a.logger.Warn("mlockall failed", "error", err)
-			// Do not treat this as fatal in environments where locking is restricted.
-			return nil
-		}
-		return nil
-	}
-
-	return nil
 }
 
 // SetBaselineDigest sets an expected hash for integrity checks.

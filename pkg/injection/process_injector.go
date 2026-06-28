@@ -158,11 +158,7 @@ func (pi *ProcessInjector) injectIntoWindowsProcess(processName string) error {
 
 	// Create a hidden agent process as a form of injection
 	cmd := exec.Command(pi.agentPath, "-mode", "injected", "-parent", processName)
-	// Note: HideWindow is Windows-specific and may not be available on all systems
-	// We'll use a more portable approach
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true, // Run in separate process group
-	}
+	cmd.SysProcAttr = newProcessAttr()
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start injected agent process: %w", err)
@@ -181,9 +177,7 @@ func (pi *ProcessInjector) injectIntoMacOSProcess(processName string) error {
 
 	// Create a background agent process as a form of injection
 	cmd := exec.Command(pi.agentPath, "-mode", "injected", "-parent", processName)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true, // Run in separate process group
-	}
+	cmd.SysProcAttr = newProcessAttr()
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start injected agent process: %w", err)
@@ -202,9 +196,7 @@ func (pi *ProcessInjector) injectIntoLinuxProcess(processName string) error {
 
 	// Create a daemonized agent process as a form of injection
 	cmd := exec.Command(pi.agentPath, "-mode", "injected", "-parent", processName)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setpgid: true, // Run in separate process group
-	}
+	cmd.SysProcAttr = newProcessAttr()
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start injected agent process: %w", err)

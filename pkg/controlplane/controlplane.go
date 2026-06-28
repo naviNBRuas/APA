@@ -176,9 +176,10 @@ func (c *ControlPlane) Set(ctx context.Context, key string, value []byte, ttl ti
 	c.localVers[key] = version
 	msg.Version = version
 	c.applyLocked(msg)
+	isLeader := c.isLeader
 	c.mu.Unlock()
 
-	if c.cfg.Mode == "elected" && !c.isLeader {
+	if c.cfg.Mode == "elected" && !isLeader {
 		msg.Type = "request"
 	}
 	return c.broadcast(ctx, msg)
