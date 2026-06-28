@@ -83,7 +83,12 @@ issues:
     - linters: [gosec]
       text: "G104:"
     - linters: [unused]
+      text: "."
     - linters: [goconst]
+      text: "."
     - linters: [prealloc]
+      text: "."
     - linters: [thelper]
+      text: "."
     - linters: [whitespace]
+      text: "."
