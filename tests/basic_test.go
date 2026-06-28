@@ -81,7 +81,16 @@ func TestApplyConfig(t *testing.T) {
 		t.Fatalf("NewRuntime failed: %v", err)
 	}
 
-	newConfig := "admin_listen_address: 127.0.0.1:0\nlog_level: debug\n"
+	newConfig := `
+admin_listen_address: 127.0.0.1:0
+module_path: ` + dir + `/modules
+identity_file_path: ` + dir + `/identities/key.pem
+policy_path: ` + dir + `/policies/policy.yaml
+controller_path: ` + dir + `/controllers
+log_level: debug
+update:
+  public_key: "92aaba2155699b6691c41270c98d4570a96716a1d5f98e44b556958e352270a0"
+`
 	if err := rt.ApplyConfig([]byte(newConfig)); err != nil {
 		t.Errorf("ApplyConfig failed: %v", err)
 	}
