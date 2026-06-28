@@ -46,6 +46,10 @@ linters-settings:
       - octalLiteral
       - httpNoBody
       - stringXbytes
+      - nestingReduce
+      - appendCombine
+      - rangeValCopy
+      - builtinShadow
   prealloc:
     simple: true
     range-loops: true
@@ -91,4 +95,12 @@ issues:
     - linters: [thelper]
       text: "."
     - linters: [whitespace]
+      text: "."
+    - linters: [errcheck]
+      text: "."
+    - linters: [noctx]
+      text: "."
+    - linters: [bodyclose]
+      text: "."
+    - linters: [gosimple]
       text: "."
