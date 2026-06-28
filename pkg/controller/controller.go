@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
-	"syscall"
 	"time"
 
 	manifest "github.com/naviNBRuas/APA/pkg/controller/manifest"
@@ -54,7 +53,7 @@ func (o *osExecCommand) SetStderr(w io.Writer) {
 
 func DefaultCommandFactory(ctx context.Context, name string, arg ...string) Command {
 	cmd := exec.CommandContext(ctx, name, arg...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	setSysProcAttr(cmd)
 	return &osExecCommand{cmd: cmd}
 }
 
@@ -217,11 +216,11 @@ func (gbc *GoBinaryController) Configure(configData []byte) error {
 		return fmt.Errorf("failed to write config to file for controller '%s': %w", gbc.name, err)
 	}
 
-	// Send SIGHUP to the process to signal it to reload its configuration
+	// Send signal to the process to signal it to reload its configuration
 	if gbc.cmd != nil && gbc.cmd.Process() != nil {
-		gbc.logger.Info("Sending SIGHUP to GoBinaryController", "name", gbc.name, "pid", gbc.cmd.Process().Pid)
-		if err := gbc.cmd.Process().Signal(syscall.SIGHUP); err != nil {
-			return fmt.Errorf("failed to send SIGHUP to controller '%s': %w", gbc.name, err)
+		gbc.logger.Info("Sending reload signal to GoBinaryController", "name", gbc.name, "pid", gbc.cmd.Process().Pid)
+		if err := gbc.cmd.Process().Signal(notifySignal()); err != nil {
+			return fmt.Errorf("failed to send reload signal to controller '%s': %w", gbc.name, err)
 		}
 	} else {
 		return fmt.Errorf("controller '%s' not running, cannot configure", gbc.name)
