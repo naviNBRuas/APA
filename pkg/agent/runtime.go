@@ -652,14 +652,14 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 					if err := rt.p2p.PublishLeaderElectionMessage(ctx, msg); err != nil {
 						rt.logger.Error("Failed to publish leader election message", "error", err)
 					}
-				if isLeader {
-					rt.runMu.Lock()
-					rt.currentLeader = myID
-					rt.runMu.Unlock()
-					rt.logger.Info("Agent is the current leader", "peer_id", myID)
-				} else {
-					rt.logger.Info("Agent is not the leader")
-				}
+					if isLeader {
+						rt.runMu.Lock()
+						rt.currentLeader = myID
+						rt.runMu.Unlock()
+						rt.logger.Info("Agent is the current leader", "peer_id", myID)
+					} else {
+						rt.logger.Info("Agent is not the leader")
+					}
 				}
 			}
 		}()

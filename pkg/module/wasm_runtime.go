@@ -22,7 +22,7 @@ func NewWasmRuntime(ctx context.Context, logger *slog.Logger) (*WasmRuntime, err
 
 	// Instantiate WASI, which is required for many modules.
 	if _, err := wasi_snapshot_preview1.Instantiate(ctx, runtime); err != nil {
-		runtime.Close(ctx)
+		_ = runtime.Close(ctx)
 		return nil, fmt.Errorf("failed to instantiate WASI: %w", err)
 	}
 
@@ -41,7 +41,7 @@ func NewWasmRuntime(ctx context.Context, logger *slog.Logger) (*WasmRuntime, err
 		NewFunctionBuilder().WithFunc(logMessage).Export("log_message").
 		Instantiate(ctx)
 	if err != nil {
-		runtime.Close(ctx)
+		_ = runtime.Close(ctx)
 		return nil, fmt.Errorf("failed to instantiate host module: %w", err)
 	}
 

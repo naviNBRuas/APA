@@ -88,7 +88,7 @@ func (ad *AdvancedDiscovery) startMdnsDiscovery(ctx context.Context) {
 	}
 
 	<-ctx.Done()
-	s.Close()
+	_ = s.Close()
 }
 
 type discoveryNotifee struct {
