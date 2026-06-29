@@ -271,7 +271,7 @@ func NewP2P(ctx context.Context, logger *slog.Logger, config Config, peerID peer
 		config:  config,
 		privKey: privKey,
 	}
-	p2p.AdmittedPeers = make(map[peer.ID]bool)
+	p2p.admittedPeers = make(map[peer.ID]bool)
 
 	p2p.advancedDiscovery = NewAdvancedDiscovery(logger, host, dht, config.ServiceTag)
 

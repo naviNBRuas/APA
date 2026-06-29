@@ -111,7 +111,7 @@ func (rt *Runtime) metricsHandler(w http.ResponseWriter, r *http.Request) {
 
 	if rt.p2p != nil {
 		metrics["peer_count"] = rt.p2p.PeerCount()
-		metrics["admitted_peers"] = rt.p2p.AdmittedPeers
+		metrics["admitted_peers"] = rt.p2p.AdmittedPeers()
 		metrics["topics_health"] = rt.p2p.GetTopicHealth()
 	}
 
