@@ -3,6 +3,7 @@ package consensus
 import (
 	"context"
 	"log/slog"
+	"sync"
 )
 
 // Consensus defines the interface for consensus algorithms
@@ -36,6 +37,7 @@ type Config struct {
 
 // BaseConsensus provides a base implementation for consensus algorithms
 type BaseConsensus struct {
+	mu       sync.RWMutex
 	logger   *slog.Logger
 	config   *Config
 	isLeader bool
@@ -54,16 +56,22 @@ func NewBaseConsensus(logger *slog.Logger, config *Config) *BaseConsensus {
 
 // IsLeader returns whether this node is the leader
 func (c *BaseConsensus) IsLeader() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.isLeader
 }
 
 // GetLeaderID returns the ID of the current leader
 func (c *BaseConsensus) GetLeaderID() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.leaderID
 }
 
 // SetLeader sets the leader status for this node
 func (c *BaseConsensus) SetLeader(isLeader bool, leaderID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.isLeader = isLeader
 	c.leaderID = leaderID
 

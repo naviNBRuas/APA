@@ -50,7 +50,8 @@ type PropagationPayload struct {
 
 // P2P manages the libp2p host and networking components for the agent.
 type P2P struct {
-	AdmittedPeers        map[peer.ID]bool // Explicit peer admission opt-in (exported)
+	mu                   sync.RWMutex
+	admittedPeers        map[peer.ID]bool
 	logger               *slog.Logger
 	host                 host.Host
 	dht                  *dht.IpfsDHT
@@ -123,7 +124,15 @@ func (p *P2P) PeerCount() int {
 
 // SetForwardDecider installs a forward decider used to gate hop-by-hop tasks.
 func (p *P2P) SetForwardDecider(decider ForwardDecider) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.forwardDecider = decider
+}
+
+func (p *P2P) getForwardDecider() ForwardDecider {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.forwardDecider
 }
 
 // GetConnectedPeers returns the list of currently connected peers.
@@ -135,23 +144,41 @@ func (p *P2P) GetConnectedPeers() []peer.ID {
 	return p.host.Network().Peers()
 }
 
+// AdmittedPeers returns a copy of the admitted peers map.
+func (p *P2P) AdmittedPeers() map[peer.ID]bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	result := make(map[peer.ID]bool, len(p.admittedPeers))
+	for k, v := range p.admittedPeers {
+		result[k] = v
+	}
+	return result
+}
+
 // AdmitPeer explicitly opts-in a peer for trusted communication.
 func (p *P2P) AdmitPeer(id peer.ID) {
 	if p == nil {
 		return
 	}
-	if p.AdmittedPeers == nil {
-		p.AdmittedPeers = make(map[peer.ID]bool)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.admittedPeers == nil {
+		p.admittedPeers = make(map[peer.ID]bool)
 	}
-	p.AdmittedPeers[id] = true
+	p.admittedPeers[id] = true
 }
 
 // IsPeerAdmitted checks if a peer is explicitly admitted.
 func (p *P2P) IsPeerAdmitted(id peer.ID) bool {
-	if p == nil || p.AdmittedPeers == nil {
+	if p == nil {
 		return false
 	}
-	return p.AdmittedPeers[id]
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	if p.admittedPeers == nil {
+		return false
+	}
+	return p.admittedPeers[id]
 }
 
 // GetTopicHealth reports the join status of all critical topics.
@@ -311,8 +338,8 @@ func (p *P2P) handlePropagationRequest(stream network.Stream) {
 		}
 	}
 
-	if p.propagationHandler != nil {
-		if err := p.propagationHandler(ctx, remotePeer, payload); err != nil {
+	if handler := p.getPropagationHandler(); handler != nil {
+		if err := handler(ctx, remotePeer, payload); err != nil {
 			p.logger.Error("Propagation handler failed", "peer", remotePeer, "error", err)
 			_ = json.NewEncoder(stream).Encode(map[string]string{"status": "error", "message": err.Error()})
 			return
@@ -326,7 +353,8 @@ func (p *P2P) handlePropagationRequest(stream network.Stream) {
 
 // SendPropagationPayload sends a signed payload to a peer over the propagation protocol.
 func (p *P2P) SendPropagationPayload(ctx context.Context, peerID peer.ID, payload PropagationPayload) error {
-	if p.forwardDecider != nil && !p.forwardDecider.AllowForward(peerID, len(payload.Payload)) {
+	fd := p.getForwardDecider()
+	if fd != nil && !fd.AllowForward(peerID, len(payload.Payload)) {
 		return fmt.Errorf("forward vetoed by policy for peer %s", peerID)
 	}
 	stream, err := p.host.NewStream(ctx, peerID, PropagationProtocol)
