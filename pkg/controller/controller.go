@@ -96,7 +96,7 @@ func NewGoBinaryController(logger *slog.Logger, manifest *manifest.Manifest) *Go
 		logger.Error("Failed to create temporary config file for controller", "name", manifest.Name, "error", err)
 		return nil // Or handle error appropriately
 	}
-	tmpConfigFile.Close()
+	_ = tmpConfigFile.Close()
 
 	// Create a unique temporary file for controller messages
 	tmpMessageFile, err := os.CreateTemp("", fmt.Sprintf("controller-message-%s-*.json", manifest.Name))
@@ -104,7 +104,7 @@ func NewGoBinaryController(logger *slog.Logger, manifest *manifest.Manifest) *Go
 		logger.Error("Failed to create temporary message file for controller", "name", manifest.Name, "error", err)
 		return nil // Or handle error appropriately
 	}
-	tmpMessageFile.Close()
+	_ = tmpMessageFile.Close()
 
 	// Ensure the temporary files are cleaned up when the controller is no longer needed
 	// For more robust cleanup, consider a dedicated Close method or context-based cleanup.

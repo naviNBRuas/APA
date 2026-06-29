@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/naviNBRuas/APA/pkg/policy"
 )
@@ -133,11 +134,17 @@ func (m *Manager) InstallModule(manifestURL string) error {
 	m.logger.Info("Installing module from URL", "url", manifestURL)
 
 	// 1. Fetch manifest from URL
-	resp, err := http.Get(manifestURL)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", manifestURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create manifest request: %w", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to fetch manifest from URL: %w", err)
 	}
-	defer resp.Body.Close() //nolint:errcheck
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("bad status fetching manifest: %s", resp.Status)
@@ -159,11 +166,15 @@ func (m *Manager) InstallModule(manifestURL string) error {
 		return fmt.Errorf("manifest for %s does not contain a WasmURL", manifest.Name)
 	}
 
-	resp, err = http.Get(wasmURL)
+	req, err = http.NewRequestWithContext(ctx, "GET", wasmURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create wasm request: %w", err)
+	}
+	resp, err = http.DefaultClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("failed to fetch wasm file: %w", err)
 	}
-	defer resp.Body.Close() //nolint:errcheck
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("bad status fetching wasm file: %s", resp.Status)
@@ -359,7 +370,7 @@ func (m *Manager) verifyHash(filePath, expectedHash string, manifest *Manifest) 
 	if err != nil {
 		return err
 	}
-	defer file.Close() //nolint:errcheck
+	defer func() { _ = file.Close() }()
 
 	hasher := sha256.New()
 	if _, err := io.Copy(hasher, file); err != nil {
@@ -376,7 +387,10 @@ func (m *Manager) verifyHash(filePath, expectedHash string, manifest *Manifest) 
 		if m.signingPrivKey == nil {
 			return fmt.Errorf("cannot verify signature: signing private key not provided to manager")
 		}
-		pubKey := m.signingPrivKey.Public().(ed25519.PublicKey) //nolint:errcheck
+		pubKey, ok := m.signingPrivKey.Public().(ed25519.PublicKey)
+		if !ok {
+			return fmt.Errorf("signing private key is not an Ed25519 key")
+		}
 		for _, sigHex := range manifest.Signatures {
 			sig, err := hex.DecodeString(sigHex)
 			if err != nil {

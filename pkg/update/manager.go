@@ -304,7 +304,7 @@ func (m *Manager) fetchReleaseInfo(ctx context.Context) (*ReleaseInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("bad status from update server: %s", resp.Status)
@@ -327,7 +327,7 @@ func (m *Manager) downloadFile(ctx context.Context, url string) ([]byte, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("bad status from artifact server: %s", resp.Status)

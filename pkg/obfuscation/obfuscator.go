@@ -246,7 +246,7 @@ func readTracerPID(path string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer f.Close() //nolint:errcheck
+	defer func() { _ = f.Close() }()
 
 	s := bufio.NewScanner(f)
 	for s.Scan() {

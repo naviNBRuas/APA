@@ -25,7 +25,10 @@ linters:
 linters-settings:
   errcheck:
     check-type-assertions: true
-    check-blank: true
+    exclude-functions:
+      - "(*bytes.Buffer).Write"
+      - "(hash.Hash).Write"
+      - "(io.StringWriter).WriteString"
   gosec:
     excludes:
       - G115
@@ -97,10 +100,8 @@ issues:
     - linters: [whitespace]
       text: "."
     - linters: [errcheck]
-      text: "."
+      path: "_test.go"
     - linters: [noctx]
-      text: "."
+      path: "_test.go"
     - linters: [bodyclose]
-      text: "."
-    - linters: [gosimple]
-      text: "."
+      path: "_test.go"

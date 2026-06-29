@@ -56,7 +56,7 @@ func (rt *Runtime) healthHandler(w http.ResponseWriter, r *http.Request) {
 	defer rt.appendAudit("health", input)
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintln(w, "OK")
+	_, _ = fmt.Fprintln(w, "OK")
 }
 
 func (rt *Runtime) statusHandler(w http.ResponseWriter, r *http.Request) {
@@ -163,7 +163,7 @@ func (rt *Runtime) modulesHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "Module %s loaded successfully.\n", req.Name)
+		_, _ = fmt.Fprintf(w, "Module %s loaded successfully.\n", req.Name)
 	default:
 		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -209,7 +209,7 @@ func (rt *Runtime) controllersHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "Controller %s loaded successfully.\n", req.Name)
+		_, _ = fmt.Fprintf(w, "Controller %s loaded successfully.\n", req.Name)
 	default:
 		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -254,7 +254,7 @@ func (rt *Runtime) configHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, "Config updated successfully.")
+		_, _ = fmt.Fprintln(w, "Config updated successfully.")
 	default:
 		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -278,7 +278,7 @@ func (rt *Runtime) updateHandler(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		go rt.updateManager.CheckForUpdate()
 		w.WriteHeader(http.StatusAccepted)
-		fmt.Fprintln(w, "Update check initiated.")
+		_, _ = fmt.Fprintln(w, "Update check initiated.")
 	default:
 		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -312,7 +312,7 @@ func (rt *Runtime) peerCopyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Module %s successfully copied from peer %s.\n", moduleName, peerID)
+	_, _ = fmt.Fprintf(w, "Module %s successfully copied from peer %s.\n", moduleName, peerID)
 }
 
 func (rt *Runtime) triggerRegenerationHandler(w http.ResponseWriter, r *http.Request) {
@@ -334,7 +334,7 @@ func (rt *Runtime) triggerRegenerationHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintln(w, "Regeneration triggered successfully.")
+	_, _ = fmt.Fprintln(w, "Regeneration triggered successfully.")
 }
 
 func (rt *Runtime) triggerPropagationHandler(w http.ResponseWriter, r *http.Request) {
@@ -356,5 +356,5 @@ func (rt *Runtime) triggerPropagationHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintln(w, "Propagation triggered successfully.")
+	_, _ = fmt.Fprintln(w, "Propagation triggered successfully.")
 }

@@ -83,7 +83,7 @@ func (rpm *RelayProxyManager) EstablishProxyConnection(ctx context.Context, targ
 		rpm.logger.Warn("Failed to dial target via proxy in placeholder implementation", "error", err)
 		return nil
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	rpm.logger.Info("Successfully established proxy connection", "target", targetAddr)
 	return nil
@@ -125,7 +125,7 @@ func (rpm *RelayProxyManager) EstablishHTTPProxyConnection(ctx context.Context, 
 		rpm.logger.Warn("Failed to connect via proxy in placeholder implementation", "error", err)
 		return nil
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	rpm.logger.Info("Successfully connected via proxy", "status", resp.Status)
 	return nil

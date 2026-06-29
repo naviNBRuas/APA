@@ -302,7 +302,7 @@ func (p *P2P) setupPropagationProtocol() {
 
 // handlePropagationRequest handles incoming propagation payloads with verification.
 func (p *P2P) handlePropagationRequest(stream network.Stream) {
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 
 	ctx := context.Background()
 	remotePeer := stream.Conn().RemotePeer()
@@ -361,7 +361,7 @@ func (p *P2P) SendPropagationPayload(ctx context.Context, peerID peer.ID, payloa
 	if err != nil {
 		return fmt.Errorf("failed to create propagation stream: %w", err)
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 
 	if err := json.NewEncoder(stream).Encode(payload); err != nil {
 		return fmt.Errorf("failed to encode propagation payload: %w", err)
@@ -388,7 +388,7 @@ func (p *P2P) FetchModule(ctx context.Context, peerID peer.ID, name, version str
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create module fetch stream: %w", err)
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 
 	request := struct {
 		Name    string `json:"name"`
@@ -574,16 +574,16 @@ func (p *P2P) Shutdown() error {
 	}
 
 	if p.heartbeatTopic != nil {
-		p.heartbeatTopic.Close()
+		_ = p.heartbeatTopic.Close()
 	}
 	if p.moduleTopic != nil {
-		p.moduleTopic.Close()
+		_ = p.moduleTopic.Close()
 	}
 	if p.controllerCommTopic != nil {
-		p.controllerCommTopic.Close()
+		_ = p.controllerCommTopic.Close()
 	}
 	if p.leaderElectionTopic != nil {
-		p.leaderElectionTopic.Close()
+		_ = p.leaderElectionTopic.Close()
 	}
 
 	if err := p.dht.Close(); err != nil {

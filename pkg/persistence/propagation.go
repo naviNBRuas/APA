@@ -639,7 +639,7 @@ func (p *PropagationManager) isPortOpen(target string, timeout time.Duration) bo
 	if err != nil {
 		return false
 	}
-	conn.Close()
+	_ = conn.Close()
 	return true
 }
 
