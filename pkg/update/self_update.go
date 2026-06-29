@@ -37,12 +37,16 @@ func ApplyPendingUpdate() {
 	err = update.Apply(file, update.Options{})
 	if err != nil {
 		log.Printf("[ERROR] Failed to apply update: %v", err)
-		// If the update failed, we might want to try to remove the new binary
-		// to avoid getting stuck in a loop.
-		if removeErr := os.Remove(newBinaryName); removeErr != nil {
-			log.Printf("[ERROR] Failed to remove new binary after failed apply: %v", removeErr)
+		_ = os.Remove(newBinaryName)
+		// Restore from rollback backup if available
+		if _, statErr := os.Stat("agentd.rollback"); statErr == nil {
+			log.Println("[INFO] Restoring from rollback backup")
+			rb, readErr := os.ReadFile("agentd.rollback")
+			if readErr == nil {
+				if writeErr := os.WriteFile(newBinaryName, rb, 0755); writeErr == nil {
+					log.Println("[INFO] Rollback binary prepared. Restart to apply.")
+				}
+			}
 		}
 	}
-	// If Apply succeeds, it will have already restarted the process.
-	// If it fails, we log the error and continue with the old binary.
 }

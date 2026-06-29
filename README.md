@@ -1,53 +1,35 @@
 # Autonomous Polymorphic Agent (APA)
 
-[![Build Status](https://github.com/naviNBRuas/APA/workflows/CI/badge.svg)](https://github.com/naviNBRuas/APA/actions?query=workflow%3ACI)
+[![CI](https://github.com/naviNBRuas/APA/workflows/CI/badge.svg)](https://github.com/naviNBRuas/APA/actions?query=workflow%3ACI)
+[![Code Quality and Security](https://github.com/naviNBRuas/APA/workflows/Code%20Quality%20and%20Security/badge.svg)](https://github.com/naviNBRuas/APA/actions?query=workflow%3A%22Code+Quality+and+Security%22)
 [![Release](https://github.com/naviNBRuas/APA/workflows/Release/badge.svg)](https://github.com/naviNBRuas/APA/actions?query=workflow%3ARelease)
 [![Go Report Card](https://goreportcard.com/badge/github.com/naviNBRuas/APA)](https://goreportcard.com/report/github.com/naviNBRuas/APA)
 [![License](https://img.shields.io/github/license/naviNBRuas/APA)](LICENSE)
-[![GitHub release](https://img.shields.io/github/release/naviNBRuas/APA.svg)](https://github.com/naviNBRuas/APA/releases)
 
-## 🚀 Overview
+## Overview
 
-The **Autonomous Polymorphic Agent (APA)** is a cutting-edge, self-healing, and decentralized software agent platform designed for robust, secure, and autonomous operation across diverse computing environments. Built with Go, APA combines advanced networking, intelligent algorithms, and robust error handling to create a truly autonomous system.
+The **Autonomous Polymorphic Agent (APA)** is a self-healing, decentralized software agent platform designed for robust, secure, and autonomous operation across diverse computing environments. Built with Go, APA combines advanced networking, self-healing mechanisms, and modular controller architecture.
 
-## ✨ Key Features
+## Key Features
 
-### 🔧 Core Capabilities
+### Core Capabilities
 - **Multi-Protocol Networking**: TCP, UDP, HTTP, WebSocket, and libp2p support with intelligent switching
-- **Cross-Platform Compatibility**: Runs seamlessly on Linux, macOS, and Windows across AMD64, ARM64, and ARM architectures
-- **Advanced Robustness**: Comprehensive error handling, self-healing, and fault tolerance mechanisms
-- **Intelligent Algorithms**: AI/ML-powered adaptive decision-making and optimization
-- **Modular Architecture**: Extensible through plugins and WASM modules
-- **Security Framework**: End-to-end encryption, authentication, and access control
-- **Self-Updating**: Secure over-the-air updates with rollback capability
-- **Health Monitoring**: Continuous system health assessment and reporting
+- **Cross-Platform Compatibility**: Runs on Linux, macOS, and Windows across AMD64 and ARM64
+- **Self-Healing**: Automatic fault detection, process restart, and recovery orchestration
+- **Decentralized Design**: Peer-to-peer networking with DHT discovery and pubsub messaging
+- **Modular Architecture**: Extensible through WASM modules and controller plugins
+- **Security Framework**: End-to-end encryption, Ed25519 signature verification, OPA policy engine
+- **Self-Updating**: Secure over-the-air updates with Ed25519-verified artifacts
+- **Health Monitoring**: Continuous system health assessment with binary integrity checks
+- **Ephemeral Identity**: Automatic identity rotation with HMAC-derived session keys
+- **Admin API**: REST API for health, metrics, audit, and module management
 
-### 🏗️ Architecture Highlights
+### Architecture Highlights
 - **Decentralized Design**: Peer-to-peer networking with DHT discovery
 - **Microservices Pattern**: Modular components with clear separation of concerns
 - **Event-Driven**: Reactive architecture for optimal performance
-- **Zero Dependencies**: Minimal external dependencies for maximum portability
 
-## 📦 Installation
-
-### Quick Start
-
-Download the latest release for your platform:
-
-```bash
-# Linux AMD64
-curl -L https://github.com/naviNBRuas/APA/releases/latest/download/apa-linux-amd64.tar.gz | tar xz
-./apa-linux-amd64 --help
-
-# macOS ARM64 (Apple Silicon)
-curl -L https://github.com/naviNBRuas/APA/releases/latest/download/apa-darwin-arm64.tar.gz | tar xz
-./apa-darwin-arm64 --help
-
-# Windows AMD64 (PowerShell)
-iwr https://github.com/naviNBRuas/APA/releases/latest/download/apa-windows-amd64.zip -OutFile apa.zip
-Expand-Archive apa.zip
-.\apa-windows-amd64.exe --help
-```
+## Installation
 
 ### From Source
 
@@ -61,62 +43,41 @@ go build -o apa cmd/standalone-agent/main.go
 ### Docker
 
 ```bash
-docker pull ghcr.io/navinbruas/apa:latest
-docker run -it ghcr.io/navinbruas/apa:latest --help
+docker build -t apa .
+docker run -it apa --help
 ```
 
-## 🚀 Quick Demo
-
-Run the standalone agent to see all capabilities in action:
-
-```bash
-# Run with demonstration mode
-./apa --demo --demo-delay=2s
-
-# View system information
-./apa --version
-```
-
-Expected output:
-```
-{"time":"2026-01-25T00:07:29.33594536-03:00","level":"INFO","msg":"=== STANDALONE AUTONOMOUS AGENT DEMONSTRATION ==="}
-{"time":"2026-01-25T00:07:30.340239278-03:00","level":"INFO","msg":"Capability Status","name":"Multi-Protocol Networking","description":"Supports TCP, UDP, HTTP, WebSocket, and libp2p protocols","status":"SIMULATED"}
-{"time":"2026-01-25T00:07:30.341148467-03:00","level":"INFO","msg":"System Information","agent_version":"2.0.0-standalone","go_version":"go1.24.9","os":"linux","architecture":"amd64","num_goroutines":1,"num_cpus":16,"startup_time":"1.004915316s"}
-```
-
-## 🛠️ Usage
+## Usage
 
 ### Command Line Options
 
 ```
 Usage of ./apa:
-  -demo
-        Run demonstration mode (default true)
-  -demo-delay duration
-        Demonstration delay duration (default 2s)
-  -log-level string
-        Logging level (debug, info, warn, error) (default "info")
+  -config string
+        Path to agent configuration YAML file (default "configs/agent.yaml")
   -version
         Show version information
 ```
 
 ### Configuration
 
-Create a configuration file `config.yaml`:
+Create a configuration file:
 
 ```yaml
-log_level: "info"
-enable_demo: true
-demo_delay: 2s
+log_level: info
+peer_port: 9000
+admin_port: 9001
+bootstrap_peers:
+  - /ip4/1.2.3.4/tcp/9000/p2p/QmPeerID...
 ```
 
-Then run with configuration:
+Then run:
 
 ```bash
 ./apa --config=config.yaml
 ```
 
-## 🧪 Testing
+## Testing
 
 ### Run All Tests
 
@@ -130,11 +91,8 @@ go test ./...
 # Unit tests
 go test ./pkg/...
 
-# Integration tests
-go test ./tests/...
-
 # Race condition detection
-go test -race ./...
+go test -race ./pkg/...
 
 # Coverage report
 go test -coverprofile=coverage.out ./...
@@ -145,20 +103,14 @@ go tool cover -html=coverage.out
 
 The project includes comprehensive GitHub Actions workflows:
 
-- **CI**: Build, test, and lint on every push/PR
-- **Code Quality**: Static analysis and security scanning
-- **Release**: Automated release packaging and deployment
-- **Documentation**: API documentation generation
+- **CI**: Build, test, and lint on every push/PR across Linux, macOS, and Windows
+- **Code Quality**: golangci-lint, CodeQL static analysis, container vulnerability scan
+- **Release**: Manual workflow_dispatch release with cross-platform artifact builds
+- **Documentation**: Auto-generated API docs and coverage reports
 
-## 📚 Documentation
+## Documentation
 
-### API Reference
-
-Full API documentation is available at: https://navinbruas.github.io/APA/
-
-### Architecture Documentation
-
-Detailed architectural documentation can be found in the [`docs/`](docs/) directory:
+In the [`docs/`](docs/) directory:
 
 - [Project Overview](docs/PROJECT_DESCRIPTION.md)
 - [Development Plan](docs/PROJECT_DEVELOPMENT_PLAN.md)
@@ -173,48 +125,27 @@ Example modules and usage patterns are available in the [`examples/`](examples/)
 - Network drivers
 - Controller implementations
 
-## 🤝 Contributing
+## Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+We welcome contributions! Please see [Contributing Guidelines](CONTRIBUTING.md).
 
 ### Development Setup
 
 ```bash
 git clone https://github.com/naviNBRuas/APA.git
 cd APA
-
-# Install dependencies
 go mod tidy
-
-# Run tests
 go test ./...
-
-# Build
 go build -o apa cmd/standalone-agent/main.go
-```
-
-### Local Workflow Simulation
-
-To validate GitHub workflows locally (including full execution when `act` + container runtime are available):
-
-```bash
-bash scripts/validate-workflows-local.sh
-```
-
-You can also run:
-
-```bash
-make ci-local
 ```
 
 ### Code Quality Standards
 
 - All code must pass `gofmt`, `govet`, and `golangci-lint`
-- Tests must achieve >80% coverage
+- Tests should cover new functionality
 - Security scans must pass
-- Documentation must be updated for all changes
 
-## 🔒 Security
+## Security
 
 ### Reporting Vulnerabilities
 
@@ -222,41 +153,29 @@ Please report security vulnerabilities to [founder@nbr.company](mailto:founder@n
 
 ### Security Features
 
-- End-to-end encryption
-- Secure authentication
-- Regular security audits
-- Dependency vulnerability scanning
-- CodeQL static analysis
+- End-to-end encryption via AES-GCM encrypted messenger
+- Ed25519 signature verification for updates and modules
+- OPA policy engine for authorization
+- CodeQL static analysis in CI
+- Binary integrity monitoring (SHA-256, 5-minute interval)
+- Anti-analysis: debugger and sandbox detection
+- Ephemeral identity rotation
 
-## 📊 Project Status
+## Project Status
 
 [![CI](https://github.com/naviNBRuas/APA/workflows/CI/badge.svg)](https://github.com/naviNBRuas/APA/actions?query=workflow%3ACI)
 [![CodeQL](https://github.com/naviNBRuas/APA/workflows/CodeQL/badge.svg)](https://github.com/naviNBRuas/APA/actions?query=workflow%3ACodeQL)
 [![Go Report Card](https://goreportcard.com/badge/github.com/naviNBRuas/APA)](https://goreportcard.com/report/github.com/naviNBRuas/APA)
 
-## 📄 License
+## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT License — see [LICENSE](LICENSE).
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
-This project builds upon and extends the work of many excellent open-source projects:
-
-- [libp2p](https://libp2p.io/) - Decentralized networking
-- [Go](https://golang.org/) - Programming language
-- [WASM](https://webassembly.org/) - WebAssembly runtime
-- And many other amazing open-source tools and libraries
+- [libp2p](https://libp2p.io/) — Decentralized networking
+- [Go](https://golang.org/) — Programming language
+- [Open Policy Agent](https://www.openpolicyagent.org/) — Policy engine
+- [WebAssembly](https://webassembly.org/) — WASM module runtime
 
 See [ACKNOWLEDGMENTS.md](ACKNOWLEDGMENTS.md) for a complete list.
-
-## 📞 Support
-
-For support, questions, or feedback:
-
-- Open an [issue](https://github.com/naviNBRuas/APA/issues)
-- Join our [discussion forum](https://github.com/naviNBRuas/APA/discussions)
-- Email: [founder@nbr.company](mailto:founder@nbr.company)
-
----
-
-*Made with ❤️ by the APA Team*
