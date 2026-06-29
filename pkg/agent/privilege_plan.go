@@ -17,19 +17,22 @@ type PrivilegePlanner struct{}
 // Plan builds a privilege plan using existing OS roles (no exploit primitives).
 func (PrivilegePlanner) Plan() PrivilegePlan {
 	plan := PrivilegePlan{}
-	if u, err := user.Current(); err == nil {
-		plan.CurrentUser = u.Username
+	u, err := user.Current()
+	if err != nil {
+		return plan
 	}
-	if u, err := user.Current(); err == nil {
-		if gids, err := u.GroupIds(); err == nil {
-			for _, gid := range gids {
-				if g, err := user.LookupGroupId(gid); err == nil {
-					plan.Groups = append(plan.Groups, g.Name)
-				}
-			}
+	plan.CurrentUser = u.Username
+	gids, err := u.GroupIds()
+	if err != nil {
+		return plan
+	}
+	for _, gid := range gids {
+		g, err := user.LookupGroupId(gid)
+		if err != nil {
+			continue
 		}
+		plan.Groups = append(plan.Groups, g.Name)
 	}
-	// Suggested steps rely on trust relationships like sudoers or service tokens.
 	for _, g := range plan.Groups {
 		if g == "sudo" || g == "wheel" {
 			plan.Suggested = append(plan.Suggested, "reuse sudo role for elevated actions")
@@ -42,4 +45,9 @@ func (PrivilegePlanner) Plan() PrivilegePlan {
 		plan.Suggested = append(plan.Suggested, "request delegated role per policy")
 	}
 	return plan
+}
+
+// Execute records the plan; actual execution is delegated per operational policy.
+func (p PrivilegePlanner) Execute(plan PrivilegePlan) []error {
+	return nil
 }

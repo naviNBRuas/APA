@@ -256,15 +256,40 @@ func (bm *BackupManager) verifyChecksum(data []byte, expectedChecksum string) bo
 	return actualChecksum == expectedChecksum
 }
 
-// ScheduleAutomaticBackups schedules automatic backups at regular intervals
-func (bm *BackupManager) ScheduleAutomaticBackups(interval time.Duration, config, state, criticalData map[string]interface{}) {
-	bm.logger.Info("Scheduling automatic backups", "interval", interval)
+// ScheduleAutomaticBackups runs automatic backups at regular intervals until ctx is canceled.
+func (bm *BackupManager) ScheduleAutomaticBackups(ctx context.Context, interval time.Duration, config, state, criticalData map[string]interface{}) {
+	bm.logger.Info("Starting automatic backups", "interval", interval)
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
 
-	// In a real implementation, this would:
-	// 1. Create a ticker for the specified interval
-	// 2. Create backups periodically
-	// 3. Handle cleanup of old backups
+	for {
+		select {
+		case <-ctx.Done():
+			bm.logger.Info("Automatic backups stopped")
+			return
+		case <-ticker.C:
+			path, err := bm.CreateBackup(config, state, criticalData)
+			if err != nil {
+				bm.logger.Error("Automatic backup failed", "error", err)
+				continue
+			}
+			bm.logger.Info("Automatic backup created", "file", path)
+			bm.cleanupOldBackups(10)
+		}
+	}
+}
 
-	// For now, we'll just log the action
-	bm.logger.Info("Would schedule automatic backups every", "interval", interval)
+func (bm *BackupManager) cleanupOldBackups(maxBackups int) {
+	backups, err := bm.ListBackups()
+	if err != nil {
+		bm.logger.Error("Failed to list backups for cleanup", "error", err)
+		return
+	}
+	if len(backups) > maxBackups {
+		for _, b := range backups[:len(backups)-maxBackups] {
+			if err := bm.DeleteBackup(b); err != nil {
+				bm.logger.Error("Failed to delete old backup", "file", b, "error", err)
+			}
+		}
+	}
 }
