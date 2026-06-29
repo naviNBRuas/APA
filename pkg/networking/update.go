@@ -17,7 +17,7 @@ func (p *P2P) setupUpdateProtocol() {
 
 // handleUpdateFetchRequest handles incoming update fetch requests
 func (p *P2P) handleUpdateFetchRequest(stream network.Stream) {
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 
 	decoder := json.NewDecoder(stream)
 	var request struct {
@@ -63,7 +63,7 @@ func (p *P2P) FetchUpdateFromPeer(ctx context.Context, peerID peer.ID, version s
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create stream: %w", err)
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 
 	request := struct {
 		Version string `json:"version"`

@@ -30,7 +30,7 @@ func ApplyPendingUpdate() {
 		log.Printf("[ERROR] Failed to open new binary: %v", err)
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Use a library to handle the cross-platform complexities of replacing
 	// the currently running executable.

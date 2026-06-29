@@ -3,6 +3,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"log"
@@ -85,7 +86,9 @@ func processAndForward(messageFile, sink string) error {
 		return err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, sink, strings.NewReader(string(body)))
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, sink, strings.NewReader(string(body)))
 	if err != nil {
 		return err
 	}
@@ -96,7 +99,7 @@ func processAndForward(messageFile, sink string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close() //nolint:errcheck
+	defer func() { _ = resp.Body.Close() }()
 
 	log.Printf("Telemetry-forwarder posted telemetry: status=%d bytes=%d", resp.StatusCode, len(body))
 	return nil

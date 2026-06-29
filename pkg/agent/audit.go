@@ -64,7 +64,7 @@ func (al *AuditLogger) Append(entry AuditEntry) error {
 	if err != nil {
 		return fmt.Errorf("failed to open audit log: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	if _, err := f.Write(append(data, '\n')); err != nil {
 		return fmt.Errorf("failed to write audit entry: %w", err)

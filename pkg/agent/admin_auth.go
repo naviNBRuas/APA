@@ -22,7 +22,7 @@ type apiError struct {
 func writeJSONError(w http.ResponseWriter, message string, code int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	json.NewEncoder(w).Encode(apiError{Error: message, Code: code})
+	_ = json.NewEncoder(w).Encode(apiError{Error: message, Code: code})
 }
 
 func (rt *Runtime) authorizeAdminRequest(ctx context.Context, r *http.Request, input map[string]interface{}) (bool, error) {

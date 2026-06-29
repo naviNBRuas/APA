@@ -80,8 +80,12 @@ func runHeartbeat(ctx context.Context) {
 				Status:     "ok",
 				Details:    "controller alive",
 			}
-			b, _ := json.Marshal(status) //nolint:errcheck
-			log.Printf("Health-monitor heartbeat: %s", string(b))
+			b, err := json.Marshal(status)
+			if err != nil {
+				log.Printf("Health-monitor heartbeat marshal error: %v", err)
+			} else {
+				log.Printf("Health-monitor heartbeat: %s", string(b))
+			}
 		}
 	}
 }
