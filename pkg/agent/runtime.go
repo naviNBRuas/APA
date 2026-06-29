@@ -109,6 +109,8 @@ type Runtime struct {
 	ephemeralIDs              *EphemeralIdentityManager
 	rateLimiters              map[string]*rate.Limiter
 	rateMu                    sync.Mutex
+	runMu                     sync.RWMutex
+	runCancel                 context.CancelFunc
 }
 
 // NewRuntime creates a new agent runtime.
@@ -409,7 +411,7 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 		updateManager.SetP2PNetwork(p2p)
 
 		// Set the handler for incoming update fetch requests
-		p2p.FetchUpdateHandler = func(version string) (*update.ReleaseInfo, []byte, error) {
+		p2p.SetFetchUpdateHandler(func(version string) (*update.ReleaseInfo, []byte, error) {
 			logger.Info("Received request for update", "version", version)
 			return rt.GetCurrentRelease()
 		}
@@ -458,6 +460,9 @@ func (rt *Runtime) ApplyConfig(configData []byte) error {
 
 // Start starts the agent runtime.
 func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
+	rt.runMu.Lock()
+	rt.runCancel = cancel
+	rt.runMu.Unlock()
 	// Start the update checker
 	go rt.updateManager.StartPeriodicCheck(ctx, rt.config.Update.CheckInterval)
 
@@ -620,12 +625,14 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 					if err := rt.p2p.PublishLeaderElectionMessage(ctx, msg); err != nil {
 						rt.logger.Error("Failed to publish leader election message", "error", err)
 					}
-					if isLeader {
-						rt.currentLeader = myID
-						rt.logger.Info("Agent is the current leader", "peer_id", myID)
-					} else {
-						rt.logger.Info("Agent is not the leader")
-					}
+				if isLeader {
+					rt.runMu.Lock()
+					rt.currentLeader = myID
+					rt.runMu.Unlock()
+					rt.logger.Info("Agent is the current leader", "peer_id", myID)
+				} else {
+					rt.logger.Info("Agent is not the leader")
+				}
 				}
 			}
 		}()
@@ -651,10 +658,12 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 				mu.Unlock()
 
 				rt.logger.Debug("Received leader election message", "candidate", msg.CandidateID, "is_leader", msg.IsLeader, "from", msg.SenderPeerID)
-				if msg.IsLeader {
-					rt.currentLeader = peerID
-					rt.logger.Info("Leader identified", "leader_id", peerID)
-				}
+			if msg.IsLeader {
+				rt.runMu.Lock()
+				rt.currentLeader = peerID
+				rt.runMu.Unlock()
+				rt.logger.Info("Leader identified", "leader_id", peerID)
+			}
 			}
 		}
 	}()
@@ -740,6 +749,14 @@ func (rt *Runtime) GetCurrentRelease() (*update.ReleaseInfo, []byte, error) {
 // Stop gracefully shuts down the agent runtime.
 func (rt *Runtime) Stop() {
 	rt.logger.Info("Shutting down agent runtime...")
+
+	// Cancel any running Start() context to stop old goroutines
+	rt.runMu.Lock()
+	if rt.runCancel != nil {
+		rt.runCancel()
+		rt.runCancel = nil
+	}
+	rt.runMu.Unlock()
 
 	if rt.ephemeralIDs != nil {
 		rt.ephemeralIDs.Stop()

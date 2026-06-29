@@ -123,6 +123,8 @@ func New(logger *slog.Logger, transport Transport, cfg Config) *ControlPlane {
 
 // SetLeaderRank overrides the randomly chosen election rank (intended for tests or tuning).
 func (c *ControlPlane) SetLeaderRank(rank int64) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.leaderRank = rank
 }
 

@@ -29,8 +29,11 @@ func (p *P2P) handleUpdateFetchRequest(stream network.Stream) {
 		return
 	}
 
-	if p.FetchUpdateHandler != nil {
-		release, data, err := p.FetchUpdateHandler(request.Version)
+	p.mu.RLock()
+	fuh := p.FetchUpdateHandler
+	p.mu.RUnlock()
+	if fuh != nil {
+		release, data, err := fuh(request.Version)
 		if err != nil {
 			p.logger.Error("Failed to fetch update", "error", err)
 			return
@@ -88,5 +91,20 @@ func (p *P2P) FetchUpdateFromPeer(ctx context.Context, peerID peer.ID, version s
 
 // RegisterPropagationHandler registers a callback for incoming propagation payloads.
 func (p *P2P) RegisterPropagationHandler(handler func(context.Context, peer.ID, PropagationPayload) error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.propagationHandler = handler
+}
+
+func (p *P2P) getPropagationHandler() func(context.Context, peer.ID, PropagationPayload) error {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.propagationHandler
+}
+
+// SetFetchUpdateHandler sets the handler for incoming update fetch requests.
+func (p *P2P) SetFetchUpdateHandler(handler func(version string) (*update.ReleaseInfo, []byte, error)) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.FetchUpdateHandler = handler
 }

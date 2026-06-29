@@ -12,12 +12,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/naviNBRuas/APA/pkg/policy"
 )
 
 // Manager handles the lifecycle of WASM modules.
 type Manager struct {
+	mu             sync.RWMutex
 	logger         *slog.Logger
 	wasmRuntime    *WasmRuntime
 	modules        map[string]Module // Maps module name to Module instance
@@ -113,7 +115,9 @@ func (m *Manager) loadModuleFromManifest(manifestPath string) error {
 
 	// 6. Create and store module
 	module := NewWasmModule(manifest, instance, m.logger)
+	m.mu.Lock()
 	m.modules[module.Name()] = module
+	m.mu.Unlock()
 	m.logger.Info("Successfully loaded module", "name", module.Name(), "version", manifest.Version)
 
 	// 7. Announce module load via callback
@@ -185,7 +189,9 @@ func (m *Manager) InstallModule(manifestURL string) error {
 
 // RunModule starts a loaded module by name.
 func (m *Manager) RunModule(name string) error {
+	m.mu.RLock()
 	module, ok := m.modules[name]
+	m.mu.RUnlock()
 	if !ok {
 		return fmt.Errorf("module '%s' not found", name)
 	}
@@ -204,7 +210,9 @@ func (m *Manager) RunModule(name string) error {
 
 // StopModule stops a running module by name.
 func (m *Manager) StopModule(name string) error {
+	m.mu.RLock()
 	module, ok := m.modules[name]
+	m.mu.RUnlock()
 	if !ok {
 		return fmt.Errorf("module '%s' not found", name)
 	}
@@ -213,6 +221,8 @@ func (m *Manager) StopModule(name string) error {
 
 // ListModules returns the manifests of all loaded modules.
 func (m *Manager) ListModules() []*Manifest {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	manifests := make([]*Manifest, 0, len(m.modules))
 	for _, mod := range m.modules {
 		if wasmMod, ok := mod.(*WasmModule); ok {
@@ -224,6 +234,8 @@ func (m *Manager) ListModules() []*Manifest {
 
 // HasModule checks if a module with the given name and version is already loaded.
 func (m *Manager) HasModule(name, version string) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	for _, mod := range m.modules {
 		if wasmMod, ok := mod.(*WasmModule); ok {
 			if wasmMod.manifest.Name == name && wasmMod.manifest.Version == version {
@@ -236,6 +248,8 @@ func (m *Manager) HasModule(name, version string) bool {
 
 // GetModuleData finds a loaded module and returns its manifest and raw WASM bytes.
 func (m *Manager) GetModuleData(name, version string) (*Manifest, []byte, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	for _, mod := range m.modules {
 		if wasmMod, ok := mod.(*WasmModule); ok {
 			if wasmMod.manifest.Name == name && wasmMod.manifest.Version == version {
@@ -304,9 +318,17 @@ func (m *Manager) SaveAndLoadModule(manifest *Manifest, wasmBytes []byte) error 
 // Shutdown gracefully stops all modules and closes the wasm runtime.
 func (m *Manager) Shutdown() error {
 	m.logger.Info("Shutting down module manager")
-	for name, module := range m.modules {
-		if err := module.Stop(); err != nil {
-			m.logger.Error("Failed to stop module during shutdown", "name", name, "error", err)
+
+	m.mu.Lock()
+	modules := make([]Module, 0, len(m.modules))
+	for _, module := range m.modules {
+		modules = append(modules, module)
+	}
+	m.mu.Unlock()
+
+	for _, mod := range modules {
+		if err := mod.Stop(); err != nil {
+			m.logger.Error("Failed to stop module during shutdown", "name", mod.Name(), "error", err)
 			// We continue trying to stop other modules
 		}
 	}
