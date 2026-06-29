@@ -447,7 +447,7 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 		p2p.SetFetchUpdateHandler(func(version string) (*update.ReleaseInfo, []byte, error) {
 			logger.Info("Received request for update", "version", version)
 			return rt.GetCurrentRelease()
-		}
+		})
 	}
 
 	// Start topology mutation and elasticity loops for continuous adaptation.
