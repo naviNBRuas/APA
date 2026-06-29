@@ -504,7 +504,7 @@ func (rm *RobustnessManager) collectHealthMetrics() *HealthMetrics {
 
 	return &HealthMetrics{
 		Uptime:       safeUptime(rm.ctx),
-		ResponseTime: time.Duration(rand.Int63n(100)) * time.Millisecond,
+		ResponseTime: time.Duration(1+rand.Int63n(99)) * time.Millisecond,
 		ErrorRate:    rand.Float64() * 0.05,
 		Throughput:   rand.Float64() * 1000,
 		ResourceUsage: &ResourceUsage{
