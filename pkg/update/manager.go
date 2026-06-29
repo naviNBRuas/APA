@@ -375,7 +375,7 @@ func (m *Manager) downloadFile(ctx context.Context, url string) ([]byte, error) 
 
 // ensureSemverPrefix adds "v" prefix if missing for semver.Parse conformance.
 func ensureSemverPrefix(v string) string {
-	if len(v) == 0 {
+	if v == "" {
 		return "v0.0.0"
 	}
 	if v[0] != 'v' {

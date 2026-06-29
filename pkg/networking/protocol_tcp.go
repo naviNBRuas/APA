@@ -19,9 +19,9 @@ type TCPProtocol struct {
 	messageChan   chan *NetworkMessage
 	healthMetrics *ProtocolHealthMetrics
 
-	mu        sync.RWMutex
-	listener  net.Listener
-	peers     map[peer.ID]string
+	mu         sync.RWMutex
+	listener   net.Listener
+	peers      map[peer.ID]string
 	listenAddr string
 }
 

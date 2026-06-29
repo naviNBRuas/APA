@@ -22,9 +22,9 @@ type HTTPProtocol struct {
 	messageChan   chan *NetworkMessage
 	healthMetrics *ProtocolHealthMetrics
 
-	mu          sync.RWMutex
-	endpoints   map[peer.ID]string
-	listenAddr  string
+	mu         sync.RWMutex
+	endpoints  map[peer.ID]string
+	listenAddr string
 }
 
 type HTTPConfig struct {
@@ -94,7 +94,12 @@ func (hp *HTTPProtocol) SendMessage(to peer.ID, message *NetworkMessage) error {
 	if err != nil {
 		return fmt.Errorf("http marshal: %w", err)
 	}
-	resp, err := hp.client.Post(addr+"/message", "application/json", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, addr+"/message", bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("http request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := hp.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("http send: %w", err)
 	}
@@ -110,11 +115,11 @@ func (hp *HTTPProtocol) GetConnectionInfo() *ConnectionInfo {
 	addr := hp.listenAddr
 	hp.mu.RUnlock()
 	return &ConnectionInfo{
-		LocalAddress:  addr,
-		Protocol:      ProtocolHTTP,
-		Status:        ConnectionConnected,
-		Established:   time.Now(),
-		LastActivity:  time.Now(),
+		LocalAddress: addr,
+		Protocol:     ProtocolHTTP,
+		Status:       ConnectionConnected,
+		Established:  time.Now(),
+		LastActivity: time.Now(),
 	}
 }
 

@@ -19,9 +19,9 @@ type UDPProtocol struct {
 	messageChan   chan *NetworkMessage
 	healthMetrics *ProtocolHealthMetrics
 
-	mu          sync.RWMutex
-	peers       map[peer.ID]*net.UDPAddr
-	listenAddr  string
+	mu         sync.RWMutex
+	peers      map[peer.ID]*net.UDPAddr
+	listenAddr string
 }
 
 type UDPConfig struct {
