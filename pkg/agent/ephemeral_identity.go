@@ -109,7 +109,11 @@ func (m *EphemeralIdentityManager) rotate() {
 	seed = seed[:ed25519.SeedSize]
 
 	priv := ed25519.NewKeyFromSeed(seed)
-	pub := priv.Public().(ed25519.PublicKey)
+	pub, ok := priv.Public().(ed25519.PublicKey)
+	if !ok {
+		m.logger.Error("ephemeral identity: failed to cast public key to ed25519")
+		return
+	}
 
 	// SessionID derived from public key hash
 	pubHash := sha256.Sum256(pub)

@@ -36,7 +36,7 @@ func TestMetricsEndpoint(t *testing.T) {
 	_, ok := metrics["uptime_seconds"]
 	require.True(t, ok)
 	// topics_health is only present if p2p is not nil
-	_, _ = metrics["topics_health"]
+	_ = metrics["topics_health"]
 	// Accept either presence or absence for this minimal test
 }
 
