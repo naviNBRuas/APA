@@ -685,12 +685,12 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 				mu.Unlock()
 
 				rt.logger.Debug("Received leader election message", "candidate", msg.CandidateID, "is_leader", msg.IsLeader, "from", msg.SenderPeerID)
-			if msg.IsLeader {
-				rt.runMu.Lock()
-				rt.currentLeader = peerID
-				rt.runMu.Unlock()
-				rt.logger.Info("Leader identified", "leader_id", peerID)
-			}
+				if msg.IsLeader {
+					rt.runMu.Lock()
+					rt.currentLeader = peerID
+					rt.runMu.Unlock()
+					rt.logger.Info("Leader identified", "leader_id", peerID)
+				}
 			}
 		}
 	}()
