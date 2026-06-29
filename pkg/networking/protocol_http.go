@@ -1,5 +1,3 @@
-//go:build enhanced
-
 package networking
 
 import (
