@@ -15,6 +15,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"golang.org/x/time/rate"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
@@ -711,7 +713,6 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 
 	// Setup admin API server
 	mux := http.NewServeMux()
-	// Register admin API endpoints
 	mux.HandleFunc("/admin/metrics", rt.metricsHandler)
 	mux.HandleFunc("/admin/audit", rt.auditHandler)
 	mux.HandleFunc("/admin/status", rt.statusHandler)
@@ -723,6 +724,7 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 	mux.HandleFunc("/admin/peer-copy", rt.peerCopyHandler)
 	mux.HandleFunc("/admin/regenerate", rt.triggerRegenerationHandler)
 	mux.HandleFunc("/admin/propagate", rt.triggerPropagationHandler)
+	mux.Handle("/metrics", rt.prometheusHandler())
 
 	tlsConfig, serveTLS := rt.buildAdminTLSConfig()
 	rt.server = &http.Server{
@@ -906,6 +908,21 @@ func (rt *Runtime) waitForShutdown(cancel context.CancelFunc) {
 	rt.logger.Info("Shutdown signal received.")
 	cancel()
 	rt.Stop()
+}
+
+// prometheusHandler returns an HTTP handler that exposes prometheus metrics.
+func (rt *Runtime) prometheusHandler() http.Handler {
+	reg := prometheus.NewRegistry()
+	collectors := []prometheus.Collector{
+		prometheus.NewGauge(prometheus.GaugeOpts{Name: "apa_uptime_seconds", Help: "Agent uptime in seconds"}),
+		prometheus.NewGauge(prometheus.GaugeOpts{Name: "apa_goroutines", Help: "Number of goroutines"}),
+		prometheus.NewGauge(prometheus.GaugeOpts{Name: "apa_peers", Help: "Number of connected peers"}),
+		prometheus.NewCounter(prometheus.CounterOpts{Name: "apa_audit_entries_total", Help: "Total audit log entries"}),
+	}
+	for _, c := range collectors {
+		reg.MustRegister(c)
+	}
+	return promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
 }
 
 // monitorBinaryIntegrity periodically checks the on-disk binary against the anti-tamper baseline.

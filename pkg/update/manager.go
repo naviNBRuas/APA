@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"golang.org/x/mod/semver"
 )
 
 // ReleaseInfo describes a new agent release.
@@ -147,8 +148,16 @@ func (m *Manager) CheckForUpdate() {
 		}
 	}
 
-	// 3. Compare versions
-	if release.Version <= m.currentVersion {
+	// 3. Compare versions using semver
+	cur := ensureSemverPrefix(m.currentVersion)
+	rel := ensureSemverPrefix(release.Version)
+	if !semver.IsValid(rel) || !semver.IsValid(cur) {
+		m.logger.Warn("Invalid semver, falling back to string comparison", "current", m.currentVersion, "release", release.Version)
+		if release.Version <= m.currentVersion {
+			m.logger.Info("Agent is up to date", "current_version", m.currentVersion)
+			return
+		}
+	} else if semver.Compare(rel, cur) <= 0 {
 		m.logger.Info("Agent is up to date", "current_version", m.currentVersion)
 		return
 	}
@@ -205,7 +214,13 @@ func (m *Manager) checkForP2PUpdate(ctx context.Context) (*ReleaseInfo, []byte, 
 		}
 
 		// If we found a newer version, return it
-		if release.Version > m.currentVersion {
+		cur := ensureSemverPrefix(m.currentVersion)
+		rel := ensureSemverPrefix(release.Version)
+		if semver.IsValid(rel) && semver.IsValid(cur) {
+			if semver.Compare(rel, cur) > 0 {
+				return release, data, nil
+			}
+		} else if release.Version > m.currentVersion {
 			return release, data, nil
 		}
 	}
@@ -214,26 +229,26 @@ func (m *Manager) checkForP2PUpdate(ctx context.Context) (*ReleaseInfo, []byte, 
 }
 
 func (m *Manager) performUpdate(ctx context.Context, release *ReleaseInfo) error {
-	// 1. Find artifact for our platform
 	key := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 	artifact, ok := release.Artifacts[key]
 	if !ok {
 		return fmt.Errorf("no artifact found for current platform: %s", key)
 	}
 
-	// 2. Download the new binary
 	newBinary, err := m.downloadFile(ctx, artifact.URL)
 	if err != nil {
 		return fmt.Errorf("failed to download new binary: %w", err)
 	}
 
-	// 3. Verify the signature
 	if err := m.verifyArtifact(artifact, newBinary); err != nil {
 		return fmt.Errorf("artifact verification failed: %w", err)
 	}
 	m.logger.Info("New binary signature verified successfully")
 
-	// 4. Save the new binary to a temporary location
+	if err := m.backupCurrentBinary(); err != nil {
+		m.logger.Warn("Failed to back up current binary, continuing", "error", err)
+	}
+
 	if err := os.WriteFile("agentd.new", newBinary, 0755); err != nil {
 		return fmt.Errorf("failed to write new binary: %w", err)
 	}
@@ -241,27 +256,49 @@ func (m *Manager) performUpdate(ctx context.Context, release *ReleaseInfo) error
 	return nil
 }
 
-// performP2PUpdate performs an update using data received from a peer
 func (m *Manager) performP2PUpdate(ctx context.Context, release *ReleaseInfo, data []byte) error {
-	// 1. Find artifact for our platform
 	key := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
 	artifact, ok := release.Artifacts[key]
 	if !ok {
 		return fmt.Errorf("no artifact found for current platform: %s", key)
 	}
 
-	// 2. Verify the signature
 	if err := m.verifyArtifact(artifact, data); err != nil {
 		return fmt.Errorf("artifact verification failed: %w", err)
 	}
 	m.logger.Info("New binary signature verified successfully")
 
-	// 3. Save the new binary to a temporary location
+	if err := m.backupCurrentBinary(); err != nil {
+		m.logger.Warn("Failed to back up current binary, continuing", "error", err)
+	}
+
 	if err := os.WriteFile("agentd.new", data, 0755); err != nil {
 		return fmt.Errorf("failed to write new binary: %w", err)
 	}
 
 	return nil
+}
+
+// backupCurrentBinary copies the running executable to agentd.rollback for recovery.
+func (m *Manager) backupCurrentBinary() error {
+	execPath, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("cannot determine executable path: %w", err)
+	}
+	data, err := os.ReadFile(execPath)
+	if err != nil {
+		return fmt.Errorf("cannot read current binary: %w", err)
+	}
+	return os.WriteFile("agentd.rollback", data, 0755)
+}
+
+// Rollback restores the backup binary (agentd.rollback) to its original location.
+func (m *Manager) Rollback() error {
+	backup, err := os.ReadFile("agentd.rollback")
+	if err != nil {
+		return fmt.Errorf("rollback binary not found: %w", err)
+	}
+	return os.WriteFile("agentd.new", backup, 0755)
 }
 
 // verifyArtifact verifies the signature of an artifact
@@ -334,4 +371,15 @@ func (m *Manager) downloadFile(ctx context.Context, url string) ([]byte, error) 
 	}
 
 	return io.ReadAll(resp.Body)
+}
+
+// ensureSemverPrefix adds "v" prefix if missing for semver.Parse conformance.
+func ensureSemverPrefix(v string) string {
+	if len(v) == 0 {
+		return "v0.0.0"
+	}
+	if v[0] != 'v' {
+		return "v" + v
+	}
+	return v
 }
