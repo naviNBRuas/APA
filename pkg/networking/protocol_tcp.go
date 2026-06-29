@@ -120,7 +120,7 @@ func (tp *TCPProtocol) GetConnectionInfo() *ConnectionInfo {
 	return &ConnectionInfo{
 		LocalAddress: addr,
 		Protocol:     ProtocolTCP,
-		Status:       ConnectionStatusConnected,
+		Status:       ConnectionConnected,
 		Established:  time.Now(),
 		LastActivity: time.Now(),
 	}

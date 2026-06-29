@@ -112,7 +112,7 @@ func (hp *HTTPProtocol) GetConnectionInfo() *ConnectionInfo {
 	return &ConnectionInfo{
 		LocalAddress:  addr,
 		Protocol:      ProtocolHTTP,
-		Status:        ConnectionStatusConnected,
+		Status:        ConnectionConnected,
 		Established:   time.Now(),
 		LastActivity:  time.Now(),
 	}
