@@ -122,7 +122,7 @@ func (up *UDPProtocol) GetConnectionInfo() *ConnectionInfo {
 	return &ConnectionInfo{
 		LocalAddress: addr,
 		Protocol:     ProtocolUDP,
-		Status:       ConnectionStatusConnected,
+		Status:       ConnectionConnected,
 		Established:  time.Now(),
 		LastActivity: time.Now(),
 	}
