@@ -15,12 +15,13 @@ import (
 
 const defaultConfigPath = "/etc/apa/config.yaml"
 
+// Overridden at build time via -ldflags=-X main.version=<tag>
+var version = "2.0.0-standalone"
+
 func main() {
 	configPath := flag.String("config", defaultConfigPath, "Path to agent config YAML")
 	versionFlag := flag.Bool("version", false, "Show version information")
 	flag.Parse()
-
-	version := "2.0.0-standalone"
 
 	if *versionFlag {
 		fmt.Printf("APA Standalone Agent v%s\n", version)
