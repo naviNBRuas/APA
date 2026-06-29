@@ -289,9 +289,6 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 		OnActivate: func(ctx context.Context, state ActivationState) error {
 			activateCount++
 			rt.logger.Info("Autonomous activation", "peers", state.PeerCount, "network_idle", state.NetworkIdle)
-			if rt.recoveryController != nil {
-				rt.recoveryController.RecordActivity()
-			}
 			if rt.ephemeralIDs != nil && activateCount%5 == 0 {
 				rt.ephemeralIDs.ForceRotate()
 			}
@@ -301,12 +298,9 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 			if rt.propagationManager == nil {
 				return nil
 			}
-			return rt.propagationManager.Propagate(ctx)
+			return rt.propagationManager.TriggerPropagation(ctx)
 		},
-		OnAdapt: func(ctx context.Context, snapshot map[string]interface{}) error {
-			if rt.sinkResistance != nil && len(snapshot) > 0 {
-				rt.sinkResistance.Evaluate(ctx)
-			}
+		OnAdapt: func(ctx context.Context, profile EnvProfile) error {
 			return nil
 		},
 		OnCredentialRotate: func(ctx context.Context) error {
