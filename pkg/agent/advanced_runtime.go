@@ -10,9 +10,9 @@ import (
 
 // AutonomousActions defines callbacks for the autonomous decision loop.
 type AutonomousActions struct {
-	OnActivate      func(ctx context.Context, state ActivationState) error
-	OnPropagate     func(ctx context.Context) error
-	OnAdapt         func(ctx context.Context, snapshot map[string]interface{}) error
+	OnActivate         func(ctx context.Context, state ActivationState) error
+	OnPropagate        func(ctx context.Context) error
+	OnAdapt            func(ctx context.Context, profile EnvProfile) error
 	OnCredentialRotate func(ctx context.Context) error
 }
 
@@ -72,10 +72,10 @@ func (ar *AdvancedRuntime) Run(ctx context.Context, peerCount func() int) {
 						ar.logger.Warn("Autonomous action failed", "error", err)
 					}
 				}
-				snapshot := ar.inspector.Snapshot()
-				ar.persistence.Plan(snapshot)
+				envProfile := ar.inspector.Inspect()
+				ar.persistence.Plan("autonomous", 60)
 				if ar.actions.OnAdapt != nil {
-					if err := ar.actions.OnAdapt(ctx, snapshot); err != nil {
+					if err := ar.actions.OnAdapt(ctx, envProfile); err != nil {
 						ar.logger.Warn("Autonomous adaptation failed", "error", err)
 					}
 				}
@@ -90,7 +90,6 @@ func (ar *AdvancedRuntime) Run(ctx context.Context, peerCount func() int) {
 				}
 				plan := ar.privPlanner.Plan()
 				ar.privPlanner.Execute(plan)
-				ar.memoryExec.Execute(ar.orchestrator, ar.transformer, ar.inspector)
 			}
 			if executed%20 == 0 && executed > 0 {
 				if ar.actions.OnPropagate != nil {

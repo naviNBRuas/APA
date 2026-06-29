@@ -193,7 +193,7 @@ func (pm *PerformanceMonitor) GetLatestMetrics() *PerformanceMetrics {
 	runtime.ReadMemStats(&m)
 	return &PerformanceMetrics{
 		Timestamp:   time.Now(),
-		CPUUsage:    runtime.NumGoroutine(),
+		CPUUsage:    float64(runtime.NumGoroutine()),
 		MemoryUsage: m.Alloc,
 	}
 }
