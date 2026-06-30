@@ -146,7 +146,11 @@ func (p *P2P) SubscribeControllerMessages(ctx context.Context) (<-chan *Controll
 					return
 				}
 				p.logger.Error("Failed to read controller message", "error", err)
-				time.Sleep(200 * time.Millisecond)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(200 * time.Millisecond):
+				}
 				continue
 			}
 
@@ -218,7 +222,11 @@ func (p *P2P) SubscribeLeaderElectionMessages(ctx context.Context) (<-chan *Lead
 					return
 				}
 				p.logger.Error("Failed to read leader election message", "error", err)
-				time.Sleep(200 * time.Millisecond)
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(200 * time.Millisecond):
+				}
 				continue
 			}
 

@@ -112,6 +112,7 @@ type Runtime struct {
 	rateLimiters              map[string]*rate.Limiter
 	rateMu                    sync.Mutex
 	runMu                     sync.RWMutex
+	runCtx                    context.Context
 	runCancel                 context.CancelFunc
 }
 
@@ -418,7 +419,11 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 					return
 				}
 
-				manifest, wasmBytes, err := p2p.FetchModule(context.Background(), peerID, announcement.Manifest.Name, announcement.Manifest.Version)
+				ctx := rt.runCtx
+				if ctx == nil {
+					ctx = context.Background()
+				}
+				manifest, wasmBytes, err := p2p.FetchModule(ctx, peerID, announcement.Manifest.Name, announcement.Manifest.Version)
 				if err != nil {
 					logger.Error("Failed to fetch module", "name", announcement.Manifest.Name, "error", err)
 					return
@@ -490,6 +495,7 @@ func (rt *Runtime) ApplyConfig(configData []byte) error {
 // Start starts the agent runtime.
 func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 	rt.runMu.Lock()
+	rt.runCtx = ctx
 	rt.runCancel = cancel
 	rt.runMu.Unlock()
 	// Start the update checker

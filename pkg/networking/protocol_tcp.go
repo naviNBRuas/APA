@@ -55,20 +55,31 @@ func (tp *TCPProtocol) Initialize(ctx context.Context) error {
 }
 
 func (tp *TCPProtocol) acceptLoop(ctx context.Context) {
+	go func() {
+		<-ctx.Done()
+		tp.listener.Close()
+	}()
 	for {
 		conn, err := tp.listener.Accept()
 		if err != nil {
 			return
 		}
-		go tp.handleConn(conn)
+		go tp.handleConn(ctx, conn)
 	}
 }
 
-func (tp *TCPProtocol) handleConn(conn net.Conn) {
+func (tp *TCPProtocol) handleConn(ctx context.Context, conn net.Conn) {
 	defer func() { _ = conn.Close() }()
 	scanner := bufio.NewScanner(conn)
 	scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
-	for scanner.Scan() {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		if !scanner.Scan() {
+			return
+		}
 		var msg NetworkMessage
 		if err := json.Unmarshal(scanner.Bytes(), &msg); err != nil {
 			continue

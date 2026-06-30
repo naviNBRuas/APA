@@ -282,6 +282,7 @@ func NewP2P(ctx context.Context, logger *slog.Logger, config Config, peerID peer
 		backoffMin: config.ReconnectBackoffMin,
 		backoffMax: config.ReconnectBackoffMax,
 		rng:        rng,
+		parentCtx:  ctx,
 	})
 
 	p2p.setupUpdateProtocol()
@@ -498,6 +499,7 @@ type reconnectNotifee struct {
 	backoffMax time.Duration
 	rng        *rand.Rand
 	mu         sync.Mutex
+	parentCtx  context.Context
 }
 
 func (n *reconnectNotifee) jitterDelay() time.Duration {
@@ -527,7 +529,11 @@ func (n *reconnectNotifee) Disconnected(_ network.Network, c network.Conn) {
 			time.Sleep(delay)
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		parent := n.parentCtx
+		if parent == nil {
+			parent = context.Background()
+		}
+		ctx, cancel := context.WithTimeout(parent, 5*time.Second)
 		defer cancel()
 		if err := n.host.Connect(ctx, peer.AddrInfo{ID: peerID, Addrs: addrs}); err != nil {
 			n.logger.Debug("Reconnect attempt failed", "peer", peerID, "error", err)
