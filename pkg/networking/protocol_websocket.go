@@ -125,11 +125,14 @@ func (wp *WebSocketProtocol) SendMessage(to peer.ID, message *NetworkMessage) er
 		return fmt.Errorf("websocket: unknown peer %s", to)
 	}
 
-	conn, _, err := websocket.DefaultDialer.Dial(addr+"/ws", nil)
+	conn, resp, err := websocket.DefaultDialer.Dial(addr+"/ws", nil)
 	if err != nil {
 		return fmt.Errorf("websocket dial: %w", err)
 	}
 	defer func() { _ = conn.Close() }()
+	if resp != nil && resp.Body != nil {
+		defer func() { _ = resp.Body.Close() }()
+	}
 
 	data, err := json.Marshal(message)
 	if err != nil {
@@ -148,11 +151,11 @@ func (wp *WebSocketProtocol) ReceiveMessages() <-chan *NetworkMessage {
 
 func (wp *WebSocketProtocol) GetConnectionInfo() *ConnectionInfo {
 	return &ConnectionInfo{
-		LocalAddress:  wp.listenAddr,
-		Protocol:      ProtocolWebSocket,
-		Status:        wp.healthMetrics.ConnectionStatus,
-		Established:   time.Now(),
-		LastActivity:  time.Now(),
+		LocalAddress: wp.listenAddr,
+		Protocol:     ProtocolWebSocket,
+		Status:       wp.healthMetrics.ConnectionStatus,
+		Established:  time.Now(),
+		LastActivity: time.Now(),
 	}
 }
 
