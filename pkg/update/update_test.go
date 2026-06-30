@@ -237,8 +237,8 @@ func TestPerformUpdate(t *testing.T) {
 func TestPerformUpdate_MissingArtifact(t *testing.T) {
 	m := newTestManager(t, "v1.0.0")
 	release := &ReleaseInfo{
-		Version:    "v1.0.1",
-		Artifacts:  map[string]ArtifactInfo{},
+		Version:   "v1.0.1",
+		Artifacts: map[string]ArtifactInfo{},
 	}
 	err := m.performUpdate(context.Background(), release)
 	assert.Error(t, err)
@@ -336,5 +336,3 @@ func TestCurrentVersion(t *testing.T) {
 	m := newTestManager(t, "v2.0.0")
 	assert.Equal(t, "v2.0.0", m.CurrentVersion())
 }
-
-

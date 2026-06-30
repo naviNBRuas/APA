@@ -105,8 +105,11 @@ func (m *Manager) StartPeriodicCheck(ctx context.Context, interval time.Duration
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
-	// Wait a bit before the first check to allow the agent to settle.
-	time.Sleep(5 * time.Second)
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(5 * time.Second):
+	}
 	m.CheckForUpdate()
 
 	for {
