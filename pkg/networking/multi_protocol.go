@@ -85,7 +85,7 @@ func (mpm *MultiProtocolManager) initializeProtocols() error {
 		case ProtocolHTTP:
 			protocol, err = NewHTTPProtocol(mpm.logger)
 		case ProtocolWebSocket:
-			protocol, err = NewWebSocketProtocol(mpm.logger)
+			protocol, err = NewWebSocketProtocol(mpm.logger, WebSocketConfig{})
 		case ProtocolQUIC:
 			protocol, err = NewQUICProtocol(mpm.logger)
 		case ProtocolTCP:
