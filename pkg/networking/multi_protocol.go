@@ -81,19 +81,19 @@ func (mpm *MultiProtocolManager) initializeProtocols() error {
 
 		switch protoType {
 		case ProtocolLibP2P:
-			protocol, err = NewLibP2PProtocol(mpm.logger)
+			protocol, err = NewLibP2PProtocol(mpm.logger, LibP2PConfig{})
 		case ProtocolHTTP:
 			protocol, err = NewHTTPProtocol(mpm.logger)
 		case ProtocolWebSocket:
 			protocol, err = NewWebSocketProtocol(mpm.logger, WebSocketConfig{})
 		case ProtocolQUIC:
-			protocol, err = NewQUICProtocol(mpm.logger)
+			protocol, err = NewQUICProtocol(mpm.logger, QUICConfig{})
 		case ProtocolTCP:
 			protocol, err = NewTCPProtocol(mpm.logger)
 		case ProtocolUDP:
 			protocol, err = NewUDPProtocol(mpm.logger)
 		case ProtocolDNS:
-			protocol, err = NewDNSProtocol(mpm.logger)
+			protocol, err = NewDNSProtocol(mpm.logger, DNSConfig{})
 		default:
 			err = fmt.Errorf("unsupported protocol type: %s", protoType)
 		}
