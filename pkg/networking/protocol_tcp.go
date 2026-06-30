@@ -57,7 +57,7 @@ func (tp *TCPProtocol) Initialize(ctx context.Context) error {
 func (tp *TCPProtocol) acceptLoop(ctx context.Context) {
 	go func() {
 		<-ctx.Done()
-		tp.listener.Close()
+		_ = tp.listener.Close()
 	}()
 	for {
 		conn, err := tp.listener.Accept()
@@ -76,7 +76,7 @@ func (tp *TCPProtocol) handleConn(ctx context.Context, conn net.Conn) {
 		if ctx.Err() != nil {
 			return
 		}
-		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 		if !scanner.Scan() {
 			return
 		}

@@ -68,7 +68,7 @@ func (up *UDPProtocol) Initialize(ctx context.Context) error {
 func (up *UDPProtocol) readLoop(ctx context.Context) {
 	buf := make([]byte, 65535)
 	for {
-		up.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		_ = up.conn.SetReadDeadline(time.Now().Add(5 * time.Second))
 		n, _, err := up.conn.ReadFromUDP(buf)
 		if err != nil {
 			if ctx.Err() != nil {

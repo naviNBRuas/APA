@@ -5,14 +5,15 @@ concurrency:
   cancel-in-progress: false
 
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
         description: 'Tag to create a release for (must already exist)'
         required: true
         default: ''
-# the manual trigger above is now the sole entry point; releases will only
-# be produced when invoked from the Actions dashboard with a tag.
 
 
 env:
@@ -77,7 +78,7 @@ jobs:
         run: |
           mkdir -p dist
           GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} \
-            go build -ldflags="-s -w -X main.version=${{ github.event.inputs.tag }}" \
+            go build -ldflags="-s -w -X main.version=${{ github.ref_name }}" \
             -o dist/apa-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.ext }} \
             cmd/standalone-agent/main.go
 
@@ -147,25 +148,21 @@ jobs:
           name: release-packages
           path: release-assets
 
-      - name: Generate release notes
+      - name: Generate release notes from changelog
         run: |
-          echo "## What's Changed" > release-notes.md
-          echo "" >> release-notes.md
-          echo "### Features" >> release-notes.md
-          echo "- Enhanced autonomous agent capabilities" >> release-notes.md
-          echo "- Cross-platform support for Linux, macOS, and Windows" >> release-notes.md
-          echo "- Multi-architecture binaries (AMD64, ARM64)" >> release-notes.md
-          echo "" >> release-notes.md
-          echo "### Installation" >> release-notes.md
-          echo "Download the appropriate binary for your platform from the assets below." >> release-notes.md
-          echo "" >> release-notes.md
-          echo "### Verification" >> release-notes.md
-          echo "Verify the checksums using the provided checksums.txt file." >> release-notes.md
+          TAG="${{ github.ref_name }}"
+          awk -v tag="$TAG" '/^## /{if(version) exit; version=($0 ~ tag)} version{print}' \
+            CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "## $TAG" > release-notes.md
+            echo "" >> release-notes.md
+            echo "See CHANGELOG.md for details." >> release-notes.md
+          fi
 
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.tag }}
+          tag_name: ${{ github.ref_name }}
           body_path: release-notes.md
           files: |
             release-assets/*
