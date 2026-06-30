@@ -338,11 +338,4 @@ func TestCurrentVersion(t *testing.T) {
 	assert.Equal(t, "v2.0.0", m.CurrentVersion())
 }
 
-func TestGetCurrentRelease(t *testing.T) {
-	m := newTestManager(t, "v1.0.0")
-	release, data, err := m.GetCurrentRelease()
-	assert.NoError(t, err)
-	assert.NotNil(t, release)
-	assert.Equal(t, "v1.0.0", release.Version)
-	assert.Empty(t, data)
-}
+

@@ -151,7 +151,7 @@ func (wp *WebSocketProtocol) GetConnectionInfo() *ConnectionInfo {
 		LocalAddress:  wp.listenAddr,
 		Protocol:      ProtocolWebSocket,
 		Status:        wp.healthMetrics.ConnectionStatus,
-		Established:   wp.healthMetrics.CreatedAt,
+		Established:   time.Now(),
 		LastActivity:  time.Now(),
 	}
 }
