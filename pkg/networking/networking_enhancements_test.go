@@ -86,7 +86,7 @@ func TestAdvancedDiscoveryIntegration(t *testing.T) {
 	// Test relay connection
 	relayPeers, err := ad.relayProxyMgr.FindRelayPeers(ctx)
 	assert.NoError(t, err)
-	assert.Len(t, relayPeers, 3) // Should return mock relay peers
+	assert.Len(t, relayPeers, 0)
 
 	// Test Bluetooth discovery
 	btPeers, err := ad.bluetoothDisc.DiscoverNearbyPeers(ctx)

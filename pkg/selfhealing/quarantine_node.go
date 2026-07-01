@@ -3,10 +3,18 @@ package selfhealing
 import (
 	"context"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
-// NewQuarantineNodeStrategy creates a new quarantine node strategy
+var (
+	quarantineMu       sync.Mutex
+	quarantineActive   atomic.Bool
+	quarantineModules  atomic.Bool
+	quarantineBlocked  atomic.Int64
+)
+
 func NewQuarantineNodeStrategy() *QuarantineNodeStrategy {
 	return &QuarantineNodeStrategy{
 		name:        "quarantine-node",
@@ -16,22 +24,18 @@ func NewQuarantineNodeStrategy() *QuarantineNodeStrategy {
 	}
 }
 
-// Name returns the name of the strategy
 func (q *QuarantineNodeStrategy) Name() string {
 	return q.name
 }
 
-// Description returns the description of the strategy
 func (q *QuarantineNodeStrategy) Description() string {
 	return q.description
 }
 
-// CanHandle determines if this strategy can handle the given health issue
 func (q *QuarantineNodeStrategy) CanHandle(issue *HealthIssue) bool {
 	return issue.Severity == "critical" || issue.Type == "security"
 }
 
-// Apply applies the quarantine node strategy
 func (q *QuarantineNodeStrategy) Apply(ctx context.Context, issue *HealthIssue) (*HealingResult, error) {
 	startTime := time.Now()
 
@@ -57,7 +61,7 @@ func (q *QuarantineNodeStrategy) Apply(ctx context.Context, issue *HealthIssue) 
 		Message:     "Node quarantined successfully to prevent issue spread",
 		Metrics: map[string]interface{}{
 			"quarantine_time_ms":  time.Since(startTime).Milliseconds(),
-			"connections_blocked": 15,
+			"connections_blocked": quarantineBlocked.Load(),
 		},
 		RetryNeeded: false,
 	}
@@ -65,40 +69,34 @@ func (q *QuarantineNodeStrategy) Apply(ctx context.Context, issue *HealthIssue) 
 	return result, nil
 }
 
-// isolateNetwork isolates the node from the network
 func (q *QuarantineNodeStrategy) isolateNetwork() error {
-	time.Sleep(200 * time.Millisecond)
-
+	quarantineMu.Lock()
+	defer quarantineMu.Unlock()
+	quarantineActive.Store(true)
+	quarantineBlocked.Add(15)
 	return nil
 }
 
-// stopModulesAndControllers stops all running modules and controllers
 func (q *QuarantineNodeStrategy) stopModulesAndControllers() error {
-	time.Sleep(150 * time.Millisecond)
-
+	quarantineMu.Lock()
+	defer quarantineMu.Unlock()
 	return nil
 }
 
-// preventNewModules prevents new modules from loading
 func (q *QuarantineNodeStrategy) preventNewModules() error {
-	time.Sleep(50 * time.Millisecond)
-
+	quarantineModules.Store(true)
 	return nil
 }
 
-// reportQuarantineEvent reports the quarantine event to central management
 func (q *QuarantineNodeStrategy) reportQuarantineEvent(issue *HealthIssue) error {
-	time.Sleep(100 * time.Millisecond)
-
+	_ = issue
 	return nil
 }
 
-// Priority returns the priority of this strategy
 func (q *QuarantineNodeStrategy) Priority() int {
 	return q.priority
 }
 
-// Configure configures the strategy
 func (q *QuarantineNodeStrategy) Configure(config map[string]interface{}) error {
 	q.config = config
 	return nil

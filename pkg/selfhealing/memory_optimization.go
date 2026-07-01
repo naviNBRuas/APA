@@ -6,7 +6,6 @@ import (
 	"time"
 )
 
-// NewMemoryOptimizationStrategy creates a new memory optimization strategy
 func NewMemoryOptimizationStrategy() *MemoryOptimizationStrategy {
 	return &MemoryOptimizationStrategy{
 		name:        "memory-optimization",
@@ -16,24 +15,22 @@ func NewMemoryOptimizationStrategy() *MemoryOptimizationStrategy {
 	}
 }
 
-// Name returns the name of the strategy
 func (m *MemoryOptimizationStrategy) Name() string {
 	return m.name
 }
 
-// Description returns the description of the strategy
 func (m *MemoryOptimizationStrategy) Description() string {
 	return m.description
 }
 
-// CanHandle determines if this strategy can handle the given health issue
 func (m *MemoryOptimizationStrategy) CanHandle(issue *HealthIssue) bool {
 	return issue.Type == "memory" || issue.Component == "memory"
 }
 
-// Apply applies the memory optimization strategy
 func (m *MemoryOptimizationStrategy) Apply(ctx context.Context, issue *HealthIssue) (*HealingResult, error) {
 	startTime := time.Now()
+
+	before := m.readMemoryUsage()
 
 	m.forceGarbageCollection()
 
@@ -41,7 +38,7 @@ func (m *MemoryOptimizationStrategy) Apply(ctx context.Context, issue *HealthIss
 
 	m.adjustMemoryParameters()
 
-	memoryFreed := m.verifyMemoryImprovement()
+	memoryFreed := m.verifyMemoryImprovement(before)
 
 	result := &HealingResult{
 		Success:     true,
@@ -57,35 +54,36 @@ func (m *MemoryOptimizationStrategy) Apply(ctx context.Context, issue *HealthIss
 	return result, nil
 }
 
-// forceGarbageCollection forces garbage collection
+func (m *MemoryOptimizationStrategy) readMemoryUsage() uint64 {
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+	return mem.Alloc
+}
+
 func (m *MemoryOptimizationStrategy) forceGarbageCollection() {
 	runtime.GC()
-	time.Sleep(50 * time.Millisecond)
 }
 
-// clearCaches clears caches and buffers
 func (m *MemoryOptimizationStrategy) clearCaches() {
-	time.Sleep(30 * time.Millisecond)
 }
 
-// adjustMemoryParameters adjusts memory allocation parameters
 func (m *MemoryOptimizationStrategy) adjustMemoryParameters() {
-	time.Sleep(20 * time.Millisecond)
 }
 
-// verifyMemoryImprovement verifies that memory usage has improved
-func (m *MemoryOptimizationStrategy) verifyMemoryImprovement() int {
-	time.Sleep(10 * time.Millisecond)
-
-	return 50
+func (m *MemoryOptimizationStrategy) verifyMemoryImprovement(before uint64) int {
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+	freed := int64(before) - int64(mem.Alloc)
+	if freed < 0 {
+		return 0
+	}
+	return int(freed / 1024 / 1024)
 }
 
-// Priority returns the priority of this strategy
 func (m *MemoryOptimizationStrategy) Priority() int {
 	return m.priority
 }
 
-// Configure configures the strategy
 func (m *MemoryOptimizationStrategy) Configure(config map[string]interface{}) error {
 	m.config = config
 	return nil

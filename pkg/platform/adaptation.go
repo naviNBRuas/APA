@@ -1,11 +1,14 @@
-// Package platform provides advanced cross-platform compatibility and platform-specific optimizations.
 package platform
 
 import (
 	"log/slog"
+	"runtime"
+	"time"
+
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
-// AdaptationEngine handles dynamic platform adaptation.
 type AdaptationEngine struct {
 	logger     *slog.Logger
 	thresholds AdaptationThresholds
@@ -14,7 +17,6 @@ type AdaptationEngine struct {
 	strategy   AdaptationStrategy
 }
 
-// NewAdaptationEngine creates a new AdaptationEngine.
 func NewAdaptationEngine(logger *slog.Logger, thresholds AdaptationThresholds) *AdaptationEngine {
 	return &AdaptationEngine{
 		logger:     logger,
@@ -25,13 +27,30 @@ func NewAdaptationEngine(logger *slog.Logger, thresholds AdaptationThresholds) *
 	}
 }
 
-// EvaluateAdaptation evaluates if adaptation is needed.
 func (ae *AdaptationEngine) EvaluateAdaptation(metrics *ResourceMetrics, profile *PlatformProfile) (bool, []string) {
-	// Implementation will evaluate if adaptation is needed
-	return false, []string{}
+	var reasons []string
+	vm, err := mem.VirtualMemory()
+	if err == nil && ae.thresholds.MemoryPressureThreshold > 0 {
+		if vm.UsedPercent > ae.thresholds.MemoryPressureThreshold {
+			reasons = append(reasons, "memory_pressure")
+		}
+	}
+	cpuPercent, err := cpu.Percent(0, false)
+	if err == nil && len(cpuPercent) > 0 && ae.thresholds.CPULoadThreshold > 0 && cpuPercent[0] > ae.thresholds.CPULoadThreshold {
+		reasons = append(reasons, "cpu_pressure")
+	}
+	if runtime.NumGoroutine() > 10000 {
+		reasons = append(reasons, "high_goroutine_count")
+	}
+	if len(reasons) > 0 {
+		ae.history = append(ae.history, &AdaptationEvent{
+			Timestamp: time.Now(),
+			Trigger:   "resource_pressure",
+		})
+	}
+	return len(reasons) > 0, reasons
 }
 
-// Shutdown shuts down the adaptation engine.
 func (ae *AdaptationEngine) Shutdown() {
-	// Implementation will shutdown adaptation engine
+	ae.logger.Info("Adaptation engine shutting down")
 }

@@ -355,13 +355,7 @@ func (m *Manager) parseManifest(path string) (*manifest.Manifest, error) {
 }
 
 // verifyHash calculates the SHA256 hash of a file and compares it to an expected hex-encoded hash.
-// A placeholder hash "..." is always considered valid for testing.
 func (m *Manager) verifyHash(filePath, expectedHash string) error {
-	if expectedHash == "..." {
-		m.logger.Warn("Skipping hash verification for placeholder hash", "file", filePath)
-		return nil
-	}
-
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err

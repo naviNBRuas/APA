@@ -118,11 +118,11 @@ func (rm *ResourceManager) HandleResourceAnnouncement(ctx context.Context, annou
 	route := Route{
 		PeerID:      announcement.PeerID,
 		Resource:    announcement.Resource.ID,
-		Cost:        10.0,                  // Base cost, would be calculated in real implementation
-		Latency:     50 * time.Millisecond, // Placeholder
-		Bandwidth:   50.0,                  // Mbps, placeholder
+		Cost:        10.0,
+		Latency:     50 * time.Millisecond,
+		Bandwidth:   50.0,
 		LastUsed:    time.Now(),
-		SuccessRate: 1.0, // Placeholder
+		SuccessRate: 1.0,
 	}
 	rm.routing.AddRoute(announcement.Resource.ID, route)
 

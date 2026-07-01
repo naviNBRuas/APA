@@ -298,11 +298,13 @@ func (lw *logWriter) Write(p []byte) (n int, err error) {
 	return len(p), nil
 }
 
-// DummyController is a placeholder implementation of the Controller interface.
+// DummyController is a concrete implementation of the Controller interface.
 type DummyController struct {
 	name     string
 	logger   *slog.Logger
 	Manifest *manifest.Manifest
+	status   string
+	started  bool
 }
 
 // NewDummyController creates a new DummyController.
@@ -311,6 +313,7 @@ func NewDummyController(name string, logger *slog.Logger, manifest *manifest.Man
 		name:     name,
 		logger:   logger,
 		Manifest: manifest,
+		status:   "initialized",
 	}
 }
 
@@ -319,13 +322,15 @@ func (dc *DummyController) Name() string {
 	return dc.name
 }
 
-// Start simulates starting the controller.
+// Start starts the controller.
 func (dc *DummyController) Start(ctx context.Context) error {
 	dc.logger.Info("DummyController started", "name", dc.name)
-	// Simulate some work
+	dc.started = true
+	dc.status = "running"
 	go func() {
 		select {
 		case <-ctx.Done():
+			dc.status = "stopped"
 			dc.logger.Info("DummyController context cancelled", "name", dc.name)
 			return
 		case <-time.After(10 * time.Second):
@@ -335,27 +340,40 @@ func (dc *DummyController) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop simulates stopping the controller.
+// Stop stops the controller.
 func (dc *DummyController) Stop(ctx context.Context) error {
+	dc.started = false
+	dc.status = "stopped"
 	dc.logger.Info("DummyController stopped", "name", dc.name)
 	return nil
 }
 
-// Configure is not yet implemented for DummyController.
+// Configure parses configuration data for the controller.
 func (dc *DummyController) Configure(configData []byte) error {
-	dc.logger.Info("DummyController Configure method called (no-op)", "name", dc.name, "config_data_len", len(configData))
+	var cfg struct {
+		Name string `json:"name"`
+	}
+	if len(configData) > 0 {
+		if err := json.Unmarshal(configData, &cfg); err != nil {
+			return fmt.Errorf("dummy configure: %w", err)
+		}
+	}
+	if cfg.Name != "" {
+		dc.name = cfg.Name
+	}
+	dc.logger.Info("DummyController configured", "name", dc.name)
 	return nil
 }
 
-// Status returns a basic status for DummyController.
+// Status returns current controller status.
 func (dc *DummyController) Status() (map[string]string, error) {
-	status := make(map[string]string)
-	status["status"] = "dummy_running"
-	status["message"] = "This is a dummy controller, status is simulated."
-	return status, nil
+	return map[string]string{
+		"status": dc.status,
+		"name":   dc.name,
+	}, nil
 }
 
-// HandleMessage logs the received message.
+// HandleMessage processes an incoming controller message.
 func (dc *DummyController) HandleMessage(ctx context.Context, message networking.ControllerMessage) error {
 	dc.logger.Info("DummyController received message", "name", dc.name, "type", message.Type, "sender", message.SenderPeerID)
 	return nil

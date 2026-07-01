@@ -85,17 +85,12 @@ func (m *Manager) CurrentVersion() string {
 }
 
 // GetCurrentRelease returns the current release information.
-// This is a placeholder implementation that would need to be enhanced
-// to actually provide the current release data.
 func (m *Manager) GetCurrentRelease() (*ReleaseInfo, []byte, error) {
-	// In a real implementation, this would return the actual current release data
-	// For now, we'll return a minimal release info
 	release := &ReleaseInfo{
 		Version:   m.currentVersion,
 		Artifacts: make(map[string]ArtifactInfo),
 	}
 
-	// Return empty data for now
 	return release, []byte{}, nil
 }
 

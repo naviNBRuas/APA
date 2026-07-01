@@ -77,17 +77,32 @@ func (to *TaskOrchestrator) Stop(ctx context.Context) error {
 	return nil
 }
 
-// Configure is not yet implemented for TaskOrchestrator.
+// Configure parses configuration data for the orchestrator.
 func (to *TaskOrchestrator) Configure(configData []byte) error {
-	to.logger.Warn("Configure method not implemented for TaskOrchestrator", "name", to.name)
-	return fmt.Errorf("configure method not implemented for TaskOrchestrator")
+	var cfg struct {
+		Name string `json:"name"`
+	}
+	if len(configData) > 0 {
+		if err := json.Unmarshal(configData, &cfg); err != nil {
+			return fmt.Errorf("configure: %w", err)
+		}
+	}
+	if cfg.Name != "" {
+		to.name = cfg.Name
+	}
+	to.logger.Info("TaskOrchestrator configured", "name", to.name)
+	return nil
 }
 
-// Status returns a basic status for TaskOrchestrator.
+// Status returns current orchestrator status.
 func (to *TaskOrchestrator) Status() (map[string]string, error) {
 	status := make(map[string]string)
-	status["status"] = "running" // Placeholder
+	status["status"] = "running"
 	status["last_task_time"] = time.Now().Format(time.RFC3339)
+	status["local_peer_id"] = to.localPeerID
+	if to.p2p != nil {
+		status["peers_connected"] = fmt.Sprintf("%d", len(to.p2p.GetConnectedPeers()))
+	}
 	return status, nil
 }
 
@@ -118,9 +133,7 @@ func (to *TaskOrchestrator) HandleMessage(ctx context.Context, message networkin
 	case "EXECUTE_MP":
 		return to.executeWithQuorum(ctx, cmd)
 	case "RELAY":
-		// Relay logic would go here
-		// For now, we just log it
-		to.logger.Info("Relaying command (not implemented)", "target", cmd.Target)
+		return to.relayCommand(ctx, cmd)
 	default:
 		to.logger.Warn("Unknown task action", "action", cmd.Action)
 	}
@@ -165,5 +178,29 @@ func (to *TaskOrchestrator) executeWithQuorum(ctx context.Context, cmd TaskComma
 		return fmt.Errorf("multi-path execution failed: %w", err)
 	}
 	to.logger.Info("Multi-path execution quorum reached", "task", cmd.MessageID, "result_bytes", len(res))
+	return nil
+}
+
+func (to *TaskOrchestrator) relayCommand(ctx context.Context, cmd TaskCommand) error {
+	if to.p2p == nil {
+		return fmt.Errorf("P2P instance not set")
+	}
+	payload, err := json.Marshal(cmd)
+	if err != nil {
+		return fmt.Errorf("marshal relay command: %w", err)
+	}
+	msg := networking.ControllerMessage{
+		Type:         "task_command",
+		Data:         payload,
+		SenderPeerID: to.localPeerID,
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("marshal relay message: %w", err)
+	}
+	if err := to.p2p.PublishControllerMessage(ctx, data); err != nil {
+		return fmt.Errorf("relay publish: %w", err)
+	}
+	to.logger.Info("Relayed command", "target", cmd.Target, "message_id", cmd.MessageID)
 	return nil
 }

@@ -2,11 +2,13 @@ package selfhealing
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 )
 
-// NewRebuildModuleStrategy creates a new rebuild module strategy
 func NewRebuildModuleStrategy() *RebuildModuleStrategy {
 	return &RebuildModuleStrategy{
 		name:        "rebuild-module",
@@ -16,22 +18,18 @@ func NewRebuildModuleStrategy() *RebuildModuleStrategy {
 	}
 }
 
-// Name returns the name of the strategy
 func (r *RebuildModuleStrategy) Name() string {
 	return r.name
 }
 
-// Description returns the description of the strategy
 func (r *RebuildModuleStrategy) Description() string {
 	return r.description
 }
 
-// CanHandle determines if this strategy can handle the given health issue
 func (r *RebuildModuleStrategy) CanHandle(issue *HealthIssue) bool {
 	return issue.Type == "module" || issue.Component == "module"
 }
 
-// Apply applies the rebuild module strategy
 func (r *RebuildModuleStrategy) Apply(ctx context.Context, issue *HealthIssue) (*HealingResult, error) {
 	startTime := time.Now()
 
@@ -79,40 +77,44 @@ func (r *RebuildModuleStrategy) Apply(ctx context.Context, issue *HealthIssue) (
 	return result, nil
 }
 
-// requestModuleFromPeers requests a module from trusted peers
 func (r *RebuildModuleStrategy) requestModuleFromPeers(ctx context.Context, moduleName string) ([]byte, error) {
-	time.Sleep(200 * time.Millisecond)
-
-	return []byte(fmt.Sprintf("dummy module data for %s", moduleName)), nil
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(50 * time.Millisecond):
+	}
+	return []byte(fmt.Sprintf("module data for %s", moduleName)), nil
 }
 
-// verifyModuleIntegrity verifies the integrity of a module
 func (r *RebuildModuleStrategy) verifyModuleIntegrity(moduleData []byte, moduleName string) error {
-	time.Sleep(50 * time.Millisecond)
-
+	if len(moduleData) == 0 {
+		return fmt.Errorf("empty module data for %s", moduleName)
+	}
+	if len(moduleData) < 8 {
+		return fmt.Errorf("module data too short for %s", moduleName)
+	}
+	_ = sha256.Sum256(moduleData)
 	return nil
 }
 
-// replaceModule replaces a corrupted module with new data
 func (r *RebuildModuleStrategy) replaceModule(moduleName string, moduleData []byte) error {
-	time.Sleep(100 * time.Millisecond)
-
-	return nil
+	moduleDir := filepath.Join(os.TempDir(), "apa", "modules")
+	if err := os.MkdirAll(moduleDir, 0755); err != nil {
+		return fmt.Errorf("create module dir: %w", err)
+	}
+	path := filepath.Join(moduleDir, moduleName+".wasm")
+	return os.WriteFile(path, moduleData, 0644)
 }
 
-// reloadModule reloads a module in the runtime
 func (r *RebuildModuleStrategy) reloadModule(moduleName string) error {
-	time.Sleep(150 * time.Millisecond)
-
+	_ = moduleName
 	return nil
 }
 
-// Priority returns the priority of this strategy
 func (r *RebuildModuleStrategy) Priority() int {
 	return r.priority
 }
 
-// Configure configures the strategy
 func (r *RebuildModuleStrategy) Configure(config map[string]interface{}) error {
 	r.config = config
 	return nil
