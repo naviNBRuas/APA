@@ -2,6 +2,7 @@ package networking
 
 import (
 	"log/slog"
+	"math"
 	"sync"
 	"time"
 
@@ -41,5 +42,29 @@ func NewIntelligentRoutingEngine(logger *slog.Logger) *IntelligentRoutingEngine 
 }
 
 func (ire *IntelligentRoutingEngine) SelectBestRoute(to peer.ID, message *NetworkMessage) *RouteOption {
-	return nil
+	ire.mu.RLock()
+	routes, ok := ire.routingTable[to]
+	ire.mu.RUnlock()
+
+	if !ok || len(routes) == 0 {
+		return nil
+	}
+
+	var best *RouteOption
+	bestScore := math.Inf(-1)
+
+	for i := range routes {
+		r := &routes[i]
+		latencyWeight := 1.0
+		if r.Latency > 0 {
+			latencyWeight = 1.0 / (1.0 + r.Latency.Seconds())
+		}
+		score := r.Reliability*0.4 + r.Bandwidth*0.3 + latencyWeight*0.2 - r.Cost*0.1
+		if score > bestScore {
+			bestScore = score
+			best = r
+		}
+	}
+
+	return best
 }

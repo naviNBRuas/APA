@@ -3,10 +3,10 @@ package selfhealing
 import (
 	"context"
 	"fmt"
+	"net"
 	"time"
 )
 
-// NewNetworkReconnectStrategy creates a new network reconnect strategy
 func NewNetworkReconnectStrategy() *NetworkReconnectStrategy {
 	return &NetworkReconnectStrategy{
 		name:        "network-reconnect",
@@ -16,22 +16,18 @@ func NewNetworkReconnectStrategy() *NetworkReconnectStrategy {
 	}
 }
 
-// Name returns the name of the strategy
 func (n *NetworkReconnectStrategy) Name() string {
 	return n.name
 }
 
-// Description returns the description of the strategy
 func (n *NetworkReconnectStrategy) Description() string {
 	return n.description
 }
 
-// CanHandle determines if this strategy can handle the given health issue
 func (n *NetworkReconnectStrategy) CanHandle(issue *HealthIssue) bool {
 	return issue.Type == "network" || issue.Component == "network"
 }
 
-// Apply applies the network reconnect strategy
 func (n *NetworkReconnectStrategy) Apply(ctx context.Context, issue *HealthIssue) (*HealingResult, error) {
 	startTime := time.Now()
 
@@ -44,7 +40,11 @@ func (n *NetworkReconnectStrategy) Apply(ctx context.Context, issue *HealthIssue
 		return nil, fmt.Errorf("failed to close connection: %w", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
 
 	if err := n.establishConnection(endpoint); err != nil {
 		return &HealingResult{
@@ -76,7 +76,6 @@ func (n *NetworkReconnectStrategy) Apply(ctx context.Context, issue *HealthIssue
 		Message:     "Network connection reestablished successfully",
 		Metrics: map[string]interface{}{
 			"reconnect_time_ms": time.Since(startTime).Milliseconds(),
-			"packets_lost":      5,
 		},
 		RetryNeeded: false,
 	}
@@ -84,33 +83,33 @@ func (n *NetworkReconnectStrategy) Apply(ctx context.Context, issue *HealthIssue
 	return result, nil
 }
 
-// closeConnection closes a network connection
 func (n *NetworkReconnectStrategy) closeConnection(endpoint string) error {
-	time.Sleep(30 * time.Millisecond)
-
+	_ = endpoint
 	return nil
 }
 
-// establishConnection establishes a new network connection
 func (n *NetworkReconnectStrategy) establishConnection(endpoint string) error {
-	time.Sleep(100 * time.Millisecond)
-
+	conn, err := net.DialTimeout("tcp", endpoint, 3*time.Second)
+	if err != nil {
+		return fmt.Errorf("dial %s: %w", endpoint, err)
+	}
+	_ = conn.Close()
 	return nil
 }
 
-// verifyConnectivity verifies network connectivity
 func (n *NetworkReconnectStrategy) verifyConnectivity(endpoint string) error {
-	time.Sleep(50 * time.Millisecond)
-
+	conn, err := net.DialTimeout("tcp", endpoint, 2*time.Second)
+	if err != nil {
+		return fmt.Errorf("connectivity check failed for %s: %w", endpoint, err)
+	}
+	_ = conn.Close()
 	return nil
 }
 
-// Priority returns the priority of this strategy
 func (n *NetworkReconnectStrategy) Priority() int {
 	return n.priority
 }
 
-// Configure configures the strategy
 func (n *NetworkReconnectStrategy) Configure(config map[string]interface{}) error {
 	n.config = config
 	return nil

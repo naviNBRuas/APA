@@ -2,7 +2,9 @@ package health
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"runtime"
 	"time"
 )
 
@@ -81,8 +83,16 @@ func (plc *ProcessLivenessCheck) Name() string {
 }
 
 func (plc *ProcessLivenessCheck) Check(ctx context.Context) error {
-	// In a real scenario, this might check if critical goroutines are running,
-	// or if the main event loop is responsive.
-	// For now, we just return nil to indicate the process is alive.
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	procs := runtime.NumGoroutine()
+	if procs > 10000 {
+		return fmt.Errorf("too many goroutines: %d", procs)
+	}
+
 	return nil
 }

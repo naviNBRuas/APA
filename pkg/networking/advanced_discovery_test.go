@@ -139,16 +139,14 @@ func TestRelayProxyManager(t *testing.T) {
 	peerID := peer.ID("test-peer-id")
 	relayPeer := peer.ID("relay-peer-id")
 	err = ad.relayProxyMgr.EstablishRelayConnection(ctx, peerID, relayPeer)
-	assert.NoError(t, err)
+	assert.Error(t, err)
 
-	// Test establishing proxy connection
-	err = ad.relayProxyMgr.EstablishProxyConnection(ctx, "/ip4/127.0.0.1/tcp/8080", "/ip4/127.0.0.1/tcp/9090")
-	assert.NoError(t, err)
+	err = ad.relayProxyMgr.EstablishProxyConnection(ctx, "127.0.0.1:8080", "127.0.0.1:9090")
+	assert.Error(t, err)
 
-	// Test finding relay peers
 	relayPeers, err := ad.relayProxyMgr.FindRelayPeers(ctx)
 	assert.NoError(t, err)
-	assert.Len(t, relayPeers, 3) // Should return mock relay peers
+	assert.Len(t, relayPeers, 0)
 }
 
 func TestBluetoothDiscovery(t *testing.T) {

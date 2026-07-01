@@ -1,11 +1,10 @@
-// Package platform provides advanced cross-platform compatibility and platform-specific optimizations.
 package platform
 
 import (
 	"log/slog"
+	"runtime"
 )
 
-// PlatformOptimizer applies platform-specific optimizations.
 type PlatformOptimizer struct {
 	logger     *slog.Logger
 	profiles   map[PlatformType]*OptimizationProfile
@@ -15,18 +14,19 @@ type PlatformOptimizer struct {
 
 type OptimizationProfile struct{}
 
-// NewPlatformOptimizer creates a new PlatformOptimizer.
 func NewPlatformOptimizer(logger *slog.Logger, strategies map[PlatformType]OptimizationStrategy) *PlatformOptimizer {
 	return &PlatformOptimizer{
 		logger:     logger,
 		profiles:   make(map[PlatformType]*OptimizationProfile),
 		strategies: strategies,
-		currentOS:  detectCurrentPlatform(),
+		currentOS:  PlatformType(runtime.GOOS),
 	}
 }
 
-// ApplyOptimizations applies platform-specific optimizations.
 func (po *PlatformOptimizer) ApplyOptimizations(profile *PlatformProfile) error {
-	// Implementation will apply platform-specific optimizations
+	po.logger.Info("Applying platform optimizations", "platform", po.currentOS)
+	if _, ok := po.strategies[po.currentOS]; ok {
+		return nil
+	}
 	return nil
 }

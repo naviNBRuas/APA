@@ -1,11 +1,11 @@
-// Package platform provides advanced cross-platform compatibility and platform-specific optimizations.
 package platform
 
 import (
 	"log/slog"
+	"runtime"
+	"strings"
 )
 
-// CompatibilityLayer handles platform compatibility issues.
 type CompatibilityLayer struct {
 	logger    *slog.Logger
 	overrides CompatibilityOverrides
@@ -13,7 +13,6 @@ type CompatibilityLayer struct {
 	adapters  map[string]PlatformAdapter
 }
 
-// NewCompatibilityLayer creates a new CompatibilityLayer.
 func NewCompatibilityLayer(logger *slog.Logger, overrides CompatibilityOverrides) *CompatibilityLayer {
 	return &CompatibilityLayer{
 		logger:    logger,
@@ -23,26 +22,32 @@ func NewCompatibilityLayer(logger *slog.Logger, overrides CompatibilityOverrides
 	}
 }
 
-// ScanForIssues scans for compatibility issues.
 func (cl *CompatibilityLayer) ScanForIssues() []string {
-	// Implementation will scan for compatibility issues
-	return []string{}
+	var issues []string
+	switch runtime.GOOS {
+	case "windows":
+		issues = append(issues, "case_insensitive_fs")
+	case "linux":
+		issues = append(issues, "case_sensitive_fs")
+	}
+	return issues
 }
 
-// GetPatchForIssue returns the appropriate patch for an issue.
 func (cl *CompatibilityLayer) GetPatchForIssue(issue string) (*CompatibilityPatch, bool) {
-	// Implementation will return appropriate patch
+	patch, ok := cl.patches[issue]
+	if ok {
+		return &patch, true
+	}
 	return nil, false
 }
 
-// ApplyPatch applies a compatibility patch.
 func (cl *CompatibilityLayer) ApplyPatch(patch *CompatibilityPatch) error {
-	// Implementation will apply compatibility patch
+	cl.patches[patch.Name] = *patch
+	cl.logger.Info("Applied compatibility patch", "name", patch.Name, "targets", strings.Join(patch.TargetPlatforms, ","))
 	return nil
 }
 
-// EnableCompatibilityMode enables compatibility mode.
 func (cl *CompatibilityLayer) EnableCompatibilityMode() error {
-	// Implementation will enable compatibility mode
+	cl.logger.Info("Compatibility mode enabled", "os", runtime.GOOS, "arch", runtime.GOARCH)
 	return nil
 }

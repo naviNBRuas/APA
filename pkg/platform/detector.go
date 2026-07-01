@@ -59,7 +59,6 @@ func detectCurrentPlatform() PlatformType {
 
 // DetectPlatform collects detailed platform information.
 func (pd *PlatformDetector) DetectPlatform() (*PlatformProfile, error) {
-	// Implementation will collect detailed platform information
 	return &PlatformProfile{
 		OS: OperatingSystem{
 			Name:    runtime.GOOS,

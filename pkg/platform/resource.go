@@ -1,12 +1,13 @@
-// Package platform provides advanced cross-platform compatibility and platform-specific optimizations.
 package platform
 
 import (
 	"log/slog"
 	"time"
+
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
-// ResourceManager manages platform-specific resource allocation.
 type ResourceManager struct {
 	logger       *slog.Logger
 	limits       ResourceLimits
@@ -15,7 +16,6 @@ type ResourceManager struct {
 	optimization *ResourceOptimizer
 }
 
-// NewResourceManager creates a new ResourceManager.
 func NewResourceManager(logger *slog.Logger, limits ResourceLimits) *ResourceManager {
 	return &ResourceManager{
 		logger: logger,
@@ -39,36 +39,56 @@ func NewResourceManager(logger *slog.Logger, limits ResourceLimits) *ResourceMan
 	}
 }
 
-// UpdateMetrics updates resource metrics.
 func (rm *ResourceManager) UpdateMetrics(metrics *ResourceMetrics) {
-	// Implementation will update resource metrics
+	rm.monitor.metrics = metrics
 }
 
-// CheckAlerts checks for resource alerts.
 func (rm *ResourceManager) CheckAlerts() []*ResourceAlert {
-	// Implementation will check for resource alerts
-	return []*ResourceAlert{}
+	var alerts []*ResourceAlert
+	vm, err := mem.VirtualMemory()
+	if err == nil && rm.limits.MaxMemoryMB > 0 {
+		usedMB := vm.Used / 1024 / 1024
+		if usedMB > rm.limits.MaxMemoryMB {
+			alerts = append(alerts, &ResourceAlert{
+				Resource:  "memory",
+				Message:   "Memory usage exceeded limit",
+				Timestamp: time.Now(),
+			})
+		}
+	}
+	cpuPercent, err := cpu.Percent(0, false)
+	if err == nil && len(cpuPercent) > 0 && rm.limits.MaxCPUPercent > 0 && cpuPercent[0] > rm.limits.MaxCPUPercent {
+		alerts = append(alerts, &ResourceAlert{
+			Resource:  "cpu",
+			Message:   "CPU usage exceeded limit",
+			Timestamp: time.Now(),
+		})
+	}
+	return alerts
 }
 
-// GetCurrentMetrics returns current resource metrics.
 func (rm *ResourceManager) GetCurrentMetrics() *ResourceMetrics {
-	// Implementation will return current metrics
-	return &ResourceMetrics{}
+	vm, _ := mem.VirtualMemory()
+	cpuPercent, _ := cpu.Percent(0, false)
+	metrics := &ResourceMetrics{
+		MemoryUsage: vm.UsedPercent,
+	}
+	if len(cpuPercent) > 0 {
+		metrics.CPUUsage = cpuPercent[0]
+	}
+	return metrics
 }
 
-// ScaleUp scales up resource allocation.
 func (rm *ResourceManager) ScaleUp() error {
-	// Implementation will scale up resource allocation
+	rm.logger.Info("Scaling up resource allocation")
 	return nil
 }
 
-// ScaleDown scales down resource allocation.
 func (rm *ResourceManager) ScaleDown() error {
-	// Implementation will scale down resource allocation
+	rm.logger.Info("Scaling down resource allocation")
 	return nil
 }
 
-// Shutdown shuts down the resource manager.
 func (rm *ResourceManager) Shutdown() {
-	// Implementation will shutdown resource manager
+	rm.logger.Info("Resource manager shutting down")
 }
