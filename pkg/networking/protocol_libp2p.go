@@ -23,14 +23,14 @@ type LibP2PProtocol struct {
 	messageChan   chan *NetworkMessage
 	healthMetrics *ProtocolHealthMetrics
 
-	mu        sync.RWMutex
-	peers     map[peer.ID]*PeerConnection
+	mu         sync.RWMutex
+	peers      map[peer.ID]*PeerConnection
 	listenAddr string
 }
 
 type LibP2PConfig struct {
-	ListenAddrs  []string `json:"listen_addrs"`
-	ProtocolID   string   `json:"protocol_id"`
+	ListenAddrs []string `json:"listen_addrs"`
+	ProtocolID  string   `json:"protocol_id"`
 }
 
 const defaultLibP2PProtocolID = "/apa/msg/1.0.0"

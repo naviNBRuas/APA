@@ -119,10 +119,13 @@ jobs:
         run: |
           cd release
           for os_arch in bin/*; do
+            name="$(basename "$os_arch")"
             if [[ "$os_arch" == *windows* ]]; then
-              zip -j apa-$(basename $os_arch).zip $os_arch docs/*
+              zip -j "apa-${name}.zip" "$os_arch" docs/*
             else
-              tar -czf apa-$(basename $os_arch).tar.gz -C bin $(basename $os_arch) -C docs .
+              tar -czf "apa-${name}.tar.gz" \
+                -C "$PWD/bin" "$name" \
+                -C "$PWD/docs" .
             fi
           done
 

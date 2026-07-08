@@ -9,10 +9,10 @@ import (
 )
 
 var (
-	quarantineMu       sync.Mutex
-	quarantineActive   atomic.Bool
-	quarantineModules  atomic.Bool
-	quarantineBlocked  atomic.Int64
+	quarantineMu      sync.Mutex
+	quarantineActive  atomic.Bool
+	quarantineModules atomic.Bool
+	quarantineBlocked atomic.Int64
 )
 
 func NewQuarantineNodeStrategy() *QuarantineNodeStrategy {

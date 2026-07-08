@@ -26,10 +26,10 @@ type QUICProtocol struct {
 	messageChan   chan *NetworkMessage
 	healthMetrics *ProtocolHealthMetrics
 
-	mu        sync.RWMutex
+	mu         sync.RWMutex
 	listenAddr string
-	tlsConfig *tls.Config
-	peers     map[peer.ID]string
+	tlsConfig  *tls.Config
+	peers      map[peer.ID]string
 }
 
 type QUICConfig struct {
