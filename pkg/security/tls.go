@@ -31,9 +31,15 @@ func GenerateSelfSignedCert(commonName string, validityDays int) ([]byte, []byte
 		return nil, nil, fmt.Errorf("failed to generate private key: %w", err)
 	}
 
-	// Create certificate template
+	// Generate random serial number
+	serialBytes := make([]byte, 20)
+	if _, err := rand.Read(serialBytes); err != nil {
+		return nil, nil, fmt.Errorf("failed to generate serial number: %w", err)
+	}
+	serialNumber := new(big.Int).SetBytes(serialBytes)
+
 	template := x509.Certificate{
-		SerialNumber: big.NewInt(1),
+		SerialNumber: serialNumber,
 		Subject: pkix.Name{
 			CommonName:   commonName,
 			Organization: []string{"APA Project"},
