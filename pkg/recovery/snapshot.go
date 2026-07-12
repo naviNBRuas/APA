@@ -102,12 +102,12 @@ func (erc *ExtendedRecoveryController) CreateComprehensiveSnapshot(ctx context.C
 	filepath := filepath.Join(erc.snapshotStoragePath, filename)
 
 	// Ensure the snapshot storage directory exists
-	if err := os.MkdirAll(erc.snapshotStoragePath, 0755); err != nil {
+	if err := os.MkdirAll(erc.snapshotStoragePath, 0750); err != nil {
 		return "", fmt.Errorf("failed to create snapshot storage directory: %w", err)
 	}
 
 	// Write snapshot to file
-	err = os.WriteFile(filepath, data, 0644)
+	err = os.WriteFile(filepath, data, 0600)
 	if err != nil {
 		return "", fmt.Errorf("failed to write snapshot file: %w", err)
 	}

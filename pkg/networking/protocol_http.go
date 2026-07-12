@@ -48,7 +48,7 @@ func (hp *HTTPProtocol) Initialize(ctx context.Context) error {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/message", hp.handleIncoming)
-	hp.server = &http.Server{Addr: addr, Handler: mux}
+	hp.server = &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("http init: %w", err)
