@@ -61,7 +61,8 @@ func (wp *WebSocketProtocol) Initialize(ctx context.Context) error {
 	mux.HandleFunc("/ws", wp.handleWebSocket)
 
 	wp.server = &http.Server{
-		Handler: mux,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {

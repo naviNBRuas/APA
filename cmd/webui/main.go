@@ -57,11 +57,21 @@ func main() {
 	http.Handle("/", http.FileServer(http.Dir("web/ui")))
 
 	log.Printf("Starting web UI server on :%s (admin API: %s)", port, adminAPI)
+
+	srv := &http.Server{
+		Addr:              ":" + port,
+		Handler:           nil,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       120 * time.Second,
+	}
+
 	var err error
 	if tlsCert != "" && tlsKey != "" {
-		err = http.ListenAndServeTLS(":"+port, tlsCert, tlsKey, nil)
+		err = srv.ListenAndServeTLS(tlsCert, tlsKey)
 	} else {
-		err = http.ListenAndServe(":"+port, nil)
+		err = srv.ListenAndServe()
 	}
 	if err != nil {
 		log.Fatal(err)

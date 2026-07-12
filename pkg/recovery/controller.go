@@ -232,7 +232,7 @@ func (rc *RecoveryController) CreateSnapshot(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile("agent-snapshot.yaml", data, 0644)
+	return os.WriteFile("agent-snapshot.yaml", data, 0600)
 }
 
 // RestoreSnapshot restores the agent's state from a snapshot.

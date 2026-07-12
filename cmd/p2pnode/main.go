@@ -279,7 +279,7 @@ func (s *serverState) serveHTTP(ctx context.Context, addr string) {
 		writeJSON(w, map[string]string{"value": string(val)})
 	})
 
-	server := &http.Server{Addr: addr, Handler: mux}
+	server := &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 
 	go func() {
 		<-ctx.Done()

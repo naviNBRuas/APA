@@ -734,9 +734,10 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 
 	tlsConfig, serveTLS := rt.buildAdminTLSConfig()
 	rt.server = &http.Server{
-		Addr:      rt.config.AdminListenAddress,
-		Handler:   mux,
-		TLSConfig: tlsConfig,
+		Addr:              rt.config.AdminListenAddress,
+		Handler:           mux,
+		TLSConfig:         tlsConfig,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	// Start server in a goroutine
