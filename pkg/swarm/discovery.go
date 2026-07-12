@@ -71,15 +71,6 @@ func (rm *ResourceManager) AnnounceResource(ctx context.Context, resource *Resou
 	// Store resource information
 	rm.resources[resource.ID] = resource
 
-	// Add this peer as an owner (assuming local peer)
-	// In a real implementation, this would come from the network announcement
-	// owners, exists := rm.resourceOwners[resource.ID]
-	// if !exists {
-	// 	owners = make([]peer.ID, 0)
-	// }
-	// owners = append(owners, localPeerID)
-	// rm.resourceOwners[resource.ID] = owners
-
 	rm.logger.Debug("Announced resource",
 		"resource_id", resource.ID,
 		"name", resource.Name,
