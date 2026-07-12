@@ -24,7 +24,11 @@ func NewControllerTransport(logger *slog.Logger, p2p *networking.P2P, idProvider
 
 func (t *controllerTransport) Publish(ctx context.Context, topic string, payload []byte) error {
 	msg := networking.ControllerMessage{Type: topic, Data: payload}
-	if err := t.p2p.PublishControllerMessage(ctx, mustJSON(msg)); err != nil {
+	b, err := json.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("marshal controller message: %w", err)
+	}
+	if err := t.p2p.PublishControllerMessage(ctx, b); err != nil {
 		return fmt.Errorf("publish controller message: %w", err)
 	}
 	return nil
@@ -63,12 +67,4 @@ func (t *controllerTransport) LocalID() string {
 		}
 	}
 	return t.p2p.HostID()
-}
-
-func mustJSON(msg networking.ControllerMessage) []byte {
-	b, err := json.Marshal(msg)
-	if err != nil {
-		panic(err)
-	}
-	return b
 }

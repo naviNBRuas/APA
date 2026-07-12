@@ -96,18 +96,7 @@ func TestGetTrustedPeers(t *testing.T) {
 		config: &Config{},
 	}
 
-	// Test with no trusted peers configured
-	// connectedPeers := []peer.ID{peer.ID("peer1"), peer.ID("peer2"), peer.ID("peer3")}
-	// This method doesn't exist anymore, so we'll skip this test
-	// trustedPeers := regenerator.getTrustedPeers(connectedPeers)
-	// assert.Equal(t, connectedPeers, trustedPeers)
-
-	// Test with specific trusted peers configured
 	regenerator.config.TrustedPeers = []string{"peer1", "peer3"}
-	// trustedPeers = regenerator.getTrustedPeers(connectedPeers)
-	// Create expected peers with proper type
-	// expected := []peer.ID{peer.ID("peer1"), peer.ID("peer3")}
-	// assert.ElementsMatch(t, expected, trustedPeers)
 }
 
 func TestRegeneratorStart(t *testing.T) {
