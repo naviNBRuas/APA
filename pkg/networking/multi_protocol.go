@@ -46,6 +46,10 @@ func NewMultiProtocolManager(logger *slog.Logger, config MultiProtocolConfig) (*
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	if config.HealthCheckInterval <= 0 {
+		config.HealthCheckInterval = 30 * time.Second
+	}
+
 	mpm := &MultiProtocolManager{
 		logger:         logger,
 		config:         config,

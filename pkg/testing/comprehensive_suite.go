@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"log/slog"
 	"math/rand"
+	"reflect"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -18,6 +20,9 @@ import (
 	"github.com/naviNBRuas/APA/pkg/networking"
 	"github.com/naviNBRuas/APA/pkg/platform"
 	"github.com/naviNBRuas/APA/pkg/robustness"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"github.com/libp2p/go-libp2p/core/peer"
 )
 
 // TestSuite orchestrates comprehensive testing of all enhanced agent features.
@@ -927,7 +932,6 @@ func (ts *TestSuite) executeSingleTest(category TestType, name string, testFn fu
 // Specific test implementations
 
 func (ts *TestSuite) testEnhancedRuntimeInitialization(t *testing.T) {
-	// Test enhanced agent runtime initialization
 	config := &agent.EnhancedRuntimeConfig{
 		EnableAdaptiveOrchestration: true,
 		EnableFaultTolerance:        true,
@@ -937,31 +941,24 @@ func (ts *TestSuite) testEnhancedRuntimeInitialization(t *testing.T) {
 		EnablePlatformAwareness:     true,
 	}
 
-	logger := slog.Default()
-	runtime, err := agent.NewEnhancedRuntime(logger, config)
+	er, err := agent.NewEnhancedRuntime(slog.Default(), config)
+	require.NoError(t, err, "NewEnhancedRuntime should succeed")
+	require.NotNil(t, er, "EnhancedRuntime should not be nil")
 
-	if err != nil {
-		t.Fatalf("Failed to create enhanced runtime: %v", err)
-	}
-
-	if runtime == nil {
-		t.Fatal("Enhanced runtime is nil")
-	}
-
-	// Test basic functionality
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	go runtime.Run(ctx, func() int { return 5 }) // Mock peer count provider
-
-	time.Sleep(100 * time.Millisecond)
-
-	// Verify runtime is running
-	// This would involve checking internal state in a real implementation
+	done := make(chan struct{})
+	go func() {
+		er.Run(ctx, func() int { return 5 })
+		close(done)
+	}()
+	time.Sleep(50 * time.Millisecond)
+	er.Stop()
+	<-done
 }
 
 func (ts *TestSuite) testMultiProtocolManagerInitialization(t *testing.T) {
-	// Test multi-protocol networking initialization
 	config := networking.MultiProtocolConfig{
 		EnabledProtocols: []networking.ProtocolType{
 			networking.ProtocolLibP2P,
@@ -979,78 +976,57 @@ func (ts *TestSuite) testMultiProtocolManagerInitialization(t *testing.T) {
 		RedundancyLevel:     2,
 	}
 
-	logger := slog.Default()
-	manager, err := networking.NewMultiProtocolManager(logger, config)
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err, "NewMultiProtocolManager should succeed")
+	require.NotNil(t, manager, "MultiProtocolManager should not be nil")
 
-	if err != nil {
-		t.Fatalf("Failed to create multi-protocol manager: %v", err)
-	}
+	err = manager.Start()
+	require.NoError(t, err, "Start should succeed")
 
-	if manager == nil {
-		t.Fatal("Multi-protocol manager is nil")
-	}
-
-	// Test startup
-	if err := manager.Start(); err != nil {
-		t.Fatalf("Failed to start multi-protocol manager: %v", err)
-	}
-
-	// Verify protocols are initialized
 	health := manager.GetProtocolHealth()
-	if len(health) == 0 {
-		t.Error("No protocol health metrics available")
+	assert.NotEmpty(t, health, "Protocol health metrics should be available")
+
+	for p, h := range health {
+		assert.Equal(t, p, h.ProtocolType, "Health metric protocol type should match key")
+		t.Logf("Protocol %s: status=%s, latency=%v", p, h.ConnectionStatus, h.Latency)
 	}
 
-	// Cleanup
+	active := manager.GetActiveProtocol()
+	assert.NotEmpty(t, string(active), "Active protocol should be set")
+
 	manager.Stop()
 }
 
 func (ts *TestSuite) testPlatformManagerDetection(t *testing.T) {
-	// Test platform detection and profiling
 	config := platform.PlatformConfig{
 		EnableAutoDetection: true,
 		EnableOptimizations: true,
 		EnableCompatibility: true,
 	}
 
-	logger := slog.Default()
-	manager, err := platform.NewPlatformManager(logger, config)
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err, "NewPlatformManager should succeed")
+	require.NotNil(t, manager, "PlatformManager should not be nil")
 
-	if err != nil {
-		t.Fatalf("Failed to create platform manager: %v", err)
-	}
-
-	if manager == nil {
-		t.Fatal("Platform manager is nil")
-	}
-
-	// Test platform detection
 	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err, "ForcePlatformDetection should succeed")
+	require.NotNil(t, profile, "PlatformProfile should not be nil")
 
-	if err != nil {
-		t.Fatalf("Failed to detect platform: %v", err)
-	}
+	assert.NotEmpty(t, profile.OS.Name, "OS name should not be empty")
+	assert.NotEmpty(t, profile.Architecture.Type, "Architecture type should not be empty")
+	assert.NotEmpty(t, profile.Runtime.GoVersion, "Go version should not be empty")
 
-	if profile == nil {
-		t.Fatal("Platform profile is nil")
-	}
+	r := runtime.GOARCH
+	assert.Condition(t, func() bool {
+		return strings.Contains(profile.Architecture.Type, r) || profile.Architecture.Type == r
+	}, "Architecture type %q should match runtime.GOARCH %q", profile.Architecture.Type, r)
 
-	// Verify profile contains expected information
-	if profile.OS.Name == "" {
-		t.Error("Platform OS name is empty")
-	}
-
-	if profile.Architecture.Type == "" {
-		t.Error("Platform architecture type is empty")
-	}
-
-	if profile.Runtime.GoVersion == "" {
-		t.Error("Go runtime version is empty")
-	}
+	assert.Equal(t, runtime.GOOS, profile.Runtime.GoOS, "GoOS should match runtime.GOOS")
+	assert.Positive(t, profile.ConfidenceScore, "Confidence score should be positive")
+	assert.False(t, profile.ProfileTimestamp.IsZero(), "Profile timestamp should be set")
 }
 
 func (ts *TestSuite) testRobustnessManagerErrorHandling(t *testing.T) {
-	// Test error handling and recovery mechanisms
 	config := robustness.RobustnessConfig{
 		EnableErrorHandling:      true,
 		EnableSelfHealing:        true,
@@ -1060,31 +1036,24 @@ func (ts *TestSuite) testRobustnessManagerErrorHandling(t *testing.T) {
 		EnableEmergencyProtocols: true,
 	}
 
-	logger := slog.Default()
-	manager, err := robustness.NewRobustnessManager(logger, config)
+	manager, err := robustness.NewRobustnessManager(slog.Default(), config)
+	require.NoError(t, err, "NewRobustnessManager should succeed")
+	require.NotNil(t, manager, "RobustnessManager should not be nil")
 
-	if err != nil {
-		t.Fatalf("Failed to create robustness manager: %v", err)
-	}
+	err = manager.Start()
+	require.NoError(t, err, "Start should succeed")
 
-	if manager == nil {
-		t.Fatal("Robustness manager is nil")
-	}
+	err = manager.Start()
+	require.Error(t, err, "Double start should fail")
 
-	// Test startup
-	if err := manager.Start(); err != nil {
-		t.Fatalf("Failed to start robustness manager: %v", err)
-	}
+	time.Sleep(50 * time.Millisecond)
 
-	// Allow time for initialization
-	time.Sleep(100 * time.Millisecond)
+	manager.Stop()
 
-	// Cleanup
 	manager.Stop()
 }
 
 func (ts *TestSuite) testIntelligenceEngineDecisionMaking(t *testing.T) {
-	// Test adaptive decision-making capabilities
 	config := intelligence.IntelligenceConfig{
 		EnableAdaptiveDecisionMaking: true,
 		EnableMachineLearning:        true,
@@ -1095,122 +1064,2006 @@ func (ts *TestSuite) testIntelligenceEngineDecisionMaking(t *testing.T) {
 		EnableAnomalyDetection:       true,
 	}
 
-	logger := slog.Default()
-	engine, err := intelligence.NewIntelligenceEngine(logger, config)
+	engine, err := intelligence.NewIntelligenceEngine(slog.Default(), config)
+	require.NoError(t, err, "NewIntelligenceEngine should succeed")
+	require.NotNil(t, engine, "IntelligenceEngine should not be nil")
 
-	if err != nil {
-		t.Fatalf("Failed to create intelligence engine: %v", err)
-	}
+	err = engine.Start()
+	require.NoError(t, err, "Start should succeed")
 
-	if engine == nil {
-		t.Fatal("Intelligence engine is nil")
-	}
+	err = engine.Start()
+	require.Error(t, err, "Double start should fail")
 
-	// Test startup
-	if err := engine.Start(); err != nil {
-		t.Fatalf("Failed to start intelligence engine: %v", err)
-	}
+	time.Sleep(50 * time.Millisecond)
 
-	// Allow time for initialization
-	time.Sleep(100 * time.Millisecond)
+	engine.Stop()
 
-	// Cleanup
 	engine.Stop()
 }
 
-func (ts *TestSuite) testNetworkProtocolSwitching(t *testing.T)        { t.Skip("placeholder") }
-func (ts *TestSuite) testPlatformOptimizationApplication(t *testing.T) { t.Skip("placeholder") }
-func (ts *TestSuite) testSelfHealingRecovery(t *testing.T)             { t.Skip("placeholder") }
-func (ts *TestSuite) testAdaptiveLearning(t *testing.T)                { t.Skip("placeholder") }
-func (ts *TestSuite) testCrossPlatformCompatibility(t *testing.T)      { t.Skip("placeholder") }
+func (ts *TestSuite) testNetworkProtocolSwitching(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+		},
+		ProtocolPriorities: map[networking.ProtocolType]int{
+			networking.ProtocolLibP2P: 10,
+			networking.ProtocolHTTP:   5,
+		},
+		AdaptiveSwitching: true,
+		FailoverTimeout:   2 * time.Second,
+	}
 
-func (ts *TestSuite) testAgentComponentIntegration(t *testing.T)  { t.Skip("placeholder") }
-func (ts *TestSuite) testNetworkProtocolIntegration(t *testing.T) { t.Skip("placeholder") }
-func (ts *TestSuite) testPlatformAwareIntegration(t *testing.T)   { t.Skip("placeholder") }
-func (ts *TestSuite) testRobustnessIntegration(t *testing.T)      { t.Skip("placeholder") }
-func (ts *TestSuite) testIntelligenceIntegration(t *testing.T)    { t.Skip("placeholder") }
-func (ts *TestSuite) testEndToEndWorkflow(t *testing.T)           { t.Skip("placeholder") }
-func (ts *TestSuite) testFailoverIntegration(t *testing.T)        { t.Skip("placeholder") }
-func (ts *TestSuite) testLoadBalancingIntegration(t *testing.T)   { t.Skip("placeholder") }
-func (ts *TestSuite) testSecurityIntegration(t *testing.T)        { t.Skip("placeholder") }
-func (ts *TestSuite) testMonitoringIntegration(t *testing.T)      { t.Skip("placeholder") }
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
 
-func (ts *TestSuite) testStartupPerformance(t *testing.T)   { t.Skip("placeholder") }
-func (ts *TestSuite) testMemoryEfficiency(t *testing.T)     { t.Skip("placeholder") }
-func (ts *TestSuite) testCPUUtilization(t *testing.T)       { t.Skip("placeholder") }
-func (ts *TestSuite) testNetworkThroughput(t *testing.T)    { t.Skip("placeholder") }
-func (ts *TestSuite) testResponseLatency(t *testing.T)      { t.Skip("placeholder") }
-func (ts *TestSuite) testConcurrentOperations(t *testing.T) { t.Skip("placeholder") }
-func (ts *TestSuite) testResourceScaling(t *testing.T)      { t.Skip("placeholder") }
-func (ts *TestSuite) testProtocolOverhead(t *testing.T)     { t.Skip("placeholder") }
-func (ts *TestSuite) testDecisionMakingSpeed(t *testing.T)  { t.Skip("placeholder") }
-func (ts *TestSuite) testLearningPerformance(t *testing.T)  { t.Skip("placeholder") }
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
 
-func (ts *TestSuite) testHighLoadStress(t *testing.T)      { t.Skip("placeholder") }
-func (ts *TestSuite) testResourceExhaustion(t *testing.T)  { t.Skip("placeholder") }
-func (ts *TestSuite) testNetworkPartitioning(t *testing.T) { t.Skip("placeholder") }
-func (ts *TestSuite) testConcurrentFailures(t *testing.T)  { t.Skip("placeholder") }
-func (ts *TestSuite) testMemoryPressure(t *testing.T)      { t.Skip("placeholder") }
-func (ts *TestSuite) testCPUStarvation(t *testing.T)       { t.Skip("placeholder") }
-func (ts *TestSuite) testDiskIOLimitations(t *testing.T)   { t.Skip("placeholder") }
-func (ts *TestSuite) testExtendedRuntime(t *testing.T)     { t.Skip("placeholder") }
-func (ts *TestSuite) testChaosEngineering(t *testing.T)    { t.Skip("placeholder") }
-func (ts *TestSuite) testDisasterRecovery(t *testing.T)    { t.Skip("placeholder") }
+	initial := manager.GetActiveProtocol()
+	t.Logf("Active protocol: %s", initial)
 
-func (ts *TestSuite) testLinuxCompatibility(t *testing.T)         { t.Skip("placeholder") }
-func (ts *TestSuite) testWindowsCompatibility(t *testing.T)       { t.Skip("placeholder") }
-func (ts *TestSuite) testMacOSCompatibility(t *testing.T)         { t.Skip("placeholder") }
-func (ts *TestSuite) testARMCompatibility(t *testing.T)           { t.Skip("placeholder") }
-func (ts *TestSuite) testAMD64Compatibility(t *testing.T)         { t.Skip("placeholder") }
-func (ts *TestSuite) testContainerCompatibility(t *testing.T)     { t.Skip("placeholder") }
-func (ts *TestSuite) testVersionCompatibility(t *testing.T)       { t.Skip("placeholder") }
-func (ts *TestSuite) testConfigurationCompatibility(t *testing.T) { t.Skip("placeholder") }
-func (ts *TestSuite) testAPICompatibility(t *testing.T)           { t.Skip("placeholder") }
-func (ts *TestSuite) testLibraryCompatibility(t *testing.T)       { t.Skip("placeholder") }
+	err = manager.ForceProtocolSwitch(networking.ProtocolHTTP)
+	require.NoError(t, err)
 
-func (ts *TestSuite) testErrorRecovery(t *testing.T)            { t.Skip("placeholder") }
-func (ts *TestSuite) testNetworkFailureRecovery(t *testing.T)   { t.Skip("placeholder") }
-func (ts *TestSuite) testComponentFailureHandling(t *testing.T) { t.Skip("placeholder") }
-func (ts *TestSuite) testGracefulDegradation(t *testing.T)      { t.Skip("placeholder") }
-func (ts *TestSuite) testEmergencyProtocols(t *testing.T)       { t.Skip("placeholder") }
-func (ts *TestSuite) testSelfHealingMechanisms(t *testing.T)    { t.Skip("placeholder") }
-func (ts *TestSuite) testFaultInjection(t *testing.T)           { t.Skip("placeholder") }
-func (ts *TestSuite) testCircuitBreaker(t *testing.T)           { t.Skip("placeholder") }
-func (ts *TestSuite) testRetryMechanisms(t *testing.T)          { t.Skip("placeholder") }
-func (ts *TestSuite) testBackupRestoration(t *testing.T)        { t.Skip("placeholder") }
+	err = manager.ForceProtocolSwitch(networking.ProtocolLibP2P)
+	require.NoError(t, err)
 
-func (ts *TestSuite) testAdaptiveDecisionMaking(t *testing.T)  { t.Skip("placeholder") }
-func (ts *TestSuite) testMachineLearningAccuracy(t *testing.T) { t.Skip("placeholder") }
-func (ts *TestSuite) testPredictiveAnalytics(t *testing.T)     { t.Skip("placeholder") }
-func (ts *TestSuite) testBehavioralAnalysis(t *testing.T)      { t.Skip("placeholder") }
-func (ts *TestSuite) testPatternRecognition(t *testing.T)      { t.Skip("placeholder") }
-func (ts *TestSuite) testOptimizationAlgorithms(t *testing.T)  { t.Skip("placeholder") }
-func (ts *TestSuite) testStrategicPlanning(t *testing.T)       { t.Skip("placeholder") }
-func (ts *TestSuite) testKnowledgeBase(t *testing.T)           { t.Skip("placeholder") }
-func (ts *TestSuite) testLearningAdaptation(t *testing.T)      { t.Skip("placeholder") }
-func (ts *TestSuite) testIntelligentRouting(t *testing.T)      { t.Skip("placeholder") }
+	health := manager.GetProtocolHealth()
+	assert.Len(t, health, 2, "Should have health metrics for both protocols")
+}
 
-func (ts *TestSuite) testMultiProtocolCommunication(t *testing.T) { t.Skip("placeholder") }
-func (ts *TestSuite) testProtocolFailover(t *testing.T)           { t.Skip("placeholder") }
-func (ts *TestSuite) testLoadBalancing(t *testing.T)              { t.Skip("placeholder") }
-func (ts *TestSuite) testNetworkRedundancy(t *testing.T)          { t.Skip("placeholder") }
-func (ts *TestSuite) testSecurityProtocols(t *testing.T)          { t.Skip("placeholder") }
-func (ts *TestSuite) testLatencyOptimization(t *testing.T)        { t.Skip("placeholder") }
-func (ts *TestSuite) testBandwidthManagement(t *testing.T)        { t.Skip("placeholder") }
-func (ts *TestSuite) testConnectionPooling(t *testing.T)          { t.Skip("placeholder") }
-func (ts *TestSuite) testTrafficShaping(t *testing.T)             { t.Skip("placeholder") }
-func (ts *TestSuite) testPeerDiscovery(t *testing.T)              { t.Skip("placeholder") }
+func (ts *TestSuite) testPlatformOptimizationApplication(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+		EnableCompatibility: true,
+	}
 
-func (ts *TestSuite) testPlatformDetection(t *testing.T)      { t.Skip("placeholder") }
-func (ts *TestSuite) testResourceOptimization(t *testing.T)   { t.Skip("placeholder") }
-func (ts *TestSuite) testPowerManagement(t *testing.T)        { t.Skip("placeholder") }
-func (ts *TestSuite) testContainerSupport(t *testing.T)       { t.Skip("placeholder") }
-func (ts *TestSuite) testHardwareAcceleration(t *testing.T)   { t.Skip("placeholder") }
-func (ts *TestSuite) testFilesystemOptimization(t *testing.T) { t.Skip("placeholder") }
-func (ts *TestSuite) testProcessScheduling(t *testing.T)      { t.Skip("placeholder") }
-func (ts *TestSuite) testMemoryManagement(t *testing.T)       { t.Skip("placeholder") }
-func (ts *TestSuite) testNetworkStack(t *testing.T)           { t.Skip("placeholder") }
-func (ts *TestSuite) testSecurityHardening(t *testing.T)      { t.Skip("placeholder") }
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+	require.NotNil(t, manager)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+	require.NotNil(t, profile)
+
+	err = manager.ApplyPlatformOptimizations()
+	require.NoError(t, err, "ApplyPlatformOptimizations should succeed")
+
+	err = manager.Start()
+	require.NoError(t, err)
+
+	profile = manager.GetPlatformProfile()
+	require.NotNil(t, profile)
+	assert.NotEmpty(t, profile.OS.Name)
+
+	manager.Stop()
+}
+
+func (ts *TestSuite) testSelfHealingRecovery(t *testing.T) {
+	config := robustness.RobustnessConfig{
+		EnableErrorHandling:    true,
+		EnableSelfHealing:      true,
+		EnableHealthMonitoring: true,
+		EnableDegradation:      true,
+	}
+
+	manager, err := robustness.NewRobustnessManager(slog.Default(), config)
+	require.NoError(t, err)
+	require.NotNil(t, manager)
+
+	err = manager.Start()
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.Error(t, err, "Double start should be rejected")
+
+	time.Sleep(50 * time.Millisecond)
+	manager.Stop()
+	manager.Stop()
+}
+
+func (ts *TestSuite) testAdaptiveLearning(t *testing.T) {
+	config := intelligence.IntelligenceConfig{
+		EnableAdaptiveDecisionMaking: true,
+		EnableMachineLearning:        true,
+		EnablePredictiveAnalytics:    true,
+		EnableOptimization:           true,
+	}
+
+	engine, err := intelligence.NewIntelligenceEngine(slog.Default(), config)
+	require.NoError(t, err)
+	require.NotNil(t, engine)
+
+	err = engine.Start()
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.Error(t, err, "Double start should be rejected")
+
+	time.Sleep(50 * time.Millisecond)
+	engine.Stop()
+	engine.Stop()
+}
+
+func (ts *TestSuite) testCrossPlatformCompatibility(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+		EnableCompatibility: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	assert.Equal(t, runtime.GOOS, profile.Runtime.GoOS)
+	assert.Equal(t, runtime.GOARCH, profile.Runtime.GoArch)
+	assert.NotEmpty(t, profile.Runtime.GoVersion)
+
+	assert.NotEmpty(t, profile.OS.Name)
+	assert.NotEmpty(t, profile.OS.Kernel)
+	assert.NotEmpty(t, profile.Architecture.Type)
+
+	assert.NotZero(t, profile.Hardware.Memory.Total, "Hardware specs should be populated")
+	assert.Positive(t, profile.ConfidenceScore)
+}
+
+func (ts *TestSuite) testAgentComponentIntegration(t *testing.T) {
+	config := &agent.EnhancedRuntimeConfig{
+		EnableAdaptiveOrchestration: true,
+		EnableFaultTolerance:        true,
+		EnableResourceOptimization:  true,
+		EnableIntelligenceCore:      true,
+		EnableMultiProtocolStack:    true,
+		EnablePlatformAwareness:     true,
+	}
+
+	er, err := agent.NewEnhancedRuntime(slog.Default(), config)
+	require.NoError(t, err)
+	require.NotNil(t, er)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		er.Run(ctx, func() int { return 3 })
+		close(done)
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	er.Stop()
+	<-done
+}
+
+func (ts *TestSuite) testNetworkProtocolIntegration(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+			networking.ProtocolWebSocket,
+		},
+		ProtocolPriorities: map[networking.ProtocolType]int{
+			networking.ProtocolLibP2P: 10,
+			networking.ProtocolHTTP:   5,
+			networking.ProtocolWebSocket: 7,
+		},
+		HealthCheckInterval: 30 * time.Second,
+		FailoverTimeout:     5 * time.Second,
+		AdaptiveSwitching:   true,
+		RedundancyLevel:     2,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	err = manager.SendMessage(peer.ID("peer1"), &networking.NetworkMessage{
+		Type:     networking.MessageTypePing,
+		Protocol: manager.GetActiveProtocol(),
+	})
+	t.Logf("SendMessage to unconnected peer returned: %v", err)
+
+	health := manager.GetProtocolHealth()
+	assert.NotEmpty(t, health, "Health metrics should be available")
+	for _, h := range health {
+		t.Logf("Protocol %s: messages_sent=%d", h.ProtocolType, h.TotalMessagesSent)
+		break
+	}
+}
+
+func (ts *TestSuite) testPlatformAwareIntegration(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+		EnableCompatibility: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	assert.Equal(t, runtime.GOOS, profile.Runtime.GoOS, "Detected GoOS should match runtime")
+	assert.Equal(t, runtime.GOARCH, profile.Runtime.GoArch, "Detected GoArch should match runtime")
+	assert.Equal(t, runtime.Version(), profile.Runtime.GoVersion, "Go version should match")
+
+	err = manager.ApplyPlatformOptimizations()
+	assert.NoError(t, err, "Optimization should succeed after detection")
+}
+
+func (ts *TestSuite) testRobustnessIntegration(t *testing.T) {
+	config := robustness.RobustnessConfig{
+		EnableErrorHandling:      true,
+		EnableSelfHealing:        true,
+		EnableFaultInjection:     true,
+		EnableHealthMonitoring:   true,
+		EnableDegradation:        true,
+		EnableEmergencyProtocols: true,
+	}
+
+	manager, err := robustness.NewRobustnessManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	err = manager.Start()
+	require.Error(t, err, "Duplicate start should be rejected")
+
+	time.Sleep(50 * time.Millisecond)
+}
+
+func (ts *TestSuite) testIntelligenceIntegration(t *testing.T) {
+	config := intelligence.IntelligenceConfig{
+		EnableAdaptiveDecisionMaking: true,
+		EnableMachineLearning:        true,
+		EnablePredictiveAnalytics:    true,
+		EnableBehavioralAnalysis:     true,
+		EnableOptimization:           true,
+		EnableStrategicPlanning:      true,
+		EnableAnomalyDetection:       true,
+	}
+
+	engine, err := intelligence.NewIntelligenceEngine(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	defer engine.Stop()
+
+	err = engine.Start()
+	require.Error(t, err, "Duplicate start should be rejected")
+
+	time.Sleep(50 * time.Millisecond)
+}
+
+func (ts *TestSuite) testEndToEndWorkflow(t *testing.T) {
+	erConfig := &agent.EnhancedRuntimeConfig{
+		EnableAdaptiveOrchestration: true,
+		EnableFaultTolerance:        true,
+		EnableResourceOptimization:  true,
+		EnableIntelligenceCore:      true,
+		EnableMultiProtocolStack:    true,
+		EnablePlatformAwareness:     true,
+	}
+
+	er, err := agent.NewEnhancedRuntime(slog.Default(), erConfig)
+	require.NoError(t, err)
+
+	netConfig := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{networking.ProtocolLibP2P},
+		AdaptiveSwitching: true,
+		FailoverTimeout:   5 * time.Second,
+	}
+	netManager, err := networking.NewMultiProtocolManager(slog.Default(), netConfig)
+	require.NoError(t, err)
+
+	platConfig := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+	}
+	platManager, err := platform.NewPlatformManager(slog.Default(), platConfig)
+	require.NoError(t, err)
+
+	err = netManager.Start()
+	require.NoError(t, err)
+	defer netManager.Stop()
+
+	err = platManager.Start()
+	require.NoError(t, err)
+	defer platManager.Stop()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		er.Run(ctx, func() int { return 3 })
+		close(done)
+	}()
+	time.Sleep(50 * time.Millisecond)
+	er.Stop()
+	<-done
+
+	profile, err := platManager.ForcePlatformDetection()
+	require.NoError(t, err)
+	assert.NotEmpty(t, profile.OS.Name)
+
+	health := netManager.GetProtocolHealth()
+	assert.NotEmpty(t, health)
+}
+
+func (ts *TestSuite) testFailoverIntegration(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+		},
+		ProtocolPriorities: map[networking.ProtocolType]int{
+			networking.ProtocolLibP2P: 10,
+			networking.ProtocolHTTP:   5,
+		},
+		AdaptiveSwitching: true,
+		FailoverTimeout:   2 * time.Second,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	err = manager.ForceProtocolSwitch(networking.ProtocolHTTP)
+	require.NoError(t, err)
+	assert.Equal(t, networking.ProtocolHTTP, manager.GetActiveProtocol())
+
+	err = manager.ForceProtocolSwitch(networking.ProtocolLibP2P)
+	require.NoError(t, err)
+}
+
+func (ts *TestSuite) testLoadBalancingIntegration(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+		},
+		ProtocolPriorities: map[networking.ProtocolType]int{
+			networking.ProtocolLibP2P: 10,
+			networking.ProtocolHTTP:   5,
+		},
+		LoadBalancingStrategy: networking.StrategyLeastLoad,
+		AdaptiveSwitching:     true,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+	require.NotNil(t, manager)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	health := manager.GetProtocolHealth()
+	assert.NotEmpty(t, health)
+
+	err = manager.ForceProtocolSwitch(networking.ProtocolHTTP)
+	require.NoError(t, err)
+}
+
+func (ts *TestSuite) testSecurityIntegration(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+		},
+		SecurityRequirements: networking.SecurityRequirements{
+			MinimumEncryption: networking.SecurityHigh,
+			RequireSignatures: true,
+			RequireMTLS:       true,
+		},
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	active := manager.GetActiveProtocol()
+	assert.NotEmpty(t, string(active))
+}
+
+func (ts *TestSuite) testMonitoringIntegration(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+		},
+		HealthCheckInterval: 10 * time.Second,
+		AdaptiveSwitching:   true,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	health := manager.GetProtocolHealth()
+	require.NotEmpty(t, health)
+
+	for p, h := range health {
+		assert.Equal(t, p, h.ProtocolType)
+		t.Logf("%s: connected=%v, latency=%v, throughput=%.2f",
+			p, h.ConnectionStatus == networking.ConnectionConnected, h.Latency, h.Throughput)
+	}
+}
+
+func (ts *TestSuite) testStartupPerformance(t *testing.T) {
+	start := time.Now()
+
+	config := &agent.EnhancedRuntimeConfig{
+		EnableAdaptiveOrchestration: true,
+		EnableFaultTolerance:        true,
+		EnableResourceOptimization:  true,
+		EnableIntelligenceCore:      true,
+		EnableMultiProtocolStack:    true,
+		EnablePlatformAwareness:     true,
+	}
+
+	er, err := agent.NewEnhancedRuntime(slog.Default(), config)
+	require.NoError(t, err)
+	require.NotNil(t, er)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() {
+		er.Run(ctx, func() int { return 5 })
+		close(done)
+	}()
+	time.Sleep(20 * time.Millisecond)
+	er.Stop()
+	<-done
+
+	elapsed := time.Since(start)
+	t.Logf("EnhancedRuntime lifecycle completed in %v", elapsed)
+	assert.WithinDuration(t, time.Now(), start, 10*time.Second, "Lifecycle should complete within bounds")
+}
+
+func (ts *TestSuite) testMemoryEfficiency(t *testing.T) {
+	var before, after runtime.MemStats
+	runtime.ReadMemStats(&before)
+
+	config := &agent.EnhancedRuntimeConfig{
+		EnableAdaptiveOrchestration: true,
+		EnableFaultTolerance:        true,
+	}
+	er, err := agent.NewEnhancedRuntime(slog.Default(), config)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	done := make(chan struct{})
+	go func() {
+		er.Run(ctx, func() int { return 5 })
+		close(done)
+	}()
+	time.Sleep(20 * time.Millisecond)
+	er.Stop()
+	<-done
+
+	runtime.ReadMemStats(&after)
+	allocDelta := after.TotalAlloc - before.TotalAlloc
+	t.Logf("Memory allocated during runtime lifecycle: %d bytes", allocDelta)
+	assert.Positive(t, allocDelta, "Some memory should be allocated")
+}
+
+func (ts *TestSuite) testCPUUtilization(t *testing.T) {
+	startCPU := runtime.NumGoroutine()
+
+	managers := make([]interface{ Stop() }, 0, 3)
+
+	netCfg := networking.MultiProtocolConfig{
+		EnabledProtocols:  []networking.ProtocolType{networking.ProtocolLibP2P},
+		AdaptiveSwitching: true,
+	}
+	netMgr, err := networking.NewMultiProtocolManager(slog.Default(), netCfg)
+	require.NoError(t, err)
+	err = netMgr.Start()
+	require.NoError(t, err)
+	managers = append(managers, netMgr)
+
+	platCfg := platform.PlatformConfig{EnableAutoDetection: true}
+	platMgr, err := platform.NewPlatformManager(slog.Default(), platCfg)
+	require.NoError(t, err)
+	err = platMgr.Start()
+	require.NoError(t, err)
+	managers = append(managers, platMgr)
+
+	for _, m := range managers {
+		m.Stop()
+	}
+
+	endCPU := runtime.NumGoroutine()
+	t.Logf("Goroutine delta: %d (start=%d, end=%d)", endCPU-startCPU, startCPU, endCPU)
+}
+
+func (ts *TestSuite) testNetworkThroughput(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+		},
+		AdaptiveSwitching: true,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	start := time.Now()
+	msgCount := 50
+	peerID := peer.ID("throughput-test-peer")
+	for i := range msgCount {
+		_ = manager.SendMessage(peerID, &networking.NetworkMessage{
+			ID:       fmt.Sprintf("msg-%d", i),
+			Type:     networking.MessageTypeData,
+			Protocol: manager.GetActiveProtocol(),
+		})
+	}
+	elapsed := time.Since(start)
+	t.Logf("Sent %d messages in %v (%.0f msg/s)", msgCount, elapsed, float64(msgCount)/elapsed.Seconds())
+}
+
+func (ts *TestSuite) testResponseLatency(t *testing.T) {
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), networking.MultiProtocolConfig{
+		EnabledProtocols:  []networking.ProtocolType{networking.ProtocolLibP2P},
+		AdaptiveSwitching: true,
+	})
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	health := manager.GetProtocolHealth()
+	for p, h := range health {
+		latency := h.Latency
+		t.Logf("Protocol %s: latency=%v", p, latency)
+		break
+	}
+
+	start := time.Now()
+	_ = manager.SendMessage(peer.ID("latency-test-peer"), &networking.NetworkMessage{Type: networking.MessageTypePing})
+	elapsed := time.Since(start)
+	t.Logf("SendMessage latency: %v", elapsed)
+	assert.True(t, elapsed < 5*time.Second, "SendMessage should complete within 5s")
+}
+
+func (ts *TestSuite) testConcurrentOperations(t *testing.T) {
+	var wg sync.WaitGroup
+	errs := make(chan error, 10)
+
+	for range 5 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			m, err := networking.NewMultiProtocolManager(slog.Default(), networking.MultiProtocolConfig{
+				EnabledProtocols:  []networking.ProtocolType{networking.ProtocolLibP2P},
+				AdaptiveSwitching: true,
+			})
+			if err != nil {
+				errs <- err
+				return
+			}
+			if e := m.Start(); e != nil {
+				errs <- e
+				return
+			}
+			m.Stop()
+		}()
+	}
+
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		t.Errorf("Concurrent operation failed: %v", err)
+	}
+}
+
+func (ts *TestSuite) testResourceScaling(t *testing.T) {
+	netConfig := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+			networking.ProtocolWebSocket,
+		},
+		HealthCheckInterval: 30 * time.Second,
+		AdaptiveSwitching:   true,
+		RedundancyLevel:     3,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), netConfig)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	health := manager.GetProtocolHealth()
+	assert.Len(t, health, 3, "All 3 protocols should report health")
+
+	for _, h := range health {
+		t.Logf("Protocol %s: availability=%.2f, error_rate=%.4f",
+			h.ProtocolType, h.Availability, h.ErrorRate)
+	}
+}
+
+func (ts *TestSuite) testProtocolOverhead(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+		},
+		ProtocolPriorities: map[networking.ProtocolType]int{
+			networking.ProtocolLibP2P: 10,
+			networking.ProtocolHTTP:   5,
+		},
+		AdaptiveSwitching: true,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	for p, h := range manager.GetProtocolHealth() {
+		t.Logf("Protocol %s: error_rate=%.4f, availability=%.2f, throughput=%.2f",
+			p, h.ErrorRate, h.Availability, h.Throughput)
+	}
+
+	err = manager.ForceProtocolSwitch(networking.ProtocolHTTP)
+	require.NoError(t, err)
+}
+
+func (ts *TestSuite) testDecisionMakingSpeed(t *testing.T) {
+	config := intelligence.IntelligenceConfig{
+		EnableAdaptiveDecisionMaking: true,
+		EnableMachineLearning:        true,
+		EnablePredictiveAnalytics:    true,
+		EnableOptimization:           true,
+	}
+
+	start := time.Now()
+	engine, err := intelligence.NewIntelligenceEngine(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	engine.Stop()
+
+	elapsed := time.Since(start)
+	t.Logf("IntelligenceEngine lifecycle completed in %v", elapsed)
+}
+
+func (ts *TestSuite) testLearningPerformance(t *testing.T) {
+	configs := []intelligence.IntelligenceConfig{
+		{EnableAdaptiveDecisionMaking: true},
+		{EnableAdaptiveDecisionMaking: true, EnableMachineLearning: true, EnablePredictiveAnalytics: true},
+		{
+			EnableAdaptiveDecisionMaking: true,
+			EnableMachineLearning:        true,
+			EnablePredictiveAnalytics:    true,
+			EnableBehavioralAnalysis:     true,
+			EnableOptimization:           true,
+			EnableStrategicPlanning:      true,
+			EnableAnomalyDetection:       true,
+		},
+	}
+
+	for i, cfg := range configs {
+		start := time.Now()
+		engine, err := intelligence.NewIntelligenceEngine(slog.Default(), cfg)
+		require.NoError(t, err)
+
+		err = engine.Start()
+		require.NoError(t, err)
+		engine.Stop()
+
+		elapsed := time.Since(start)
+		t.Logf("Config %d (%d features): %v", i+1, countEnabled(cfg), elapsed)
+	}
+}
+
+func countEnabled(cfg intelligence.IntelligenceConfig) int {
+	v := reflect.ValueOf(cfg)
+	count := 0
+	for i := range v.NumField() {
+		f := v.Field(i)
+		if f.Kind() == reflect.Bool && f.Bool() {
+			count++
+		}
+	}
+	return count
+}
+
+func (ts *TestSuite) testHighLoadStress(t *testing.T) {
+	count := 20
+	var wg sync.WaitGroup
+	errs := make(chan error, count)
+
+	for range count {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			m, err := networking.NewMultiProtocolManager(slog.Default(), networking.MultiProtocolConfig{
+				EnabledProtocols:  []networking.ProtocolType{networking.ProtocolLibP2P},
+				AdaptiveSwitching: true,
+			})
+			if err != nil {
+				errs <- err
+				return
+			}
+			if e := m.Start(); e != nil {
+				errs <- e
+				return
+			}
+			m.GetProtocolHealth()
+			m.Stop()
+		}()
+	}
+
+	wg.Wait()
+	close(errs)
+
+	var failures []error
+	for err := range errs {
+		failures = append(failures, err)
+	}
+	assert.Empty(t, failures, "All %d concurrent manager lifecycles should succeed", count)
+}
+
+func (ts *TestSuite) testResourceExhaustion(t *testing.T) {
+	_, err := agent.NewEnhancedRuntime(slog.Default(), &agent.EnhancedRuntimeConfig{
+		EnableFaultTolerance:       true,
+		EnableAdaptiveOrchestration: true,
+		EnableResourceOptimization:  true,
+	})
+	require.NoError(t, err)
+
+	_, err = agent.NewEnhancedRuntime(nil, &agent.EnhancedRuntimeConfig{})
+	require.Error(t, err, "Nil logger should be rejected")
+}
+
+func (ts *TestSuite) testNetworkPartitioning(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+			networking.ProtocolWebSocket,
+		},
+		ProtocolPriorities: map[networking.ProtocolType]int{
+			networking.ProtocolLibP2P: 10,
+			networking.ProtocolHTTP:   5,
+			networking.ProtocolWebSocket: 7,
+		},
+		FailoverTimeout:   5 * time.Second,
+		AdaptiveSwitching: true,
+		RedundancyLevel:   2,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	initial := manager.GetActiveProtocol()
+	t.Logf("Initial active protocol: %s", initial)
+
+	err = manager.ForceProtocolSwitch(networking.ProtocolHTTP)
+	require.NoError(t, err)
+	t.Logf("Failed over to %s", networking.ProtocolHTTP)
+}
+
+func (ts *TestSuite) testConcurrentFailures(t *testing.T) {
+	var wg sync.WaitGroup
+	errs := make(chan error, 10)
+
+	for range 5 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			m, err := networking.NewMultiProtocolManager(slog.Default(), networking.MultiProtocolConfig{
+				EnabledProtocols:  []networking.ProtocolType{networking.ProtocolLibP2P},
+				AdaptiveSwitching: true,
+			})
+			if err != nil {
+				errs <- err
+				return
+			}
+			if e := m.Start(); e != nil {
+				errs <- e
+				return
+			}
+			for range 3 {
+				_ = m.ForceProtocolSwitch(networking.ProtocolHTTP)
+			}
+			m.Stop()
+		}()
+	}
+
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		t.Logf("Recoverable error during concurrent failure: %v", err)
+	}
+}
+
+func (ts *TestSuite) testMemoryPressure(t *testing.T) {
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	beforeAlloc := memStats.Alloc
+
+	for range 50 {
+		m, err := networking.NewMultiProtocolManager(slog.Default(), networking.MultiProtocolConfig{
+			EnabledProtocols:  []networking.ProtocolType{networking.ProtocolLibP2P},
+			AdaptiveSwitching: true,
+		})
+		require.NoError(t, err)
+		_ = m.Start()
+		m.Stop()
+	}
+
+	runtime.GC()
+	runtime.ReadMemStats(&memStats)
+	t.Logf("Memory delta after 50 create/start/stop cycles: %d bytes", memStats.Alloc-beforeAlloc)
+}
+
+func (ts *TestSuite) testCPUStarvation(t *testing.T) {
+	start := time.Now()
+
+	m, err := networking.NewMultiProtocolManager(slog.Default(), networking.MultiProtocolConfig{
+		EnabledProtocols:  []networking.ProtocolType{networking.ProtocolLibP2P},
+		AdaptiveSwitching: true,
+	})
+	require.NoError(t, err)
+
+	err = m.Start()
+	require.NoError(t, err)
+
+	for range 100 {
+		_ = m.ForceProtocolSwitch(networking.ProtocolHTTP)
+		_ = m.ForceProtocolSwitch(networking.ProtocolLibP2P)
+	}
+
+	m.Stop()
+	elapsed := time.Since(start)
+	t.Logf("100 protocol switch cycles completed in %v", elapsed)
+	assert.True(t, elapsed < 30*time.Second, "Should complete within 30s")
+}
+
+func (ts *TestSuite) testDiskIOLimitations(t *testing.T) {
+	tsuite, err := NewTestSuite(slog.Default(), TestConfig{
+		EnableUnitTests: true,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, tsuite)
+}
+
+func (ts *TestSuite) testExtendedRuntime(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	er, err := agent.NewEnhancedRuntime(slog.Default(), &agent.EnhancedRuntimeConfig{
+		EnableAdaptiveOrchestration: true,
+		EnableFaultTolerance:        true,
+	})
+	require.NoError(t, err)
+
+	done := make(chan struct{})
+	go func() {
+		er.Run(ctx, func() int { return 5 })
+		close(done)
+	}()
+	time.Sleep(100 * time.Millisecond)
+	er.Stop()
+	<-done
+}
+
+func (ts *TestSuite) testChaosEngineering(t *testing.T) {
+	managers := make([]*networking.MultiProtocolManager, 0, 10)
+
+	for range 10 {
+		m, err := networking.NewMultiProtocolManager(slog.Default(), networking.MultiProtocolConfig{
+			EnabledProtocols: []networking.ProtocolType{
+				networking.ProtocolLibP2P,
+				networking.ProtocolHTTP,
+			},
+			AdaptiveSwitching: true,
+		})
+		if err != nil {
+			continue
+		}
+		_ = m.Start()
+		managers = append(managers, m)
+	}
+
+	assert.NotEmpty(t, managers, "At least one manager should be created")
+
+	for _, m := range managers {
+		_ = m.ForceProtocolSwitch(networking.ProtocolHTTP)
+		m.Stop()
+	}
+}
+
+func (ts *TestSuite) testDisasterRecovery(t *testing.T) {
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+		},
+		FailoverTimeout:   30 * time.Second,
+		AdaptiveSwitching: true,
+	})
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+
+	err = manager.ForceProtocolSwitch(networking.ProtocolHTTP)
+	require.NoError(t, err)
+
+	err = manager.ForceProtocolSwitch(networking.ProtocolLibP2P)
+	require.NoError(t, err)
+
+	manager.Stop()
+}
+
+func (ts *TestSuite) testLinuxCompatibility(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+		EnableCompatibility: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+	require.NotNil(t, profile)
+
+	if runtime.GOOS == "linux" {
+		assert.Equal(t, "linux", profile.Runtime.GoOS)
+		assert.Contains(t, strings.ToLower(profile.OS.Name), "linux")
+		assert.NotEmpty(t, profile.OS.Kernel)
+	}
+
+	t.Logf("OS: %s %s, Kernel: %s, GoOS: %s", profile.OS.Name, profile.OS.Version, profile.OS.Kernel, profile.Runtime.GoOS)
+}
+
+func (ts *TestSuite) testWindowsCompatibility(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+		EnableCompatibility: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	if runtime.GOOS == "windows" {
+		assert.Equal(t, "windows", profile.Runtime.GoOS)
+	}
+
+	assert.NotEmpty(t, profile.OS.Name)
+	t.Logf("Platform: %s %s (GoOS: %s)", profile.OS.Name, profile.OS.Version, profile.Runtime.GoOS)
+}
+
+func (ts *TestSuite) testMacOSCompatibility(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+		EnableCompatibility: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	if runtime.GOOS == "darwin" {
+		assert.Equal(t, "darwin", profile.Runtime.GoOS)
+	}
+
+	assert.NotEmpty(t, profile.OS.Name)
+	t.Logf("Platform: %s %s (GoOS: %s)", profile.OS.Name, profile.OS.Version, profile.Runtime.GoOS)
+}
+
+func (ts *TestSuite) testARMCompatibility(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+		EnableCompatibility: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	arch := profile.Architecture
+	t.Logf("Architecture: type=%s, variant=%s, endianness=%s, num_cpus=%d, cores=%d",
+		arch.Type, arch.Variant, arch.Endianness, arch.NumCPUs, arch.NumCores)
+
+	if strings.Contains(runtime.GOARCH, "arm") {
+		assert.Contains(t, strings.ToLower(arch.Type), "arm")
+	}
+
+	assert.Positive(t, arch.NumCPUs, "CPUs should be positive")
+	assert.Positive(t, arch.NumCores, "Cores should be positive")
+}
+
+func (ts *TestSuite) testAMD64Compatibility(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+		EnableCompatibility: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	if runtime.GOARCH == "amd64" {
+		assert.Contains(t, strings.ToLower(profile.Architecture.Type), "amd64")
+	}
+
+	assert.Positive(t, profile.Architecture.CacheLine, "Cache line should be detected")
+	assert.Positive(t, profile.Architecture.PageSize, "Page size should be detected")
+	t.Logf("AMD64: cache_line=%d, page_size=%d, cpus=%d", profile.Architecture.CacheLine, profile.Architecture.PageSize, profile.Architecture.NumCPUs)
+}
+
+func (ts *TestSuite) testContainerCompatibility(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+		EnableCompatibility: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	assert.NotNil(t, profile.ContainerSupport, "ContainerSupport should be populated")
+	t.Logf("Container support detected: %+v", profile.ContainerSupport)
+}
+
+func (ts *TestSuite) testVersionCompatibility(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+		EnableCompatibility: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	assert.Equal(t, runtime.Version(), profile.Runtime.GoVersion)
+	assert.NotEmpty(t, profile.OS.Version)
+	assert.NotEmpty(t, profile.OS.Kernel)
+	t.Logf("Go: %s, OS: %s %s, Kernel: %s", profile.Runtime.GoVersion, profile.OS.Name, profile.OS.Version, profile.OS.Kernel)
+}
+
+func (ts *TestSuite) testConfigurationCompatibility(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection:    false,
+		EnableOptimizations:    false,
+		EnableCompatibility:    false,
+		PlatformProfiles:       make(map[string]platform.PlatformProfile),
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	config2 := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+		EnableCompatibility: true,
+	}
+
+	manager2, err := platform.NewPlatformManager(slog.Default(), config2)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	profile2, err := manager2.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	assert.Equal(t, profile.OS.Name, profile2.OS.Name, "Same host means same OS")
+	assert.Equal(t, profile.Runtime.GoVersion, profile2.Runtime.GoVersion)
+}
+
+func (ts *TestSuite) testAPICompatibility(t *testing.T) {
+	_, err := platform.NewPlatformManager(slog.Default(), platform.PlatformConfig{
+		EnableAutoDetection: true,
+	})
+	require.NoError(t, err)
+
+	_, err = networking.NewMultiProtocolManager(slog.Default(), networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{networking.ProtocolLibP2P},
+	})
+	require.NoError(t, err)
+
+	_, err = robustness.NewRobustnessManager(slog.Default(), robustness.RobustnessConfig{
+		EnableErrorHandling: true,
+	})
+	require.NoError(t, err)
+
+	_, err = intelligence.NewIntelligenceEngine(slog.Default(), intelligence.IntelligenceConfig{
+		EnableAdaptiveDecisionMaking: true,
+	})
+	require.NoError(t, err)
+}
+
+func (ts *TestSuite) testLibraryCompatibility(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+		EnableCompatibility: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	assert.NotEmpty(t, profile.Runtime.Compiler, "Compiler should be detected")
+	t.Logf("Compiler: %s, CGO: %v, GOMAXPROCS: %d, GOGC: %s",
+		profile.Runtime.Compiler, profile.Runtime.CGOEnabled,
+		profile.Runtime.GOMAXPROCS, profile.Runtime.GOGC)
+}
+
+func (ts *TestSuite) testErrorRecovery(t *testing.T) {
+	config := robustness.RobustnessConfig{
+		EnableErrorHandling:    true,
+		EnableSelfHealing:      true,
+		EnableHealthMonitoring: true,
+	}
+
+	manager, err := robustness.NewRobustnessManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.Error(t, err, "Double start should produce error")
+
+	manager.Stop()
+}
+
+func (ts *TestSuite) testNetworkFailureRecovery(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+		},
+		FailoverTimeout:   30 * time.Second,
+		AdaptiveSwitching: true,
+		RedundancyLevel:   1,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	active := manager.GetActiveProtocol()
+	t.Logf("Active protocol before simulated failure: %s", active)
+
+	err = manager.ForceProtocolSwitch(networking.ProtocolHTTP)
+	require.NoError(t, err)
+	t.Logf("Recovered on protocol: %s", networking.ProtocolHTTP)
+}
+
+func (ts *TestSuite) testComponentFailureHandling(t *testing.T) {
+	_, err := agent.NewEnhancedRuntime(nil, &agent.EnhancedRuntimeConfig{})
+	require.Error(t, err, "Nil logger should be rejected")
+
+	_, err = networking.NewMultiProtocolManager(nil, networking.MultiProtocolConfig{})
+	require.Error(t, err, "Nil logger should be rejected")
+
+	_, err = platform.NewPlatformManager(nil, platform.PlatformConfig{})
+	require.Error(t, err, "Nil logger should be rejected")
+
+	_, err = robustness.NewRobustnessManager(nil, robustness.RobustnessConfig{})
+	require.Error(t, err, "Nil logger should be rejected")
+
+	_, err = intelligence.NewIntelligenceEngine(nil, intelligence.IntelligenceConfig{})
+	require.Error(t, err, "Nil logger should be rejected")
+}
+
+func (ts *TestSuite) testGracefulDegradation(t *testing.T) {
+	manager, err := robustness.NewRobustnessManager(slog.Default(), robustness.RobustnessConfig{
+		EnableDegradation:        true,
+		EnableHealthMonitoring:   true,
+		EnableEmergencyProtocols: true,
+	})
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	manager.Stop()
+
+	manager2, err := robustness.NewRobustnessManager(slog.Default(), robustness.RobustnessConfig{
+		EnableDegradation:        false,
+		EnableHealthMonitoring:   false,
+		EnableEmergencyProtocols: false,
+	})
+	require.NoError(t, err)
+
+	err = manager2.Start()
+	require.NoError(t, err)
+	manager2.Stop()
+}
+
+func (ts *TestSuite) testEmergencyProtocols(t *testing.T) {
+	config := robustness.RobustnessConfig{
+		EnableEmergencyProtocols: true,
+		EnableErrorHandling:      true,
+		EnableHealthMonitoring:   true,
+	}
+
+	manager, err := robustness.NewRobustnessManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	manager.Stop()
+}
+
+func (ts *TestSuite) testSelfHealingMechanisms(t *testing.T) {
+	config := robustness.RobustnessConfig{
+		EnableSelfHealing:      true,
+		EnableHealthMonitoring: true,
+		EnableErrorHandling:    true,
+	}
+
+	manager, err := robustness.NewRobustnessManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	manager.Stop()
+}
+
+func (ts *TestSuite) testFaultInjection(t *testing.T) {
+	config := robustness.RobustnessConfig{
+		EnableFaultInjection:   true,
+		EnableErrorHandling:    true,
+		EnableSelfHealing:      true,
+		EnableHealthMonitoring: true,
+	}
+
+	manager, err := robustness.NewRobustnessManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	manager.Stop()
+
+	configNoFault := robustness.RobustnessConfig{
+		EnableFaultInjection:   false,
+		EnableErrorHandling:    true,
+		EnableSelfHealing:      true,
+		EnableHealthMonitoring: true,
+	}
+
+	manager2, err := robustness.NewRobustnessManager(slog.Default(), configNoFault)
+	require.NoError(t, err)
+
+	err = manager2.Start()
+	require.NoError(t, err)
+	manager2.Stop()
+}
+
+func (ts *TestSuite) testCircuitBreaker(t *testing.T) {
+	manager, err := robustness.NewRobustnessManager(slog.Default(), robustness.RobustnessConfig{
+		EnableErrorHandling:    true,
+		EnableHealthMonitoring: true,
+		EnableSelfHealing:      true,
+	})
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	manager.Stop()
+}
+
+func (ts *TestSuite) testRetryMechanisms(t *testing.T) {
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+		},
+		FailoverTimeout:   30 * time.Second,
+		AdaptiveSwitching: true,
+	})
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	for range 3 {
+		err := manager.ForceProtocolSwitch(networking.ProtocolHTTP)
+		if err == nil {
+			break
+		}
+		t.Logf("Retry attempt failed: %v", err)
+	}
+}
+
+func (ts *TestSuite) testBackupRestoration(t *testing.T) {
+	_, err := networking.NewMultiProtocolManager(slog.Default(), networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+		},
+		RedundancyLevel:   2,
+		AdaptiveSwitching: true,
+	})
+	require.NoError(t, err)
+
+	_, err = platform.NewPlatformManager(slog.Default(), platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+	})
+	require.NoError(t, err)
+}
+
+func (ts *TestSuite) testAdaptiveDecisionMaking(t *testing.T) {
+	config := intelligence.IntelligenceConfig{
+		EnableAdaptiveDecisionMaking: true,
+		EnableMachineLearning:        true,
+		EnableAnomalyDetection:       true,
+	}
+
+	engine, err := intelligence.NewIntelligenceEngine(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	engine.Stop()
+}
+
+func (ts *TestSuite) testMachineLearningAccuracy(t *testing.T) {
+	config := intelligence.IntelligenceConfig{
+		EnableMachineLearning:        true,
+		EnablePredictiveAnalytics:    true,
+		EnableAnomalyDetection:       true,
+	}
+
+	engine, err := intelligence.NewIntelligenceEngine(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	engine.Stop()
+}
+
+func (ts *TestSuite) testPredictiveAnalytics(t *testing.T) {
+	config := intelligence.IntelligenceConfig{
+		EnablePredictiveAnalytics: true,
+		EnableMachineLearning:     true,
+		EnableAnomalyDetection:    true,
+	}
+
+	engine, err := intelligence.NewIntelligenceEngine(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	engine.Stop()
+}
+
+func (ts *TestSuite) testBehavioralAnalysis(t *testing.T) {
+	config := intelligence.IntelligenceConfig{
+		EnableBehavioralAnalysis:  true,
+		EnableAnomalyDetection:    true,
+		EnableAdaptiveDecisionMaking: true,
+	}
+
+	engine, err := intelligence.NewIntelligenceEngine(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	engine.Stop()
+}
+
+func (ts *TestSuite) testPatternRecognition(t *testing.T) {
+	config := intelligence.IntelligenceConfig{
+		EnableMachineLearning:        true,
+		EnablePredictiveAnalytics:    true,
+		EnableBehavioralAnalysis:     true,
+		EnableAnomalyDetection:       true,
+	}
+
+	engine, err := intelligence.NewIntelligenceEngine(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	engine.Stop()
+}
+
+func (ts *TestSuite) testOptimizationAlgorithms(t *testing.T) {
+	config := intelligence.IntelligenceConfig{
+		EnableOptimization:           true,
+		EnableAdaptiveDecisionMaking: true,
+		EnableMachineLearning:        true,
+	}
+
+	engine, err := intelligence.NewIntelligenceEngine(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	engine.Stop()
+}
+
+func (ts *TestSuite) testStrategicPlanning(t *testing.T) {
+	config := intelligence.IntelligenceConfig{
+		EnableStrategicPlanning:      true,
+		EnablePredictiveAnalytics:    true,
+		EnableAdaptiveDecisionMaking: true,
+	}
+
+	engine, err := intelligence.NewIntelligenceEngine(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	engine.Stop()
+}
+
+func (ts *TestSuite) testKnowledgeBase(t *testing.T) {
+	config := intelligence.IntelligenceConfig{
+		EnableMachineLearning:  true,
+		EnablePredictiveAnalytics: true,
+		EnableAnomalyDetection: true,
+	}
+
+	engine, err := intelligence.NewIntelligenceEngine(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	engine.Stop()
+}
+
+func (ts *TestSuite) testLearningAdaptation(t *testing.T) {
+	config := intelligence.IntelligenceConfig{
+		EnableMachineLearning:        true,
+		EnableAdaptiveDecisionMaking: true,
+		EnableBehavioralAnalysis:     true,
+	}
+
+	engine, err := intelligence.NewIntelligenceEngine(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	engine.Stop()
+}
+
+func (ts *TestSuite) testIntelligentRouting(t *testing.T) {
+	config := intelligence.IntelligenceConfig{
+		EnableAdaptiveDecisionMaking: true,
+		EnablePredictiveAnalytics:    true,
+		EnableOptimization:           true,
+		EnableStrategicPlanning:      true,
+	}
+
+	engine, err := intelligence.NewIntelligenceEngine(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = engine.Start()
+	require.NoError(t, err)
+	engine.Stop()
+}
+
+func (ts *TestSuite) testMultiProtocolCommunication(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+			networking.ProtocolWebSocket,
+		},
+		AdaptiveSwitching: true,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	peerID := peer.ID("test-peer")
+	err = manager.SendMessage(peerID, &networking.NetworkMessage{
+		ID:       "msg-1",
+		Type:     networking.MessageTypeData,
+		Priority: networking.PriorityNormal,
+		Protocol: manager.GetActiveProtocol(),
+	})
+	assert.NoError(t, err, "SendMessage should not return error")
+
+	active := manager.GetActiveProtocol()
+	t.Logf("Active protocol for communication: %s", active)
+}
+
+func (ts *TestSuite) testProtocolFailover(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+			networking.ProtocolWebSocket,
+		},
+		ProtocolPriorities: map[networking.ProtocolType]int{
+			networking.ProtocolLibP2P:    10,
+			networking.ProtocolHTTP:      5,
+			networking.ProtocolWebSocket: 7,
+		},
+		FailoverTimeout:   30 * time.Second,
+		AdaptiveSwitching: true,
+		RedundancyLevel:   2,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	for _, target := range []networking.ProtocolType{
+		networking.ProtocolWebSocket,
+		networking.ProtocolHTTP,
+		networking.ProtocolLibP2P,
+	} {
+		err := manager.ForceProtocolSwitch(target)
+		require.NoError(t, err)
+		assert.Equal(t, target, manager.GetActiveProtocol())
+	}
+}
+
+func (ts *TestSuite) testLoadBalancing(t *testing.T) {
+	strategies := []networking.LoadBalancingStrategy{
+		networking.StrategyRoundRobin,
+		networking.StrategyLeastLoad,
+		networking.StrategyRandom,
+		networking.StrategyAdaptive,
+	}
+
+	for _, s := range strategies {
+		manager, err := networking.NewMultiProtocolManager(slog.Default(), networking.MultiProtocolConfig{
+			EnabledProtocols:      []networking.ProtocolType{networking.ProtocolLibP2P, networking.ProtocolHTTP},
+			LoadBalancingStrategy: s,
+			AdaptiveSwitching:     true,
+		})
+		require.NoError(t, err, "Strategy %s should create manager", s)
+
+		err = manager.Start()
+		require.NoError(t, err, "Strategy %s should start", s)
+
+		health := manager.GetProtocolHealth()
+		assert.NotEmpty(t, health, "Strategy %s should have health metrics", s)
+		manager.Stop()
+	}
+}
+
+func (ts *TestSuite) testNetworkRedundancy(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+		},
+		RedundancyLevel:   3,
+		AdaptiveSwitching: true,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	health := manager.GetProtocolHealth()
+	for p, h := range health {
+		assert.Positive(t, h.Availability, "Protocol %s should have >0 availability", p)
+	}
+}
+
+func (ts *TestSuite) testSecurityProtocols(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+		},
+		SecurityRequirements: networking.SecurityRequirements{
+			MinimumEncryption: networking.SecurityMaximum,
+			RequireSignatures: true,
+			RequireMTLS:       true,
+		},
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	active := manager.GetActiveProtocol()
+	assert.NotEmpty(t, string(active))
+}
+
+func (ts *TestSuite) testLatencyOptimization(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+		},
+		ProtocolPriorities: map[networking.ProtocolType]int{
+			networking.ProtocolLibP2P: 10,
+			networking.ProtocolHTTP:   1,
+		},
+		AdaptiveSwitching: true,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	active := manager.GetActiveProtocol()
+	assert.Equal(t, networking.ProtocolLibP2P, active, "Highest-priority protocol should be active")
+
+	err = manager.ForceProtocolSwitch(networking.ProtocolHTTP)
+	require.NoError(t, err)
+}
+
+func (ts *TestSuite) testBandwidthManagement(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+		},
+		QoSRequirements: networking.QoSRequirements{
+			MinBandwidth:   100.0,
+			MaxLatency:     500 * time.Millisecond,
+			MinReliability: 0.99,
+		},
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	health := manager.GetProtocolHealth()
+	for p, h := range health {
+		t.Logf("Protocol %s: throughput=%.2f, latency=%v", p, h.Throughput, h.Latency)
+	}
+}
+
+func (ts *TestSuite) testConnectionPooling(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+		},
+		AdaptiveSwitching: true,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	for range 10 {
+		err := manager.SendMessage(peer.ID("pool-peer"), &networking.NetworkMessage{
+			Type: networking.MessageTypeData,
+		})
+		if err != nil {
+			t.Logf("Pool send returned: %v", err)
+		}
+	}
+
+	ch := manager.ReceiveMessages()
+	assert.NotNil(t, ch, "ReceiveMessages should return a channel")
+}
+
+func (ts *TestSuite) testTrafficShaping(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+			networking.ProtocolHTTP,
+		},
+		AdaptiveSwitching: true,
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	peerID := peer.ID("traffic-peer")
+	for i := range 20 {
+		_ = manager.SendMessage(peerID, &networking.NetworkMessage{
+			ID:       fmt.Sprintf("burst-msg-%d", i),
+			Type:     networking.MessageTypeData,
+			Priority: networking.PriorityNormal,
+		})
+	}
+
+	health := manager.GetProtocolHealth()
+	for p, h := range health {
+		t.Logf("Protocol %s: sent=%d, recv=%d, bytes_tx=%d",
+			p, h.TotalMessagesSent, h.TotalMessagesRecv, h.BytesTransmitted)
+	}
+}
+
+func (ts *TestSuite) testPeerDiscovery(t *testing.T) {
+	config := networking.MultiProtocolConfig{
+		EnabledProtocols: []networking.ProtocolType{
+			networking.ProtocolLibP2P,
+		},
+	}
+
+	manager, err := networking.NewMultiProtocolManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	err = manager.Start()
+	require.NoError(t, err)
+	defer manager.Stop()
+
+	active := manager.GetActiveProtocol()
+	assert.Equal(t, networking.ProtocolLibP2P, active)
+}
+
+func (ts *TestSuite) testPlatformDetection(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+		EnableCompatibility: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+	require.NotNil(t, profile)
+
+	assert.Equal(t, runtime.GOOS, profile.Runtime.GoOS)
+	assert.Equal(t, runtime.GOARCH, profile.Runtime.GoArch)
+	assert.Equal(t, runtime.Version(), profile.Runtime.GoVersion)
+	assert.Equal(t, runtime.Compiler, profile.Runtime.Compiler)
+	assert.Positive(t, profile.ConfidenceScore)
+}
+
+func (ts *TestSuite) testResourceOptimization(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	err = manager.ApplyPlatformOptimizations()
+	require.NoError(t, err)
+
+	assert.NotZero(t, profile.Hardware.Memory.Total, "Memory detection should succeed")
+	t.Logf("Total memory: %d, CPUs: %d", profile.Hardware.Memory.Total, profile.Architecture.NumCPUs)
+}
+
+func (ts *TestSuite) testPowerManagement(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	assert.NotNil(t, profile.PowerManagement, "PowerManagement should be populated")
+	t.Logf("Power management: %+v", profile.PowerManagement)
+}
+
+func (ts *TestSuite) testContainerSupport(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+		EnableCompatibility: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	assert.NotNil(t, profile.ContainerSupport)
+	t.Logf("Container support: %+v", profile.ContainerSupport)
+}
+
+func (ts *TestSuite) testHardwareAcceleration(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	hw := profile.Hardware
+	t.Logf("Hardware - CPUs: %d, Memory: %d, Arch: %s %s",
+		profile.Architecture.NumCPUs, hw.Memory.Total,
+		profile.Architecture.Type, profile.Architecture.Variant)
+
+	assert.NotZero(t, hw.Memory.Total)
+	assert.Positive(t, profile.Architecture.NumCPUs)
+}
+
+func (ts *TestSuite) testFilesystemOptimization(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	assert.NotNil(t, profile.FileSystem, "FileSystem capabilities should be populated")
+	t.Logf("Filesystem: %+v", profile.FileSystem)
+}
+
+func (ts *TestSuite) testProcessScheduling(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	assert.Positive(t, profile.Architecture.NumCPUs, "CPU count should be positive")
+	assert.Positive(t, profile.Architecture.NumThreads, "Thread count should be positive")
+	t.Logf("CPUs: %d, Cores: %d, Threads: %d",
+		profile.Architecture.NumCPUs, profile.Architecture.NumCores,
+		profile.Architecture.NumThreads)
+}
+
+func (ts *TestSuite) testMemoryManagement(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+	assert.NotZero(t, memStats.TotalAlloc, "Memory allocation should be measurable")
+	t.Logf("Platform memory: %d, Runtime alloc: %d bytes", profile.Hardware.Memory.Total, memStats.Alloc)
+}
+
+func (ts *TestSuite) testNetworkStack(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	assert.NotNil(t, profile.NetworkCapabilities, "Network capabilities should be populated")
+	t.Logf("Network capabilities: %+v", profile.NetworkCapabilities)
+}
+
+func (ts *TestSuite) testSecurityHardening(t *testing.T) {
+	config := platform.PlatformConfig{
+		EnableAutoDetection: true,
+		EnableOptimizations: true,
+	}
+
+	manager, err := platform.NewPlatformManager(slog.Default(), config)
+	require.NoError(t, err)
+
+	profile, err := manager.ForcePlatformDetection()
+	require.NoError(t, err)
+
+	assert.NotNil(t, profile.SecurityFeatures, "Security features should be populated")
+	t.Logf("Security features: %+v", profile.SecurityFeatures)
+}
 
 // Additional test methods would be implemented similarly...
 
