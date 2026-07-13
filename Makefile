@@ -9,7 +9,7 @@ MATRIX_PLATFORMS?=linux/amd64 linux/arm64 linux/arm linux/386 linux/riscv64 wind
 GOFLAGS?=
 DIST_DIR=dist
 
-.PHONY: all build build-standalone build-linux build-windows build-darwin build-matrix build-matrix-minimal
+.PHONY: all build build-standalone build-enhanced test-enhanced build-linux build-windows build-darwin build-matrix build-matrix-minimal
 .PHONY: test test-race test-pkg test-integration lint lint-fix coverage clean check ci-local
 .PHONY: dist package-matrix checksums
 
@@ -22,6 +22,14 @@ build:
 build-standalone:
 	@echo "Building standalone-agent..."
 	CGO_ENABLED=0 go build $(GOFLAGS) -o $(BUILD_DIR)/$(STANDALONE_NAME) $(STANDALONE_PATH)
+
+build-enhanced:
+	@echo "Building enhanced-agent..."
+	CGO_ENABLED=0 go build $(GOFLAGS) -tags enhanced -o $(BUILD_DIR)/enhanced-agent cmd/enhanced-agent/main.go
+
+test-enhanced:
+	@echo "Running tests with enhanced tag..."
+	go test -tags enhanced -count=1 -timeout=5m ./pkg/...
 
 build-linux:
 	@echo "Building for Linux (amd64)..."

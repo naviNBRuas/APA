@@ -3,53 +3,36 @@
 package testing
 
 import (
-	"context"
 	"log/slog"
 	"testing"
 	"time"
 )
 
 func TestNewTestSuite(t *testing.T) {
-	ts := NewTestSuite(slog.Default(), TestConfig{})
+	ts, err := NewTestSuite(slog.Default(), TestConfig{})
+	if err != nil {
+		t.Fatalf("NewTestSuite failed: %v", err)
+	}
 	if ts == nil {
 		t.Fatal("NewTestSuite returned nil")
 	}
 }
 
-func TestTestSuiteStartStop(t *testing.T) {
-	ts := NewTestSuite(slog.Default(), TestConfig{
-		UnitTestsConfig: UnitTestsConfig{Enabled: true},
-	})
-	if err := ts.Start(); err != nil {
-		t.Fatalf("Start failed: %v", err)
-	}
-	ts.Stop()
-}
-
-func TestTestSuiteRunUnitTests(t *testing.T) {
-	ts := NewTestSuite(slog.Default(), TestConfig{
+func TestTestSuiteRun(t *testing.T) {
+	ts, err := NewTestSuite(slog.Default(), TestConfig{
 		EnableUnitTests: true,
 		TestTimeout:     10 * time.Second,
 	})
-	if err := ts.Start(); err != nil {
-		t.Fatalf("Start failed: %v", err)
-	}
-	defer ts.Stop()
-
-	results, err := ts.RunAllTests(context.Background())
 	if err != nil {
-		t.Fatalf("RunAllTests failed: %v", err)
+		t.Fatalf("NewTestSuite failed: %v", err)
 	}
-	if results == nil {
-		t.Fatal("RunAllTests returned nil results")
-	}
-}
 
-func TestTestSuiteGetSummary(t *testing.T) {
-	ts := NewTestSuite(slog.Default(), TestConfig{})
-	summary := ts.GetSummary()
+	summary, err := ts.Run()
+	if err != nil {
+		t.Fatalf("Run failed: %v", err)
+	}
 	if summary == nil {
-		t.Fatal("GetSummary returned nil")
+		t.Fatal("Run returned nil summary")
 	}
 }
 
@@ -72,15 +55,17 @@ func TestTestSuiteConfigValidation(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ts := NewTestSuite(slog.Default(), tc.config)
-			err := ts.Start()
+			ts, err := NewTestSuite(slog.Default(), tc.config)
+			if err != nil {
+				t.Fatalf("NewTestSuite failed: %v", err)
+			}
+			_, err = ts.Run()
 			if tc.wantErr && err == nil {
 				t.Error("expected error, got nil")
 			}
 			if !tc.wantErr && err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
-			ts.Stop()
 		})
 	}
 }
