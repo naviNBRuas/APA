@@ -295,10 +295,127 @@ func TestStrategiesPriorityOrdering(t *testing.T) {
 	assert.Equal(t, "low", applicable[2].Name())
 }
 
+func TestDetectAndHeal_CheckerError(t *testing.T) {
+	logger := slog.Default()
+	mockHealthChecker := new(MockHealthChecker)
+	mockEventHandler := new(MockEventHandler)
+
+	framework := NewHealingFramework(logger, mockHealthChecker, mockEventHandler)
+
+	mockHealthChecker.On("CheckHealth", mock.Anything).Return([]*health.CheckResult{}, assert.AnError)
+
+	err := framework.DetectAndHeal(context.Background())
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to check health")
+}
+
+func TestDetectAndHeal_SuccessWithStrategy(t *testing.T) {
+	logger := slog.Default()
+	mockHealthChecker := new(MockHealthChecker)
+	mockEventHandler := new(MockEventHandler)
+	mockEventHandler.On("OnHealingAttempt", mock.Anything, mock.Anything, mock.Anything).Return()
+	mockEventHandler.On("OnHealingSuccess", mock.Anything, mock.Anything, mock.Anything).Return()
+
+	framework := NewHealingFramework(logger, mockHealthChecker, mockEventHandler)
+
+	results := []*health.CheckResult{
+		{
+			Component: "process",
+			Status:    health.StatusFailed,
+			Message:   "Process crashed",
+			Metrics:   map[string]interface{}{},
+		},
+	}
+	mockHealthChecker.On("CheckHealth", mock.Anything).Return(results, nil)
+
+	strategy := &MockStrategy{name: "mock-restart", priority: 80}
+	framework.RegisterStrategy(strategy) //nolint:errcheck
+
+	ctx := context.Background()
+	err := framework.DetectAndHeal(ctx)
+	assert.NoError(t, err)
+}
+
+func TestDetectAndHeal_NilEventHandler(t *testing.T) {
+	logger := slog.Default()
+	mockHealthChecker := new(MockHealthChecker)
+
+	framework := NewHealingFramework(logger, mockHealthChecker, nil)
+
+	results := []*health.CheckResult{
+		{
+			Component: "process",
+			Status:    health.StatusFailed,
+			Message:   "Process crashed",
+			Metrics:   map[string]interface{}{},
+		},
+	}
+	mockHealthChecker.On("CheckHealth", mock.Anything).Return(results, nil)
+
+	strategy := &MockStrategy{name: "always-succeed", priority: 50}
+	framework.RegisterStrategy(strategy) //nolint:errcheck
+
+	assert.NotPanics(t, func() {
+		err := framework.DetectAndHeal(context.Background())
+		assert.NoError(t, err)
+	})
+}
+
+func TestSchedulePeriodicHealing_Cancellation(t *testing.T) {
+	logger := slog.Default()
+	mockHealthChecker := new(MockHealthChecker)
+	mockEventHandler := new(MockEventHandler)
+
+	framework := NewHealingFramework(logger, mockHealthChecker, mockEventHandler)
+
+	mockHealthChecker.On("CheckHealth", mock.Anything).Return([]*health.CheckResult{}, nil)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+
+	go func() {
+		framework.SchedulePeriodicHealing(ctx, 10*time.Millisecond)
+		close(done)
+	}()
+
+	time.Sleep(15 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("SchedulePeriodicHealing did not stop after context cancellation")
+	}
+}
+
+func TestConcurrentStrategyRegistration(t *testing.T) {
+	logger := slog.Default()
+	mockHealthChecker := new(MockHealthChecker)
+	mockEventHandler := new(MockEventHandler)
+
+	framework := NewHealingFramework(logger, mockHealthChecker, mockEventHandler)
+
+	done := make(chan bool, 2)
+	register := func(name string) {
+		s := &MockStrategy{name: name, priority: 50}
+		framework.RegisterStrategy(s) //nolint:errcheck
+		done <- true
+	}
+
+	go register("concurrent-1")
+	go register("concurrent-2")
+
+	<-done
+	<-done
+
+	assert.Len(t, framework.ListStrategies(), 2)
+}
+
 // MockStrategy is a mock implementation of HealingStrategy for testing
 type MockStrategy struct {
-	name     string
-	priority int
+	name      string
+	priority  int
+	failApply bool
 }
 
 func (m *MockStrategy) Name() string {
@@ -315,6 +432,9 @@ func (m *MockStrategy) CanHandle(issue *HealthIssue) bool {
 }
 
 func (m *MockStrategy) Apply(ctx context.Context, issue *HealthIssue) (*HealingResult, error) {
+	if m.failApply {
+		return nil, assert.AnError
+	}
 	return &HealingResult{
 		Success:     true,
 		ActionTaken: "Mock action",
