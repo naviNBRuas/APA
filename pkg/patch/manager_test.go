@@ -12,135 +12,253 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPatchManager(t *testing.T) {
-	logger := slog.Default()
-	patchManager := NewPatchManager(logger)
-
-	content := []byte("This is a test patch content")
+func newValidPatch(id, name, severity, target string) *Patch {
+	content := []byte(name + " content")
 	hasher := sha256.New()
 	hasher.Write(content)
 	hash := hex.EncodeToString(hasher.Sum(nil))
-
-	patch := &Patch{
-		ID:          "test-patch-001",
-		Name:        "Test Patch",
-		Version:     "1.0.0",
-		Description: "A test patch for testing purposes",
-		Severity:    "medium",
-		Target:      "module",
-		Content:     content,
-		Hash:        hash,
-		CreatedAt:   time.Now(),
+	return &Patch{
+		ID:        id,
+		Name:      name,
+		Version:   "1.0.0",
+		Severity:  severity,
+		Target:    target,
+		Content:   content,
+		Hash:      hash,
+		CreatedAt: time.Now(),
 	}
-
-	err := patchManager.AddPatch(patch)
-	require.NoError(t, err, "Failed to add patch")
-
-	err = patchManager.ApplyPatch(context.Background(), patch.ID)
-	assert.NoError(t, err, "Failed to apply patch")
-
-	err = patchManager.RollbackPatch(context.Background(), patch.ID)
-	assert.NoError(t, err, "Failed to rollback patch")
-
-	priority := patchManager.GetPatchPriority(patch)
-	assert.Equal(t, 3, priority)
-
-	patches := patchManager.GetPatchesByPriority()
-	assert.Equal(t, 1, len(patches))
-
-	mediumPatches := patchManager.GetPatchesBySeverity("medium")
-	assert.Equal(t, 1, len(mediumPatches))
-
-	peerAddresses := []string{"192.168.1.100:4001", "192.168.1.101:4001"}
-	err = patchManager.DistributePatch(context.Background(), patch.ID, peerAddresses)
-	assert.NoError(t, err, "Failed to distribute patch")
-
-	err = patchManager.VerifyPatch(patch.ID)
-	assert.Error(t, err, "Expected verification to fail for non-applied patch")
 }
 
-func TestPatchIntegrityVerification(t *testing.T) {
-	logger := slog.Default()
-	patchManager := NewPatchManager(logger)
-
-	content := []byte("This is a test patch content")
-	wrongHash := "incorrect-hash"
-
-	patch := &Patch{
-		ID:          "test-patch-002",
-		Name:        "Test Patch with Wrong Hash",
-		Version:     "1.0.0",
-		Description: "A test patch with incorrect hash",
-		Severity:    "high",
-		Target:      "agent",
-		Content:     content,
-		Hash:        wrongHash,
-		CreatedAt:   time.Now(),
-	}
-
-	err := patchManager.AddPatch(patch)
-	assert.Error(t, err, "Expected patch addition to fail with incorrect hash")
+func TestNewPatchManager(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	require.NotNil(t, pm)
+	assert.Empty(t, pm.patches)
+	assert.Empty(t, pm.appliedPatches)
+	assert.Empty(t, pm.patchBackups)
 }
 
-func TestPatchPrioritization(t *testing.T) {
-	logger := slog.Default()
-	patchManager := NewPatchManager(logger)
+func TestAddPatch_Success(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	patch := newValidPatch("p1", "Test Patch", "medium", "module")
 
-	criticalContent := []byte("critical patch content")
-	criticalHasher := sha256.New()
-	criticalHasher.Write(criticalContent)
-	criticalHash := hex.EncodeToString(criticalHasher.Sum(nil))
+	err := pm.AddPatch(patch)
+	assert.NoError(t, err)
+	assert.Len(t, pm.patches, 1)
+}
 
-	criticalPatch := &Patch{
-		ID:       "critical-patch",
-		Name:     "Critical Patch",
-		Severity: "critical",
-		Target:   "agent",
-		Content:  criticalContent,
-		Hash:     criticalHash,
+func TestAddPatch_HashMismatch(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	patch := newValidPatch("p1", "Test", "medium", "module")
+	patch.Hash = "bad-hash"
+
+	err := pm.AddPatch(patch)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "hash mismatch")
+	assert.Empty(t, pm.patches)
+}
+
+func TestAddPatch_EmptyContent(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	hasher := sha256.New()
+	hash := hex.EncodeToString(hasher.Sum(nil))
+	patch := &Patch{
+		ID:      "p-empty",
+		Name:    "Empty",
+		Content: []byte{},
+		Hash:    hash,
 	}
 
-	highContent := []byte("high patch content")
-	highHasher := sha256.New()
-	highHasher.Write(highContent)
-	highHash := hex.EncodeToString(highHasher.Sum(nil))
+	err := pm.AddPatch(patch)
+	assert.NoError(t, err)
+}
 
-	highPatch := &Patch{
-		ID:       "high-patch",
-		Name:     "High Patch",
-		Severity: "high",
-		Target:   "module",
-		Content:  highContent,
-		Hash:     highHash,
+func TestApplyPatch_Success(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	patch := newValidPatch("p1", "Test", "medium", "module")
+	require.NoError(t, pm.AddPatch(patch))
+
+	err := pm.ApplyPatch(context.Background(), "p1")
+	assert.NoError(t, err)
+	assert.Len(t, pm.appliedPatches, 1)
+	assert.Len(t, pm.patchBackups, 1)
+}
+
+func TestApplyPatch_NotFound(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+
+	err := pm.ApplyPatch(context.Background(), "nonexistent")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+}
+
+func TestApplyPatch_AgentTarget(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	patch := newValidPatch("p1", "Agent Fix", "critical", "agent")
+	require.NoError(t, pm.AddPatch(patch))
+
+	err := pm.ApplyPatch(context.Background(), "p1")
+	assert.NoError(t, err)
+}
+
+func TestApplyPatch_DriverTarget(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	patch := newValidPatch("p1", "Driver Fix", "high", "driver")
+	require.NoError(t, pm.AddPatch(patch))
+
+	err := pm.ApplyPatch(context.Background(), "p1")
+	assert.NoError(t, err)
+}
+
+func TestApplyPatch_UnknownTarget(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	patch := newValidPatch("p1", "Unknown", "medium", "firmware")
+	require.NoError(t, pm.AddPatch(patch))
+
+	err := pm.ApplyPatch(context.Background(), "p1")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown patch target")
+	assert.Empty(t, pm.appliedPatches)
+}
+
+func TestRollbackPatch_Success(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	patch := newValidPatch("p1", "Test", "medium", "module")
+	require.NoError(t, pm.AddPatch(patch))
+	require.NoError(t, pm.ApplyPatch(context.Background(), "p1"))
+
+	err := pm.RollbackPatch(context.Background(), "p1")
+	assert.NoError(t, err)
+	assert.Empty(t, pm.appliedPatches)
+	assert.Empty(t, pm.patchBackups)
+}
+
+func TestRollbackPatch_NotApplied(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+
+	err := pm.RollbackPatch(context.Background(), "p1")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not applied")
+}
+
+func TestRollbackPatch_MissingBackup(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	patch := newValidPatch("p1", "Test", "medium", "module")
+	pm.appliedPatches["p1"] = patch
+
+	err := pm.RollbackPatch(context.Background(), "p1")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "backup not found")
+}
+
+func TestGetPatchPriority(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	tests := []struct {
+		severity string
+		expected int
+	}{
+		{"critical", 1},
+		{"high", 2},
+		{"medium", 3},
+		{"low", 4},
+		{"unknown", 5},
+		{"", 5},
 	}
 
-	mediumContent := []byte("medium patch content")
-	mediumHasher := sha256.New()
-	mediumHasher.Write(mediumContent)
-	mediumHash := hex.EncodeToString(mediumHasher.Sum(nil))
+	for _, tt := range tests {
+		patch := newValidPatch("p", "Test", tt.severity, "module")
+		assert.Equal(t, tt.expected, pm.GetPatchPriority(patch), "severity=%s", tt.severity)
+	}
+}
 
-	mediumPatch := &Patch{
-		ID:       "medium-patch",
-		Name:     "Medium Patch",
-		Severity: "medium",
-		Target:   "driver",
-		Content:  mediumContent,
-		Hash:     mediumHash,
-	}
+func TestGetPatchesByPriority_Sorted(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	require.NoError(t, pm.AddPatch(newValidPatch("p-low", "Low", "low", "module")))
+	require.NoError(t, pm.AddPatch(newValidPatch("p-critical", "Critical", "critical", "module")))
+	require.NoError(t, pm.AddPatch(newValidPatch("p-medium", "Medium", "medium", "module")))
 
-	if err := patchManager.AddPatch(criticalPatch); err != nil {
-		assert.NoError(t, err, "Failed to add critical patch")
-	}
-	if err := patchManager.AddPatch(highPatch); err != nil {
-		assert.NoError(t, err, "Failed to add high patch")
-	}
-	if err := patchManager.AddPatch(mediumPatch); err != nil {
-		assert.NoError(t, err, "Failed to add medium patch")
-	}
+	patches := pm.GetPatchesByPriority()
+	require.Len(t, patches, 3)
+	assert.Equal(t, "p-critical", patches[0].ID)
+	assert.Equal(t, "p-medium", patches[1].ID)
+	assert.Equal(t, "p-low", patches[2].ID)
+}
 
-	patches := patchManager.GetPatchesByPriority()
-	assert.Equal(t, 3, len(patches))
-	assert.Equal(t, "critical-patch", patches[0].ID)
-	assert.Equal(t, "high-patch", patches[1].ID)
-	assert.Equal(t, "medium-patch", patches[2].ID)
+func TestGetPatchesByPriority_Empty(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	patches := pm.GetPatchesByPriority()
+	assert.Empty(t, patches)
+}
+
+func TestGetPatchesBySeverity(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	require.NoError(t, pm.AddPatch(newValidPatch("p1", "Critical 1", "critical", "module")))
+	require.NoError(t, pm.AddPatch(newValidPatch("p2", "Critical 2", "critical", "agent")))
+	require.NoError(t, pm.AddPatch(newValidPatch("p3", "Medium", "medium", "module")))
+
+	critical := pm.GetPatchesBySeverity("critical")
+	assert.Len(t, critical, 2)
+
+	medium := pm.GetPatchesBySeverity("medium")
+	assert.Len(t, medium, 1)
+
+	none := pm.GetPatchesBySeverity("high")
+	assert.Empty(t, none)
+}
+
+func TestDistributePatch_Success(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	patch := newValidPatch("p1", "Test", "medium", "module")
+	require.NoError(t, pm.AddPatch(patch))
+
+	err := pm.DistributePatch(context.Background(), "p1", []string{"peer1", "peer2"})
+	assert.NoError(t, err)
+}
+
+func TestDistributePatch_NotFound(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+
+	err := pm.DistributePatch(context.Background(), "p1", []string{"peer1"})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not found")
+}
+
+func TestDistributePatch_EmptyPeers(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	patch := newValidPatch("p1", "Test", "medium", "module")
+	require.NoError(t, pm.AddPatch(patch))
+
+	err := pm.DistributePatch(context.Background(), "p1", nil)
+	assert.NoError(t, err)
+}
+
+func TestDistributePatch_CancelledContext(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	patch := newValidPatch("p1", "Test", "medium", "module")
+	require.NoError(t, pm.AddPatch(patch))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := pm.DistributePatch(ctx, "p1", []string{"peer1"})
+	assert.NoError(t, err)
+}
+
+func TestVerifyPatch_Applied(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	patch := newValidPatch("p1", "Test", "medium", "module")
+	require.NoError(t, pm.AddPatch(patch))
+	require.NoError(t, pm.ApplyPatch(context.Background(), "p1"))
+
+	err := pm.VerifyPatch("p1")
+	assert.NoError(t, err)
+}
+
+func TestVerifyPatch_NotApplied(t *testing.T) {
+	pm := NewPatchManager(slog.Default())
+	patch := newValidPatch("p1", "Test", "medium", "module")
+	require.NoError(t, pm.AddPatch(patch))
+
+	err := pm.VerifyPatch("p1")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "not applied")
 }
