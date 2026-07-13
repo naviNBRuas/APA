@@ -83,6 +83,26 @@ jobs:
         if: matrix.os != 'windows-latest'
         run: ./standalone-agent --version
 
+  enhanced-build-test:
+    name: Enhanced Build and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache: true
+
+      - name: Build enhanced-agent
+        run: go build -tags enhanced -o bin/enhanced-agent cmd/enhanced-agent/main.go
+
+      - name: Test with enhanced tag
+        run: go test -tags enhanced -count=1 -timeout=5m ./pkg/...
+
   cross-platform-build:
     name: Cross-Platform Build Matrix
     runs-on: ubuntu-latest

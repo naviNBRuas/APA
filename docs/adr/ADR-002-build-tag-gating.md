@@ -54,17 +54,14 @@ Use **Go build tags** to selectively compile features:
 
 ### Negative
 
-- CI does not build or test `enhanced`-tagged code by default
-  (`go test ./...` skips `//go:build enhanced` files)
-- Regression can go undetected in full-featured paths
-- Contributors must remember to build with `-tags enhanced` for full validation
-- No Makefile target builds `enhanced-agent` — only ad-hoc or manual builds
 - Inflated perceived technical debt (lint errors in tagged files look like
   defects to tools that don't see the build constraint)
 
 ### Mitigations
 
-- A `ci-full` CI job should be added to build and test with `-tags enhanced`
-  (tracked in Phase 0)
+- `make build-enhanced` and `make test-enhanced` targets compile and test the
+  `enhanced` profile locally (see ADR-003).
+- An `enhanced-build-test` CI job builds and tests under `-tags enhanced` on
+  every push and pull request (see ADR-004).
 - `make check` runs on the default (untagged) profile, which covers the
-  majority of code paths and is the most commonly deployed variant
+  majority of code paths and is the most commonly deployed variant.
