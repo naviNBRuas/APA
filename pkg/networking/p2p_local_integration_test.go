@@ -11,36 +11,33 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/require"
 )
 
-// mockPolicyEnforcerLocal accepts all actions.
 type mockPolicyEnforcerLocal struct{}
 
 func (m mockPolicyEnforcerLocal) Authorize(ctx context.Context, subject, action, resource string) (bool, string, error) {
 	return true, "ok", nil
 }
 
-// newTestP2P spins up a P2P node bound to loopback on random ports.
 func newTestP2P(t *testing.T) (*P2P, context.CancelFunc) {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	priv, _, err := crypto.GenerateEd25519Key(nil)
 	if err != nil {
 		cancel()
-		t.Fatalf("failed to generate key: %v", err)
+		require.NoError(t, err, "failed to generate key")
 	}
 	pid, err := peer.IDFromPrivateKey(priv)
 	if err != nil {
 		cancel()
-		t.Fatalf("failed to derive peer id: %v", err)
+		require.NoError(t, err, "failed to derive peer id")
 	}
 	cfg := Config{
 		ListenAddresses: []string{
 			"/ip4/127.0.0.1/tcp/0",
 			"/ip4/127.0.0.1/udp/0/quic-v1",
 		},
-		// Keep this non-empty to avoid NewP2P falling back to public default
-		// bootstrap peers in local integration tests.
 		BootstrapPeers:    []string{"invalid-bootstrap-address"},
 		HeartbeatInterval: 200 * time.Millisecond,
 		ServiceTag:        "test-svc",
@@ -48,7 +45,7 @@ func newTestP2P(t *testing.T) (*P2P, context.CancelFunc) {
 	p, err := NewP2P(ctx, testLogger(t), cfg, pid, priv, mockPolicyEnforcerLocal{})
 	if err != nil {
 		cancel()
-		t.Fatalf("failed to create p2p: %v", err)
+		require.NoError(t, err, "failed to create p2p")
 	}
 	return p, cancel
 }
@@ -67,19 +64,14 @@ func requireP2PIntegration(t *testing.T) {
 	}
 }
 
-// connectPeers connects a to b bidirectionally.
 func connectPeers(t *testing.T, a, b *P2P) {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	info := peer.AddrInfo{ID: b.host.ID(), Addrs: b.host.Addrs()}
-	if err := a.host.Connect(ctx, info); err != nil {
-		t.Fatalf("connect failed: %v", err)
-	}
+	require.NoError(t, a.host.Connect(ctx, info), "connect failed")
 	info2 := peer.AddrInfo{ID: a.host.ID(), Addrs: a.host.Addrs()}
-	if err := b.host.Connect(ctx, info2); err != nil {
-		t.Fatalf("connect back failed: %v", err)
-	}
+	require.NoError(t, b.host.Connect(ctx, info2), "connect back failed")
 }
 
 func TestP2PLocalHeartbeatPropagation(t *testing.T) {
@@ -96,16 +88,10 @@ func TestP2PLocalHeartbeatPropagation(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	if err := p1.JoinHeartbeatTopic(ctx); err != nil {
-		t.Fatalf("p1 join heartbeat: %v", err)
-	}
-	if err := p2.JoinHeartbeatTopic(ctx); err != nil {
-		t.Fatalf("p2 join heartbeat: %v", err)
-	}
+	require.NoError(t, p1.JoinHeartbeatTopic(ctx), "p1 join heartbeat")
+	require.NoError(t, p2.JoinHeartbeatTopic(ctx), "p2 join heartbeat")
 	sub, err := p2.pubsub.Subscribe(HeartbeatTopic)
-	if err != nil {
-		t.Fatalf("subscribe: %v", err)
-	}
+	require.NoError(t, err, "subscribe")
 	go p1.StartHeartbeat(ctx, 100*time.Millisecond)
 
 	received := make(chan struct{}, 1)
@@ -119,7 +105,7 @@ func TestP2PLocalHeartbeatPropagation(t *testing.T) {
 	select {
 	case <-received:
 	case <-ctx.Done():
-		t.Fatalf("timeout waiting for heartbeat")
+		require.Fail(t, "timeout waiting for heartbeat")
 	}
 }
 
@@ -137,40 +123,30 @@ func TestP2PControllerMessageRoundTrip(t *testing.T) {
 
 	joinCtx, joinCancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer joinCancel()
-	if err := p1.JoinControllerCommTopic(joinCtx); err != nil {
-		t.Fatalf("p1 join controller: %v", err)
-	}
-	if err := p2.JoinControllerCommTopic(joinCtx); err != nil {
-		t.Fatalf("p2 join controller: %v", err)
-	}
+	require.NoError(t, p1.JoinControllerCommTopic(joinCtx), "p1 join controller")
+	require.NoError(t, p2.JoinControllerCommTopic(joinCtx), "p2 join controller")
 	ch, err := p2.SubscribeControllerMessages(joinCtx)
-	if err != nil {
-		t.Fatalf("subscribe controller: %v", err)
-	}
+	require.NoError(t, err, "subscribe controller")
 
 	payload := []byte(`{"type":"test","data":"hello"}`)
 	recvCtx, recvCancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer recvCancel()
 
 	for {
-		if err := p1.PublishControllerMessage(joinCtx, payload); err != nil {
-			t.Fatalf("publish controller: %v", err)
-		}
+		require.NoError(t, p1.PublishControllerMessage(joinCtx, payload), "publish controller")
 
 		select {
 		case msg := <-ch:
-			if msg == nil || msg.Type != "test" {
-				t.Fatalf("unexpected message: %+v", msg)
-			}
+			require.NotNil(t, msg)
+			require.Equal(t, "test", msg.Type)
 			var data string
-			if err := json.Unmarshal(msg.Data, &data); err != nil || data != "hello" {
-				t.Fatalf("unexpected data: %s err=%v", string(msg.Data), err)
-			}
+			require.NoError(t, json.Unmarshal(msg.Data, &data))
+			require.Equal(t, "hello", data)
 			return
 		case <-time.After(250 * time.Millisecond):
 			continue
 		case <-recvCtx.Done():
-			t.Fatalf("timeout waiting for controller message")
+			require.Fail(t, "timeout waiting for controller message")
 		}
 	}
 }

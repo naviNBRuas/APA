@@ -4,42 +4,33 @@ import (
 	"crypto/rand"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestEncryptedDiscoveryRoundTrip(t *testing.T) {
 	ed, err := NewEncryptedDiscovery("test-seed")
-	if err != nil {
-		t.Fatalf("init: %v", err)
-	}
+	require.NoError(t, err, "init: %v", err)
 	nonce := make([]byte, 12)
-	if _, err := rand.Read(nonce); err != nil {
-		t.Fatalf("nonce: %v", err)
-	}
-	// Use a valid multibase peer ID string.
+	_, err = rand.Read(nonce)
+	require.NoError(t, err, "nonce: %v", err)
 	beacon := DiscoveryBeacon{PeerID: "12D3KooWQAbH8ZqqpwYBFvToNi4zmiEJeZVrDCTnhgypKekJy5oM", Addrs: []string{"/ip4/127.0.0.1/tcp/4001"}, Ts: time.Now().Unix(), Nonce: nonce}
 	ct, err := ed.EncodeBeacon(beacon)
-	if err != nil {
-		t.Fatalf("encode: %v", err)
-	}
+	require.NoError(t, err, "encode: %v", err)
 
 	out, err := ed.DecodeBeacon(nonce, ct, time.Minute)
-	if err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if out.PeerID != beacon.PeerID || out.Addrs[0] != beacon.Addrs[0] {
-		t.Fatalf("mismatch after decode")
-	}
+	require.NoError(t, err, "decode: %v", err)
+	require.Equal(t, beacon.PeerID, out.PeerID, "mismatch after decode")
+	require.Equal(t, beacon.Addrs[0], out.Addrs[0], "mismatch after decode")
 }
 
 func TestEncryptedDiscoveryRejectsOld(t *testing.T) {
 	ed, _ := NewEncryptedDiscovery("seed")
 	nonce := make([]byte, 12)
-	if _, err := rand.Read(nonce); err != nil {
-		t.Fatalf("Failed to generate nonce: %v", err)
-	}
+	_, err := rand.Read(nonce)
+	require.NoError(t, err, "Failed to generate nonce: %v", err)
 	beacon := DiscoveryBeacon{PeerID: "12D3KooWQAbH8ZqqpwYBFvToNi4zmiEJeZVrDCTnhgypKekJy5oM", Addrs: nil, Ts: time.Now().Add(-2 * time.Hour).Unix(), Nonce: nonce}
 	ct, _ := ed.EncodeBeacon(beacon)
-	if _, err := ed.DecodeBeacon(nonce, ct, 10*time.Minute); err == nil {
-		t.Fatalf("expected old beacon rejection")
-	}
+	_, err = ed.DecodeBeacon(nonce, ct, 10*time.Minute)
+	require.Error(t, err, "expected old beacon rejection")
 }

@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 type stubResolver struct {
@@ -32,14 +34,11 @@ func TestDeterministicCandidatesStable(t *testing.T) {
 	a := namer.Candidates(ts, entropy)
 	b := namer.Candidates(ts, entropy)
 
-	if len(a) != len(b) || len(a) != 3 {
-		t.Fatalf("unexpected candidate count: a=%d b=%d", len(a), len(b))
-	}
+	require.Equal(t, len(a), len(b), "candidate length mismatch")
+	require.Equal(t, 3, len(a), "unexpected candidate count: a=%d b=%d", len(a), len(b))
 
 	for i := range a {
-		if a[i] != b[i] {
-			t.Fatalf("candidates not deterministic at %d: %s vs %s", i, a[i], b[i])
-		}
+		require.Equal(t, b[i], a[i], "candidates not deterministic at %d: %s vs %s", i, a[i], b[i])
 	}
 }
 
@@ -53,9 +52,7 @@ func TestDeterministicCandidatesVaryAcrossEpochs(t *testing.T) {
 	a := namer.Candidates(t1, entropy)
 	b := namer.Candidates(t2, entropy)
 
-	if a[0] == b[0] && a[1] == b[1] {
-		t.Fatalf("expected candidates to change across epochs")
-	}
+	require.False(t, a[0] == b[0] && a[1] == b[1], "expected candidates to change across epochs")
 }
 
 func TestResolveFirstTriesMultipleCandidates(t *testing.T) {
@@ -73,20 +70,13 @@ func TestResolveFirstTriesMultipleCandidates(t *testing.T) {
 	defer cancel()
 
 	gotName, addrs, err := ResolveFirst(ctx, resolver, names)
-	if err != nil {
-		t.Fatalf("expected success, got error: %v", err)
-	}
-	if gotName != names[1] {
-		t.Fatalf("expected second candidate to succeed, got %s", gotName)
-	}
-	if len(addrs) != 1 || addrs[0] != "203.0.113.10" {
-		t.Fatalf("unexpected addresses: %v", addrs)
-	}
+	require.NoError(t, err, "expected success, got error: %v", err)
+	require.Equal(t, names[1], gotName, "expected second candidate to succeed, got %s", gotName)
+	require.Len(t, addrs, 1, "unexpected addresses: %v", addrs)
+	require.Equal(t, "203.0.113.10", addrs[0], "unexpected address")
 }
 
 func TestBinaryPivotNonZero(t *testing.T) {
 	var zero [32]byte
-	if v := binaryPivot(zero); v == 0 {
-		t.Fatalf("expected non-zero pivot")
-	}
+	require.NotZero(t, binaryPivot(zero), "expected non-zero pivot")
 }

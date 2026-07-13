@@ -66,6 +66,9 @@ func DecryptData(key, ciphertext []byte) ([]byte, error) {
 
 // GenerateKey generates a random key of the specified size
 func GenerateKey(size int) ([]byte, error) {
+	if size <= 0 {
+		return nil, fmt.Errorf("invalid key size: %d", size)
+	}
 	key := make([]byte, size)
 	if _, err := rand.Read(key); err != nil {
 		return nil, fmt.Errorf("failed to generate key: %w", err)

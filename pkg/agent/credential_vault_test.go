@@ -3,16 +3,17 @@ package agent
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestCredentialVaultStoresAndExpires(t *testing.T) {
 	v := NewCredentialVault()
 	v.Put("api", "token123", 10*time.Millisecond)
-	if cred, ok := v.Get("api"); !ok || cred.Token != "token123" {
-		t.Fatalf("expected token")
-	}
+	cred, ok := v.Get("api")
+	require.True(t, ok, "expected token")
+	require.Equal(t, "token123", cred.Token, "expected token")
 	time.Sleep(15 * time.Millisecond)
-	if _, ok := v.Get("api"); ok {
-		t.Fatalf("expected expiry")
-	}
+	_, ok = v.Get("api")
+	require.False(t, ok, "expected expiry")
 }

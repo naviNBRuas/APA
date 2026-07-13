@@ -7,50 +7,37 @@ import (
 	"time"
 
 	libp2pcrypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/stretchr/testify/require"
 	"log/slog"
 )
 
 func TestEphemeralIdentityRotates(t *testing.T) {
 	logger := slog.Default()
 	priv, _, err := libp2pcrypto.GenerateEd25519Key(nil)
-	if err != nil {
-		t.Fatalf("failed to generate base key: %v", err)
-	}
+	require.NoError(t, err, "failed to generate base key")
 
 	mgr, err := NewEphemeralIdentityManager(logger, priv, 50*time.Millisecond)
-	if err != nil {
-		t.Fatalf("failed to create manager: %v", err)
-	}
+	require.NoError(t, err, "failed to create manager")
 	mgr.Start(testCtx(t))
 	first := mgr.Current().SessionID
 	time.Sleep(80 * time.Millisecond)
 	second := mgr.Current().SessionID
-	if first == second {
-		t.Fatalf("expected session ID to rotate, got same %s", first)
-	}
+	require.NotEqual(t, first, second, "expected session ID to rotate, got same %s", first)
 }
 
 func TestEphemeralIdentitySignatureBindsKey(t *testing.T) {
 	logger := slog.Default()
 	priv, _, err := libp2pcrypto.GenerateEd25519Key(nil)
-	if err != nil {
-		t.Fatalf("failed to generate base key: %v", err)
-	}
+	require.NoError(t, err, "failed to generate base key")
 
 	mgr, err := NewEphemeralIdentityManager(logger, priv, time.Second)
-	if err != nil {
-		t.Fatalf("failed to create manager: %v", err)
-	}
+	require.NoError(t, err, "failed to create manager")
 	mgr.Start(testCtx(t))
 	sess := mgr.Current()
 	raw, err := priv.Raw()
-	if err != nil {
-		t.Fatalf("failed to export raw priv key: %v", err)
-	}
+	require.NoError(t, err, "failed to export raw priv key")
 	base := ed25519.PrivateKey(raw)
-	if !ed25519.Verify(base.Public().(ed25519.PublicKey), sess.PublicKey, sess.Signature) {
-		t.Fatalf("signature did not verify with base public key")
-	}
+	require.True(t, ed25519.Verify(base.Public().(ed25519.PublicKey), sess.PublicKey, sess.Signature), "signature did not verify with base public key")
 }
 
 // helper returns a cancellable context tied to the test.

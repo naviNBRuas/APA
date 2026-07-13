@@ -6,16 +6,15 @@ import (
 	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewTestSuite(t *testing.T) {
 	ts, err := NewTestSuite(slog.Default(), TestConfig{})
-	if err != nil {
-		t.Fatalf("NewTestSuite failed: %v", err)
-	}
-	if ts == nil {
-		t.Fatal("NewTestSuite returned nil")
-	}
+	require.NoError(t, err, "NewTestSuite failed: %v", err)
+	require.NotNil(t, ts, "NewTestSuite returned nil")
 }
 
 func TestTestSuiteRun(t *testing.T) {
@@ -23,17 +22,11 @@ func TestTestSuiteRun(t *testing.T) {
 		EnableUnitTests: true,
 		TestTimeout:     10 * time.Second,
 	})
-	if err != nil {
-		t.Fatalf("NewTestSuite failed: %v", err)
-	}
+	require.NoError(t, err, "NewTestSuite failed: %v", err)
 
 	summary, err := ts.Run()
-	if err != nil {
-		t.Fatalf("Run failed: %v", err)
-	}
-	if summary == nil {
-		t.Fatal("Run returned nil summary")
-	}
+	require.NoError(t, err, "Run failed: %v", err)
+	require.NotNil(t, summary, "Run returned nil summary")
 }
 
 func TestTestSuiteConfigValidation(t *testing.T) {
@@ -56,15 +49,12 @@ func TestTestSuiteConfigValidation(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			ts, err := NewTestSuite(slog.Default(), tc.config)
-			if err != nil {
-				t.Fatalf("NewTestSuite failed: %v", err)
-			}
+			require.NoError(t, err, "NewTestSuite failed: %v", err)
 			_, err = ts.Run()
-			if tc.wantErr && err == nil {
-				t.Error("expected error, got nil")
-			}
-			if !tc.wantErr && err != nil {
-				t.Errorf("unexpected error: %v", err)
+			if tc.wantErr {
+				assert.Error(t, err, "expected error, got nil")
+			} else {
+				assert.NoError(t, err, "unexpected error: %v", err)
 			}
 		})
 	}

@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func mutLogger() *slog.Logger {
@@ -20,7 +22,6 @@ func TestMutatorPrunesWorstLatency(t *testing.T) {
 	tm := NewTopologyManager(mutLogger(), rep, routing)
 	local := peer.ID("local")
 
-	// connect 3 peers with varying latency
 	a := peer.ID("a")
 	b := peer.ID("b")
 	c := peer.ID("c")
@@ -35,7 +36,33 @@ func TestMutatorPrunesWorstLatency(t *testing.T) {
 	mut := NewTopologyMutator(tm, MutationPolicy{TargetDegree: 2}, local)
 	res := mut.Mutate(context.Background())
 
-	if len(res.Prune) != 1 || res.Prune[0] != c {
-		t.Fatalf("expected worst latency peer c to be pruned, got %v", res.Prune)
-	}
+	require.Len(t, res.Prune, 1, "expected one peer to be pruned")
+	assert.Equal(t, c, res.Prune[0], "expected worst latency peer c to be pruned")
+}
+
+func TestMutatorEmptyConnections(t *testing.T) {
+	rep := NewReputationSystem(mutLogger())
+	routing := NewRoutingManager(mutLogger(), rep)
+	tm := NewTopologyManager(mutLogger(), rep, routing)
+	local := peer.ID("local")
+
+	mut := NewTopologyMutator(tm, MutationPolicy{TargetDegree: 2}, local)
+	res := mut.Mutate(context.Background())
+	require.NotNil(t, res)
+	assert.Empty(t, res.Prune)
+}
+
+func TestMutatorBelowTargetDoesNotPrune(t *testing.T) {
+	rep := NewReputationSystem(mutLogger())
+	routing := NewRoutingManager(mutLogger(), rep)
+	tm := NewTopologyManager(mutLogger(), rep, routing)
+	local := peer.ID("local")
+
+	a := peer.ID("a")
+	tm.UpdatePeerConnection(a, true, nil, nil)
+	tm.UpdateEdge(local, a, 50*time.Millisecond, 100, 0.9)
+
+	mut := NewTopologyMutator(tm, MutationPolicy{TargetDegree: 3}, local)
+	res := mut.Mutate(context.Background())
+	assert.Empty(t, res.Prune, "should not prune when below target degree")
 }

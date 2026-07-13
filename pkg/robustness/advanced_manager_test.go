@@ -8,56 +8,33 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewRobustnessManager_NilLogger(t *testing.T) {
 	t.Parallel()
 	rm, err := NewRobustnessManager(nil, RobustnessConfig{})
-	if rm != nil {
-		t.Errorf("expected nil manager, got %+v", rm)
-	}
-	if err == nil {
-		t.Fatal("expected error for nil logger, got nil")
-	}
-	if err.Error() != "logger is required" {
-		t.Errorf("unexpected error message: %s", err.Error())
-	}
+	assert.Nil(t, rm)
+	require.Error(t, err)
+	assert.Equal(t, "logger is required", err.Error())
 }
 
 func TestNewRobustnessManager_DefaultConfig(t *testing.T) {
 	t.Parallel()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	rm, err := NewRobustnessManager(logger, RobustnessConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if rm == nil {
-		t.Fatal("expected non-nil manager")
-	}
-	if rm.logger != logger {
-		t.Error("logger not stored")
-	}
-	if rm.isRunning {
-		t.Error("should not be running initially")
-	}
-	if rm.errorHandler != nil {
-		t.Error("expected nil errorHandler when disabled")
-	}
-	if rm.recoveryEngine != nil {
-		t.Error("expected nil recoveryEngine when disabled")
-	}
-	if rm.healthMonitor != nil {
-		t.Error("expected nil healthMonitor when disabled")
-	}
-	if rm.degradationManager != nil {
-		t.Error("expected nil degradationManager when disabled")
-	}
-	if rm.emergencyProtocols != nil {
-		t.Error("expected nil emergencyProtocols when disabled")
-	}
-	if rm.resilienceAnalyzer == nil {
-		t.Error("expected non-nil resilienceAnalyzer (always created)")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, rm)
+	assert.Equal(t, logger, rm.logger)
+	assert.False(t, rm.isRunning)
+	assert.Nil(t, rm.errorHandler)
+	assert.Nil(t, rm.recoveryEngine)
+	assert.Nil(t, rm.healthMonitor)
+	assert.Nil(t, rm.degradationManager)
+	assert.Nil(t, rm.emergencyProtocols)
+	assert.NotNil(t, rm.resilienceAnalyzer)
 }
 
 func TestNewRobustnessManager_EnabledConfig(t *testing.T) {
@@ -71,24 +48,12 @@ func TestNewRobustnessManager_EnabledConfig(t *testing.T) {
 		EnableEmergencyProtocols: true,
 	}
 	rm, err := NewRobustnessManager(logger, config)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if rm.errorHandler == nil {
-		t.Error("expected non-nil errorHandler when enabled")
-	}
-	if rm.recoveryEngine == nil {
-		t.Error("expected non-nil recoveryEngine when enabled")
-	}
-	if rm.healthMonitor == nil {
-		t.Error("expected non-nil healthMonitor when enabled")
-	}
-	if rm.degradationManager == nil {
-		t.Error("expected non-nil degradationManager when enabled")
-	}
-	if rm.emergencyProtocols == nil {
-		t.Error("expected non-nil emergencyProtocols when enabled")
-	}
+	require.NoError(t, err)
+	assert.NotNil(t, rm.errorHandler)
+	assert.NotNil(t, rm.recoveryEngine)
+	assert.NotNil(t, rm.healthMonitor)
+	assert.NotNil(t, rm.degradationManager)
+	assert.NotNil(t, rm.emergencyProtocols)
 }
 
 func TestStartStop_Lifecycle(t *testing.T) {
@@ -101,30 +66,18 @@ func TestStartStop_Lifecycle(t *testing.T) {
 		EnableEmergencyProtocols: true,
 	}
 	rm, err := NewRobustnessManager(logger, config)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	err = rm.Start()
-	if err != nil {
-		t.Fatalf("Start() returned error: %v", err)
-	}
-	if !rm.isRunning {
-		t.Error("expected isRunning=true after Start()")
-	}
+	require.NoError(t, err, "Start()")
+	assert.True(t, rm.isRunning)
 
 	err = rm.Start()
-	if err == nil {
-		t.Error("expected error on double Start()")
-	}
-	if err.Error() != "robustness manager is already running" {
-		t.Errorf("unexpected error message: %s", err.Error())
-	}
+	require.Error(t, err)
+	assert.Equal(t, "robustness manager is already running", err.Error())
 
 	rm.Stop()
-	if rm.isRunning {
-		t.Error("expected isRunning=false after Stop()")
-	}
+	assert.False(t, rm.isRunning)
 
 	rm.Stop()
 }
@@ -132,17 +85,11 @@ func TestStartStop_Lifecycle(t *testing.T) {
 func TestStartStop_NoComponents(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	rm, err := NewRobustnessManager(logger, RobustnessConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	err = rm.Start()
-	if err != nil {
-		t.Fatalf("Start() returned error: %v", err)
-	}
-	if !rm.isRunning {
-		t.Error("expected isRunning=true after Start()")
-	}
+	require.NoError(t, err, "Start()")
+	assert.True(t, rm.isRunning)
 
 	rm.Stop()
 }
@@ -159,40 +106,17 @@ func TestNewErrorHandler(t *testing.T) {
 	}
 
 	eh := NewErrorHandler(logger, config)
-	if eh == nil {
-		t.Fatal("expected non-nil ErrorHandler")
-	}
-	if eh.logger != logger {
-		t.Error("logger not stored")
-	}
-	if eh.errorClassifier == nil {
-		t.Error("expected non-nil errorClassifier")
-	}
-	if eh.errorReporter == nil {
-		t.Error("expected non-nil errorReporter")
-	}
-	if eh.retryManager == nil {
-		t.Error("expected non-nil retryManager")
-	}
-	if eh.circuitBreaker == nil {
-		t.Error("expected non-nil circuitBreaker")
-	}
-	if eh.fallbackSystem == nil {
-		t.Error("expected non-nil fallbackSystem")
-	}
-	if eh.errorHistory == nil {
-		t.Error("expected non-nil errorHistory")
-	}
-	if eh.classificationCache == nil {
-		t.Error("expected non-nil classificationCache")
-	}
-
-	if eh.config.CircuitBreakerConfig.FailureThreshold != 5 {
-		t.Errorf("expected FailureThreshold=5, got %d", eh.config.CircuitBreakerConfig.FailureThreshold)
-	}
-	if eh.config.CircuitBreakerConfig.SuccessThreshold != 2 {
-		t.Errorf("expected SuccessThreshold=2, got %d", eh.config.CircuitBreakerConfig.SuccessThreshold)
-	}
+	require.NotNil(t, eh)
+	assert.Equal(t, logger, eh.logger)
+	assert.NotNil(t, eh.errorClassifier)
+	assert.NotNil(t, eh.errorReporter)
+	assert.NotNil(t, eh.retryManager)
+	assert.NotNil(t, eh.circuitBreaker)
+	assert.NotNil(t, eh.fallbackSystem)
+	assert.NotNil(t, eh.errorHistory)
+	assert.NotNil(t, eh.classificationCache)
+	assert.Equal(t, 5, eh.config.CircuitBreakerConfig.FailureThreshold)
+	assert.Equal(t, 2, eh.config.CircuitBreakerConfig.SuccessThreshold)
 }
 
 func TestErrorHandler_GetPendingErrors(t *testing.T) {
@@ -201,12 +125,8 @@ func TestErrorHandler_GetPendingErrors(t *testing.T) {
 	eh := NewErrorHandler(logger, ErrorHandlingConfig{})
 
 	errors := eh.GetPendingErrors()
-	if errors == nil {
-		t.Fatal("expected non-nil slice, got nil")
-	}
-	if len(errors) != 0 {
-		t.Errorf("expected empty slice, got %d elements", len(errors))
-	}
+	require.NotNil(t, errors)
+	assert.Empty(t, errors)
 }
 
 func TestErrorHandler_ClassifyError(t *testing.T) {
@@ -216,15 +136,9 @@ func TestErrorHandler_ClassifyError(t *testing.T) {
 
 	err := errors.New("test error")
 	classification := eh.ClassifyError(err)
-	if classification == nil {
-		t.Fatal("expected non-nil classification")
-	}
-	if len(classification.Categories) != 0 {
-		t.Errorf("expected empty categories, got %v", classification.Categories)
-	}
-	if classification.Severity != "" {
-		t.Errorf("expected empty severity, got %s", classification.Severity)
-	}
+	require.NotNil(t, classification)
+	assert.Empty(t, classification.Categories)
+	assert.Empty(t, classification.Severity)
 }
 
 func TestErrorHandler_ReportError(t *testing.T) {
@@ -264,27 +178,13 @@ func TestNewRetryManager(t *testing.T) {
 	}
 
 	rm := NewRetryManager(logger, policies)
-	if rm == nil {
-		t.Fatal("expected non-nil RetryManager")
-	}
-	if rm.logger != logger {
-		t.Error("logger not stored")
-	}
-	if len(rm.policies) != 1 {
-		t.Errorf("expected 1 policy, got %d", len(rm.policies))
-	}
-	if rm.policies["default"].MaxAttempts != 3 {
-		t.Errorf("expected MaxAttempts=3, got %d", rm.policies["default"].MaxAttempts)
-	}
-	if rm.policies["default"].BackoffFactor != 2.0 {
-		t.Errorf("expected BackoffFactor=2.0, got %f", rm.policies["default"].BackoffFactor)
-	}
-	if rm.executors == nil {
-		t.Error("expected non-nil executors map")
-	}
-	if rm.metrics == nil {
-		t.Error("expected non-nil metrics")
-	}
+	require.NotNil(t, rm)
+	assert.Equal(t, logger, rm.logger)
+	assert.Len(t, rm.policies, 1)
+	assert.Equal(t, 3, rm.policies["default"].MaxAttempts)
+	assert.Equal(t, 2.0, rm.policies["default"].BackoffFactor)
+	assert.NotNil(t, rm.executors)
+	assert.NotNil(t, rm.metrics)
 }
 
 func TestRetryManager_MetricsInitialState(t *testing.T) {
@@ -292,21 +192,11 @@ func TestRetryManager_MetricsInitialState(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	rm := NewRetryManager(logger, map[string]RetryPolicy{})
 
-	if rm.metrics.TotalAttempts != 0 {
-		t.Errorf("expected TotalAttempts=0, got %d", rm.metrics.TotalAttempts)
-	}
-	if rm.metrics.SuccessfulRetries != 0 {
-		t.Errorf("expected SuccessfulRetries=0, got %d", rm.metrics.SuccessfulRetries)
-	}
-	if rm.metrics.FailedRetries != 0 {
-		t.Errorf("expected FailedRetries=0, got %d", rm.metrics.FailedRetries)
-	}
-	if rm.metrics.AverageDelay != 0 {
-		t.Errorf("expected AverageDelay=0, got %v", rm.metrics.AverageDelay)
-	}
-	if rm.metrics.MaxDelay != 0 {
-		t.Errorf("expected MaxDelay=0, got %v", rm.metrics.MaxDelay)
-	}
+	assert.Zero(t, rm.metrics.TotalAttempts)
+	assert.Zero(t, rm.metrics.SuccessfulRetries)
+	assert.Zero(t, rm.metrics.FailedRetries)
+	assert.Zero(t, rm.metrics.AverageDelay)
+	assert.Zero(t, rm.metrics.MaxDelay)
 }
 
 func TestRetryManager_EmptyPolicies(t *testing.T) {
@@ -314,12 +204,8 @@ func TestRetryManager_EmptyPolicies(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	rm := NewRetryManager(logger, nil)
 
-	if rm.metrics == nil {
-		t.Error("expected non-nil metrics")
-	}
-	if rm.executors == nil {
-		t.Error("expected non-nil executors map")
-	}
+	assert.NotNil(t, rm.metrics)
+	assert.NotNil(t, rm.executors)
 }
 
 func TestNewCircuitBreaker(t *testing.T) {
@@ -335,30 +221,14 @@ func TestNewCircuitBreaker(t *testing.T) {
 	}
 
 	cb := NewCircuitBreaker(logger, config)
-	if cb == nil {
-		t.Fatal("expected non-nil CircuitBreaker")
-	}
-	if cb.logger != logger {
-		t.Error("logger not stored")
-	}
-	if cb.config.FailureThreshold != 5 {
-		t.Errorf("expected FailureThreshold=5, got %d", cb.config.FailureThreshold)
-	}
-	if cb.config.SuccessThreshold != 2 {
-		t.Errorf("expected SuccessThreshold=2, got %d", cb.config.SuccessThreshold)
-	}
-	if cb.config.ResetTimeout != 60*time.Second {
-		t.Errorf("expected ResetTimeout=60s, got %v", cb.config.ResetTimeout)
-	}
-	if cb.config.HalfOpenMaxCalls != 3 {
-		t.Errorf("expected HalfOpenMaxCalls=3, got %d", cb.config.HalfOpenMaxCalls)
-	}
-	if cb.breakers == nil {
-		t.Error("expected non-nil breakers map")
-	}
-	if cb.metrics == nil {
-		t.Error("expected non-nil metrics")
-	}
+	require.NotNil(t, cb)
+	assert.Equal(t, logger, cb.logger)
+	assert.Equal(t, 5, cb.config.FailureThreshold)
+	assert.Equal(t, 2, cb.config.SuccessThreshold)
+	assert.Equal(t, 60*time.Second, cb.config.ResetTimeout)
+	assert.Equal(t, 3, cb.config.HalfOpenMaxCalls)
+	assert.NotNil(t, cb.breakers)
+	assert.NotNil(t, cb.metrics)
 }
 
 func TestCircuitBreaker_ConfigDefaults(t *testing.T) {
@@ -366,15 +236,9 @@ func TestCircuitBreaker_ConfigDefaults(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	cb := NewCircuitBreaker(logger, CircuitBreakerConfig{})
 
-	if cb.config.FailureThreshold != 0 {
-		t.Errorf("expected FailureThreshold=0, got %d", cb.config.FailureThreshold)
-	}
-	if cb.config.Timeout != 0 {
-		t.Errorf("expected Timeout=0, got %v", cb.config.Timeout)
-	}
-	if cb.config.MetricsWindow != 0 {
-		t.Errorf("expected MetricsWindow=0, got %v", cb.config.MetricsWindow)
-	}
+	assert.Zero(t, cb.config.FailureThreshold)
+	assert.Zero(t, cb.config.Timeout)
+	assert.Zero(t, cb.config.MetricsWindow)
 }
 
 func TestCircuitBreaker_MetricsInitialState(t *testing.T) {
@@ -382,21 +246,11 @@ func TestCircuitBreaker_MetricsInitialState(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	cb := NewCircuitBreaker(logger, CircuitBreakerConfig{})
 
-	if cb.metrics.TotalCalls != 0 {
-		t.Errorf("expected TotalCalls=0, got %d", cb.metrics.TotalCalls)
-	}
-	if cb.metrics.SuccessCalls != 0 {
-		t.Errorf("expected SuccessCalls=0, got %d", cb.metrics.SuccessCalls)
-	}
-	if cb.metrics.FailureCalls != 0 {
-		t.Errorf("expected FailureCalls=0, got %d", cb.metrics.FailureCalls)
-	}
-	if cb.metrics.RejectCalls != 0 {
-		t.Errorf("expected RejectCalls=0, got %d", cb.metrics.RejectCalls)
-	}
-	if cb.metrics.AverageLatency != 0 {
-		t.Errorf("expected AverageLatency=0, got %v", cb.metrics.AverageLatency)
-	}
+	assert.Zero(t, cb.metrics.TotalCalls)
+	assert.Zero(t, cb.metrics.SuccessCalls)
+	assert.Zero(t, cb.metrics.FailureCalls)
+	assert.Zero(t, cb.metrics.RejectCalls)
+	assert.Zero(t, cb.metrics.AverageLatency)
 }
 
 func TestNewFallbackSystem(t *testing.T) {
@@ -418,30 +272,14 @@ func TestNewFallbackSystem(t *testing.T) {
 	}
 
 	fs := NewFallbackSystem(logger, strategies)
-	if fs == nil {
-		t.Fatal("expected non-nil FallbackSystem")
-	}
-	if fs.logger != logger {
-		t.Error("logger not stored")
-	}
-	if len(fs.strategies) != 2 {
-		t.Errorf("expected 2 strategies, got %d", len(fs.strategies))
-	}
-	if fs.strategies[0].Name != "cache_fallback" {
-		t.Errorf("expected strategy name 'cache_fallback', got '%s'", fs.strategies[0].Name)
-	}
-	if fs.strategies[0].Priority != 1 {
-		t.Errorf("expected Priority=1, got %d", fs.strategies[0].Priority)
-	}
-	if fs.strategies[1].Name != "degraded_response" {
-		t.Errorf("expected strategy name 'degraded_response', got '%s'", fs.strategies[1].Name)
-	}
-	if fs.metrics == nil {
-		t.Error("expected non-nil metrics")
-	}
-	if fs.executors == nil {
-		t.Error("expected non-nil executors map")
-	}
+	require.NotNil(t, fs)
+	assert.Equal(t, logger, fs.logger)
+	assert.Len(t, fs.strategies, 2)
+	assert.Equal(t, "cache_fallback", fs.strategies[0].Name)
+	assert.Equal(t, 1, fs.strategies[0].Priority)
+	assert.Equal(t, "degraded_response", fs.strategies[1].Name)
+	assert.NotNil(t, fs.metrics)
+	assert.NotNil(t, fs.executors)
 }
 
 func TestFallbackSystem_EmptyStrategies(t *testing.T) {
@@ -449,12 +287,8 @@ func TestFallbackSystem_EmptyStrategies(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	fs := NewFallbackSystem(logger, []FallbackStrategy{})
 
-	if len(fs.strategies) != 0 {
-		t.Errorf("expected 0 strategies, got %d", len(fs.strategies))
-	}
-	if fs.metrics == nil {
-		t.Error("expected non-nil metrics")
-	}
+	assert.Empty(t, fs.strategies)
+	assert.NotNil(t, fs.metrics)
 }
 
 func TestFallbackSystem_MetricsDefaultState(t *testing.T) {
@@ -462,18 +296,10 @@ func TestFallbackSystem_MetricsDefaultState(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	fs := NewFallbackSystem(logger, []FallbackStrategy{})
 
-	if fs.metrics.TotalInvocations != 0 {
-		t.Errorf("expected TotalInvocations=0, got %d", fs.metrics.TotalInvocations)
-	}
-	if fs.metrics.SuccessCount != 0 {
-		t.Errorf("expected SuccessCount=0, got %d", fs.metrics.SuccessCount)
-	}
-	if fs.metrics.FailureCount != 0 {
-		t.Errorf("expected FailureCount=0, got %d", fs.metrics.FailureCount)
-	}
-	if fs.metrics.AverageLatency != 0 {
-		t.Errorf("expected AverageLatency=0, got %v", fs.metrics.AverageLatency)
-	}
+	assert.Zero(t, fs.metrics.TotalInvocations)
+	assert.Zero(t, fs.metrics.SuccessCount)
+	assert.Zero(t, fs.metrics.FailureCount)
+	assert.Zero(t, fs.metrics.AverageLatency)
 }
 
 func TestNewRecoveryEngine(t *testing.T) {
@@ -482,33 +308,15 @@ func TestNewRecoveryEngine(t *testing.T) {
 	config := RecoveryConfig{}
 
 	re := NewRecoveryEngine(logger, config)
-	if re == nil {
-		t.Fatal("expected non-nil RecoveryEngine")
-	}
-	if re.logger != logger {
-		t.Error("logger not stored")
-	}
-	if re.diagnosticEngine == nil {
-		t.Error("expected non-nil diagnosticEngine")
-	}
-	if re.repairCoordinator == nil {
-		t.Error("expected non-nil repairCoordinator")
-	}
-	if re.restoreManager == nil {
-		t.Error("expected non-nil restoreManager")
-	}
-	if re.mitigationEngine == nil {
-		t.Error("expected non-nil mitigationEngine")
-	}
-	if re.preventionSystem == nil {
-		t.Error("expected non-nil preventionSystem")
-	}
-	if re.recoveryHistory == nil {
-		t.Error("expected non-nil recoveryHistory")
-	}
-	if re.diagnosticCache == nil {
-		t.Error("expected non-nil diagnosticCache")
-	}
+	require.NotNil(t, re)
+	assert.Equal(t, logger, re.logger)
+	assert.NotNil(t, re.diagnosticEngine)
+	assert.NotNil(t, re.repairCoordinator)
+	assert.NotNil(t, re.restoreManager)
+	assert.NotNil(t, re.mitigationEngine)
+	assert.NotNil(t, re.preventionSystem)
+	assert.NotNil(t, re.recoveryHistory)
+	assert.NotNil(t, re.diagnosticCache)
 }
 
 func TestRecoveryEngine_InitiateRecovery(t *testing.T) {
@@ -525,9 +333,7 @@ func TestRecoveryEngine_InitiateRecovery(t *testing.T) {
 	}
 
 	event := re.InitiateRecovery(RecoveryAutomatic, diag)
-	if event == nil {
-		t.Fatal("expected non-nil RecoveryEvent")
-	}
+	require.NotNil(t, event)
 }
 
 func TestRecoveryEngine_RepairComponent(t *testing.T) {
@@ -554,33 +360,15 @@ func TestNewHealthMonitor(t *testing.T) {
 	config := HealthMonitoringConfig{}
 
 	hm := NewHealthMonitor(logger, config)
-	if hm == nil {
-		t.Fatal("expected non-nil HealthMonitor")
-	}
-	if hm.logger != logger {
-		t.Error("logger not stored")
-	}
-	if hm.metricsCollector == nil {
-		t.Error("expected non-nil metricsCollector")
-	}
-	if hm.healthChecker == nil {
-		t.Error("expected non-nil healthChecker")
-	}
-	if hm.anomalyDetector == nil {
-		t.Error("expected non-nil anomalyDetector")
-	}
-	if hm.alertManager == nil {
-		t.Error("expected non-nil alertManager")
-	}
-	if hm.healthStatus == nil {
-		t.Error("expected non-nil healthStatus")
-	}
-	if hm.healthStatus.OverallStatus != HealthUnknown {
-		t.Errorf("expected OverallStatus=HealthUnknown, got %s", hm.healthStatus.OverallStatus)
-	}
-	if hm.monitoringData == nil {
-		t.Error("expected non-nil monitoringData")
-	}
+	require.NotNil(t, hm)
+	assert.Equal(t, logger, hm.logger)
+	assert.NotNil(t, hm.metricsCollector)
+	assert.NotNil(t, hm.healthChecker)
+	assert.NotNil(t, hm.anomalyDetector)
+	assert.NotNil(t, hm.alertManager)
+	assert.NotNil(t, hm.healthStatus)
+	assert.Equal(t, HealthUnknown, hm.healthStatus.OverallStatus)
+	assert.NotNil(t, hm.monitoringData)
 }
 
 func TestHealthMonitor_UpdateHealthStatus(t *testing.T) {
@@ -620,12 +408,8 @@ func TestHealthMonitor_DetectAnomalies(t *testing.T) {
 	}
 
 	anomalies := hm.DetectAnomalies(metrics)
-	if anomalies == nil {
-		t.Fatal("expected non-nil slice, got nil")
-	}
-	if len(anomalies) != 0 {
-		t.Errorf("expected 0 anomalies, got %d", len(anomalies))
-	}
+	require.NotNil(t, anomalies)
+	assert.Empty(t, anomalies)
 }
 
 func TestHealthMonitor_GenerateAlerts(t *testing.T) {
@@ -639,12 +423,8 @@ func TestHealthMonitor_GenerateAlerts(t *testing.T) {
 	}
 
 	alerts := hm.GenerateAlerts(metrics)
-	if alerts == nil {
-		t.Fatal("expected non-nil slice, got nil")
-	}
-	if len(alerts) != 0 {
-		t.Errorf("expected 0 alerts, got %d", len(alerts))
-	}
+	require.NotNil(t, alerts, "alerts should not be nil")
+	assert.Empty(t, alerts, "expected 0 alerts")
 }
 
 func TestHealthMonitor_GetDegradedComponents(t *testing.T) {
@@ -653,12 +433,8 @@ func TestHealthMonitor_GetDegradedComponents(t *testing.T) {
 	hm := NewHealthMonitor(logger, HealthMonitoringConfig{})
 
 	components := hm.GetDegradedComponents()
-	if components == nil {
-		t.Fatal("expected non-nil slice, got nil")
-	}
-	if len(components) != 0 {
-		t.Errorf("expected 0 components, got %d", len(components))
-	}
+	require.NotNil(t, components, "components should not be nil")
+	assert.Empty(t, components, "expected 0 components")
 }
 
 func TestHealthMonitor_GetCurrentMetrics(t *testing.T) {
@@ -667,9 +443,7 @@ func TestHealthMonitor_GetCurrentMetrics(t *testing.T) {
 	hm := NewHealthMonitor(logger, HealthMonitoringConfig{})
 
 	metrics := hm.GetCurrentMetrics()
-	if metrics == nil {
-		t.Fatal("expected non-nil HealthMetrics")
-	}
+	require.NotNil(t, metrics, "expected non-nil HealthMetrics")
 }
 
 func TestHealthMonitor_Shutdown(t *testing.T) {
@@ -685,21 +459,11 @@ func TestNewFaultInjector(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	fi := NewFaultInjector(logger, FaultInjectionConfig{})
 
-	if fi == nil {
-		t.Fatal("expected non-nil FaultInjector")
-	}
-	if fi.logger != logger {
-		t.Error("logger not stored")
-	}
-	if fi.injectionPoints == nil {
-		t.Error("expected non-nil injectionPoints map")
-	}
-	if fi.scenarios == nil {
-		t.Error("expected non-nil scenarios map")
-	}
-	if fi.activeInjections == nil {
-		t.Error("expected non-nil activeInjections map")
-	}
+	require.NotNil(t, fi, "expected non-nil FaultInjector")
+	assert.Equal(t, logger, fi.logger, "logger not stored")
+	assert.NotNil(t, fi.injectionPoints, "expected non-nil injectionPoints map")
+	assert.NotNil(t, fi.scenarios, "expected non-nil scenarios map")
+	assert.NotNil(t, fi.activeInjections, "expected non-nil activeInjections map")
 }
 
 func TestFaultInjector_Inject(t *testing.T) {
@@ -707,30 +471,12 @@ func TestFaultInjector_Inject(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	fi := NewFaultInjector(logger, FaultInjectionConfig{})
 
-	err := fi.InjectFault(FaultNetwork)
-	if err != nil {
-		t.Errorf("InjectFault returned unexpected error: %v", err)
-	}
-	err = fi.InjectFault(FaultDisk)
-	if err != nil {
-		t.Errorf("InjectFault returned unexpected error: %v", err)
-	}
-	err = fi.InjectFault(FaultMemory)
-	if err != nil {
-		t.Errorf("InjectFault returned unexpected error: %v", err)
-	}
-	err = fi.InjectFault(FaultCPU)
-	if err != nil {
-		t.Errorf("InjectFault returned unexpected error: %v", err)
-	}
-	err = fi.InjectFault(FaultProcess)
-	if err != nil {
-		t.Errorf("InjectFault returned unexpected error: %v", err)
-	}
-	err = fi.InjectFault(FaultService)
-	if err != nil {
-		t.Errorf("InjectFault returned unexpected error: %v", err)
-	}
+	require.NoError(t, fi.InjectFault(FaultNetwork), "InjectFault(FaultNetwork)")
+	require.NoError(t, fi.InjectFault(FaultDisk), "InjectFault(FaultDisk)")
+	require.NoError(t, fi.InjectFault(FaultMemory), "InjectFault(FaultMemory)")
+	require.NoError(t, fi.InjectFault(FaultCPU), "InjectFault(FaultCPU)")
+	require.NoError(t, fi.InjectFault(FaultProcess), "InjectFault(FaultProcess)")
+	require.NoError(t, fi.InjectFault(FaultService), "InjectFault(FaultService)")
 }
 
 func TestFaultInjector_Shutdown(t *testing.T) {
@@ -745,30 +491,14 @@ func TestNewDegradationManager(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	dm := NewDegradationManager(logger, DegradationConfig{})
 
-	if dm == nil {
-		t.Fatal("expected non-nil DegradationManager")
-	}
-	if dm.logger != logger {
-		t.Error("logger not stored")
-	}
-	if dm.degradationLevels == nil {
-		t.Error("expected non-nil degradationLevels map")
-	}
-	if dm.modeSelector == nil {
-		t.Error("expected non-nil modeSelector")
-	}
-	if dm.resourceScaler == nil {
-		t.Error("expected non-nil resourceScaler")
-	}
-	if dm.qualityManager == nil {
-		t.Error("expected non-nil qualityManager")
-	}
-	if dm.currentLevel != DegradationNone {
-		t.Errorf("expected currentLevel=%s, got %s", DegradationNone, dm.currentLevel)
-	}
-	if dm.degradationHistory == nil {
-		t.Error("expected non-nil degradationHistory")
-	}
+	require.NotNil(t, dm, "expected non-nil DegradationManager")
+	assert.Equal(t, logger, dm.logger, "logger not stored")
+	assert.NotNil(t, dm.degradationLevels, "expected non-nil degradationLevels map")
+	assert.NotNil(t, dm.modeSelector, "expected non-nil modeSelector")
+	assert.NotNil(t, dm.resourceScaler, "expected non-nil resourceScaler")
+	assert.NotNil(t, dm.qualityManager, "expected non-nil qualityManager")
+	assert.Equal(t, DegradationNone, dm.currentLevel)
+	assert.NotNil(t, dm.degradationHistory, "expected non-nil degradationHistory")
 }
 
 func TestDegradationManager_LevelsAndTransitions(t *testing.T) {
@@ -776,9 +506,7 @@ func TestDegradationManager_LevelsAndTransitions(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	dm := NewDegradationManager(logger, DegradationConfig{})
 
-	if dm.GetCurrentLevel() != DegradationNone {
-		t.Errorf("expected initial level %s, got %s", DegradationNone, dm.GetCurrentLevel())
-	}
+	assert.Equal(t, DegradationNone, dm.GetCurrentLevel())
 
 	dm.ApplyDegradation(DegradationModerate)
 	dm.ApplyDegradation(DegradationSevere)
@@ -799,9 +527,7 @@ func TestDegradationManager_AssessDegradationLevel(t *testing.T) {
 	}
 
 	level := dm.AssessDegradationLevel(metrics)
-	if level != DegradationNone {
-		t.Errorf("expected DegradationNone, got %s", level)
-	}
+	assert.Equal(t, DegradationNone, level)
 }
 
 func TestDegradationManager_ApplyDegradation(t *testing.T) {
@@ -809,9 +535,7 @@ func TestDegradationManager_ApplyDegradation(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	dm := NewDegradationManager(logger, DegradationConfig{})
 
-	if dm.GetCurrentLevel() != DegradationNone {
-		t.Errorf("expected initial currentLevel=%s, got %s", DegradationNone, dm.GetCurrentLevel())
-	}
+	assert.Equal(t, DegradationNone, dm.GetCurrentLevel())
 
 	dm.ApplyDegradation(DegradationModerate)
 	dm.ApplyDegradation(DegradationSevere)
@@ -830,27 +554,13 @@ func TestNewEmergencyProtocols(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ep := NewEmergencyProtocols(logger, EmergencyConfig{})
 
-	if ep == nil {
-		t.Fatal("expected non-nil EmergencyProtocols")
-	}
-	if ep.logger != logger {
-		t.Error("logger not stored")
-	}
-	if ep.protocols == nil {
-		t.Error("expected non-nil protocols map")
-	}
-	if ep.responseEngine == nil {
-		t.Error("expected non-nil responseEngine")
-	}
-	if ep.coordination == nil {
-		t.Error("expected non-nil coordination")
-	}
-	if ep.escalation == nil {
-		t.Error("expected non-nil escalation")
-	}
-	if ep.activeEmergencies == nil {
-		t.Error("expected non-nil activeEmergencies map")
-	}
+	require.NotNil(t, ep, "expected non-nil EmergencyProtocols")
+	assert.Equal(t, logger, ep.logger, "logger not stored")
+	assert.NotNil(t, ep.protocols, "expected non-nil protocols map")
+	assert.NotNil(t, ep.responseEngine, "expected non-nil responseEngine")
+	assert.NotNil(t, ep.coordination, "expected non-nil coordination")
+	assert.NotNil(t, ep.escalation, "expected non-nil escalation")
+	assert.NotNil(t, ep.activeEmergencies, "expected non-nil activeEmergencies map")
 }
 
 func TestEmergencyProtocols_Activate(t *testing.T) {
@@ -882,27 +592,13 @@ func TestNewResilienceAnalyzer(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ra := NewResilienceAnalyzer(logger, ResilienceConfig{})
 
-	if ra == nil {
-		t.Fatal("expected non-nil ResilienceAnalyzer")
-	}
-	if ra.logger != logger {
-		t.Error("logger not stored")
-	}
-	if ra.stressTester == nil {
-		t.Error("expected non-nil stressTester")
-	}
-	if ra.failureAnalyzer == nil {
-		t.Error("expected non-nil failureAnalyzer")
-	}
-	if ra.improvementEngine == nil {
-		t.Error("expected non-nil improvementEngine")
-	}
-	if ra.resilienceMetrics == nil {
-		t.Error("expected non-nil resilienceMetrics")
-	}
-	if ra.analysisHistory == nil {
-		t.Error("expected non-nil analysisHistory")
-	}
+	require.NotNil(t, ra, "expected non-nil ResilienceAnalyzer")
+	assert.Equal(t, logger, ra.logger, "logger not stored")
+	assert.NotNil(t, ra.stressTester, "expected non-nil stressTester")
+	assert.NotNil(t, ra.failureAnalyzer, "expected non-nil failureAnalyzer")
+	assert.NotNil(t, ra.improvementEngine, "expected non-nil improvementEngine")
+	assert.NotNil(t, ra.resilienceMetrics, "expected non-nil resilienceMetrics")
+	assert.NotNil(t, ra.analysisHistory, "expected non-nil analysisHistory")
 }
 
 func TestResilienceAnalyzer_StoreAnalysis(t *testing.T) {
@@ -953,24 +649,12 @@ func TestErrorClassifier(t *testing.T) {
 	}
 
 	ec := NewErrorClassifier(logger, rules)
-	if ec == nil {
-		t.Fatal("expected non-nil ErrorClassifier")
-	}
-	if ec.logger != logger {
-		t.Error("logger not stored")
-	}
-	if len(ec.rules) != 2 {
-		t.Errorf("expected 2 rules, got %d", len(ec.rules))
-	}
-	if ec.rules[0].Name != "network_error" {
-		t.Errorf("expected rule name 'network_error', got '%s'", ec.rules[0].Name)
-	}
-	if ec.rules[1].Name != "db_error" {
-		t.Errorf("expected rule name 'db_error', got '%s'", ec.rules[1].Name)
-	}
-	if ec.cache == nil {
-		t.Error("expected non-nil cache")
-	}
+	require.NotNil(t, ec)
+	assert.Equal(t, logger, ec.logger)
+	assert.Len(t, ec.rules, 2)
+	assert.Equal(t, "network_error", ec.rules[0].Name)
+	assert.Equal(t, "db_error", ec.rules[1].Name)
+	assert.NotNil(t, ec.cache)
 }
 
 func TestErrorReporter(t *testing.T) {
@@ -978,12 +662,8 @@ func TestErrorReporter(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	er := NewErrorReporter(logger, ErrorReportingConfig{})
 
-	if er == nil {
-		t.Fatal("expected non-nil ErrorReporter")
-	}
-	if er.logger != logger {
-		t.Error("logger not stored")
-	}
+	require.NotNil(t, er)
+	assert.Equal(t, logger, er.logger)
 }
 
 func TestRobustnessManager_Concurrency(t *testing.T) {
@@ -995,9 +675,7 @@ func TestRobustnessManager_Concurrency(t *testing.T) {
 	}
 
 	rm, err := NewRobustnessManager(logger, config)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	var wg sync.WaitGroup
 	for i := 0; i < 10; i++ {
@@ -1012,9 +690,7 @@ func TestRobustnessManager_Concurrency(t *testing.T) {
 	wg.Wait()
 
 	err = rm.Start()
-	if err != nil {
-		t.Fatalf("Start() returned error: %v", err)
-	}
+	require.NoError(t, err, "Start()")
 	time.Sleep(50 * time.Millisecond)
 
 	rm.Stop()
@@ -1025,17 +701,11 @@ func TestRobustnessManager_MultipleStarts(t *testing.T) {
 	rm, err := NewRobustnessManager(logger, RobustnessConfig{
 		EnableHealthMonitoring: true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if err := rm.Start(); err != nil {
-		t.Fatalf("first Start() failed: %v", err)
-	}
+	require.NoError(t, rm.Start(), "first Start()")
 
-	if err := rm.Start(); err == nil {
-		t.Error("expected error on second Start()")
-	}
+	require.Error(t, rm.Start(), "expected error on second Start()")
 
 	rm.Stop()
 }
@@ -1053,23 +723,15 @@ func TestRobustnessManager_ErrorHandlerIntegration(t *testing.T) {
 			},
 		},
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if rm.errorHandler == nil {
-		t.Fatal("errorHandler should be initialized")
-	}
+	require.NotNil(t, rm.errorHandler)
 
 	classification := rm.errorHandler.ClassifyError(errors.New("test error"))
-	if classification == nil {
-		t.Error("classification should not be nil")
-	}
+	assert.NotNil(t, classification)
 
 	pending := rm.errorHandler.GetPendingErrors()
-	if pending == nil {
-		t.Error("pending errors should not be nil")
-	}
+	assert.NotNil(t, pending)
 
 	rm.errorHandler.Shutdown()
 }
@@ -1079,21 +741,15 @@ func TestRobustnessManager_RecoveryEngineIntegration(t *testing.T) {
 	rm, err := NewRobustnessManager(logger, RobustnessConfig{
 		EnableSelfHealing: true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if rm.recoveryEngine == nil {
-		t.Fatal("recoveryEngine should be initialized")
-	}
+	require.NotNil(t, rm.recoveryEngine)
 
 	event := rm.recoveryEngine.InitiateRecovery(RecoveryAutomatic, &DiagnosticResult{
 		TestName: "integration_test",
 		Status:   TestFailed,
 	})
-	if event == nil {
-		t.Error("RecoveryEvent should not be nil")
-	}
+	assert.NotNil(t, event)
 
 	rm.recoveryEngine.RepairComponent("test_component")
 	rm.recoveryEngine.Shutdown()
@@ -1104,23 +760,15 @@ func TestRobustnessManager_HealthMonitorIntegration(t *testing.T) {
 	rm, err := NewRobustnessManager(logger, RobustnessConfig{
 		EnableHealthMonitoring: true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if rm.healthMonitor == nil {
-		t.Fatal("healthMonitor should be initialized")
-	}
+	require.NotNil(t, rm.healthMonitor)
 
 	metrics := rm.healthMonitor.GetCurrentMetrics()
-	if metrics == nil {
-		t.Error("GetCurrentMetrics() should not return nil")
-	}
+	assert.NotNil(t, metrics)
 
 	components := rm.healthMonitor.GetDegradedComponents()
-	if components == nil {
-		t.Error("GetDegradedComponents() should not return nil slice")
-	}
+	assert.NotNil(t, components)
 
 	rm.healthMonitor.UpdateHealthStatus(&HealthMetrics{
 		Uptime:       10 * time.Minute,
@@ -1144,48 +792,28 @@ func TestNewRobustnessManager_AllComponentsEnabled(t *testing.T) {
 	}
 
 	rm, err := NewRobustnessManager(logger, config)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if rm.errorHandler == nil {
-		t.Error("errorHandler must be initialized when enabled")
-	}
-	if rm.recoveryEngine == nil {
-		t.Error("recoveryEngine must be initialized when enabled")
-	}
-	if rm.faultInjector == nil {
-		t.Error("faultInjector must be initialized when enabled")
-	}
-	if rm.healthMonitor == nil {
-		t.Error("healthMonitor must be initialized when enabled")
-	}
-	if rm.degradationManager == nil {
-		t.Error("degradationManager must be initialized when enabled")
-	}
-	if rm.emergencyProtocols == nil {
-		t.Error("emergencyProtocols must be initialized when enabled")
-	}
-	if rm.resilienceAnalyzer == nil {
-		t.Error("resilienceAnalyzer must be initialized (always created)")
-	}
+	assert.NotNil(t, rm.errorHandler)
+	assert.NotNil(t, rm.recoveryEngine)
+	assert.NotNil(t, rm.faultInjector)
+	assert.NotNil(t, rm.healthMonitor)
+	assert.NotNil(t, rm.degradationManager)
+	assert.NotNil(t, rm.emergencyProtocols)
+	assert.NotNil(t, rm.resilienceAnalyzer)
 }
 
 func TestRobustnessManager_Context(t *testing.T) {
 	t.Parallel()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	rm, err := NewRobustnessManager(logger, RobustnessConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if rm.ctx == nil {
-		t.Fatal("context should not be nil")
-	}
+	require.NotNil(t, rm.ctx)
 
 	select {
 	case <-rm.ctx.Done():
-		t.Fatal("context should not be cancelled initially")
+		require.Fail(t, "context should not be cancelled initially")
 	default:
 	}
 
@@ -1194,7 +822,7 @@ func TestRobustnessManager_Context(t *testing.T) {
 	select {
 	case <-rm.ctx.Done():
 	default:
-		t.Fatal("context should be cancelled after cancel()")
+		require.Fail(t, "context should be cancelled after cancel()")
 	}
 }
 
@@ -1202,14 +830,10 @@ func TestRobustnessManager_Logging(t *testing.T) {
 	t.Parallel()
 	logger := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	rm, err := NewRobustnessManager(logger, RobustnessConfig{EnableErrorHandling: true})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	err = rm.Start()
-	if err != nil {
-		t.Fatalf("Start() returned error: %v", err)
-	}
+	require.NoError(t, err, "Start()")
 
 	rm.Stop()
 }
@@ -1219,20 +843,14 @@ func TestRobustnessManager_DegradationManagerIntegration(t *testing.T) {
 	rm, err := NewRobustnessManager(logger, RobustnessConfig{
 		EnableDegradation: true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if rm.degradationManager == nil {
-		t.Fatal("degradationManager should be initialized")
-	}
+	require.NotNil(t, rm.degradationManager)
 
 	level := rm.degradationManager.AssessDegradationLevel(&HealthMetrics{
 		ResourceUsage: &ResourceUsage{CPU: 99.9, Memory: 95.0},
 	})
-	if level != DegradationNone {
-		t.Errorf("expected DegradationNone, got %s", level)
-	}
+	assert.Equal(t, DegradationNone, level)
 
 	rm.degradationManager.ApplyDegradation(DegradationModerate)
 	rm.degradationManager.Shutdown()
@@ -1243,13 +861,9 @@ func TestRobustnessManager_EmergencyProtocolsIntegration(t *testing.T) {
 	rm, err := NewRobustnessManager(logger, RobustnessConfig{
 		EnableEmergencyProtocols: true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if rm.emergencyProtocols == nil {
-		t.Fatal("emergencyProtocols should be initialized")
-	}
+	require.NotNil(t, rm.emergencyProtocols, "emergencyProtocols should be initialized")
 
 	rm.emergencyProtocols.ActivateProtocol(EmergencySystemCrash)
 	rm.emergencyProtocols.ActivateProtocol(EmergencySecurityBreach)
@@ -1261,30 +875,20 @@ func TestRobustnessManager_FaultInjectorIntegration(t *testing.T) {
 	rm, err := NewRobustnessManager(logger, RobustnessConfig{
 		EnableFaultInjection: true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if rm.faultInjector == nil {
-		t.Fatal("faultInjector should be initialized")
-	}
+	require.NotNil(t, rm.faultInjector)
 
-	if err := rm.faultInjector.InjectFault(FaultNetwork); err != nil {
-		t.Errorf("InjectFault returned error: %v", err)
-	}
+	require.NoError(t, rm.faultInjector.InjectFault(FaultNetwork))
 	rm.faultInjector.Shutdown()
 }
 
 func TestRobustnessManager_ResilienceAnalyzerIntegration(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	rm, err := NewRobustnessManager(logger, RobustnessConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if rm.resilienceAnalyzer == nil {
-		t.Fatal("resilienceAnalyzer should be initialized")
-	}
+	require.NotNil(t, rm.resilienceAnalyzer)
 
 	analysis := &ResilienceAnalysis{
 		ID:      "test_001",
@@ -1299,21 +903,11 @@ func TestErrorEvent_Defaults(t *testing.T) {
 	t.Parallel()
 	event := &ErrorEvent{}
 
-	if event.ID != "" {
-		t.Errorf("expected empty ID, got %s", event.ID)
-	}
-	if event.RetryCount != 0 {
-		t.Errorf("expected RetryCount=0, got %d", event.RetryCount)
-	}
-	if event.FallbackUsed {
-		t.Error("expected FallbackUsed=false")
-	}
-	if event.Handled {
-		t.Error("expected Handled=false")
-	}
-	if event.Context != nil {
-		t.Error("expected nil Context")
-	}
+	assert.Empty(t, event.ID)
+	assert.Zero(t, event.RetryCount)
+	assert.False(t, event.FallbackUsed)
+	assert.False(t, event.Handled)
+	assert.Nil(t, event.Context)
 }
 
 func TestErrorEvent_Full(t *testing.T) {
@@ -1335,54 +929,26 @@ func TestErrorEvent_Full(t *testing.T) {
 		Handled:      true,
 	}
 
-	if event.ID != "evt-001" {
-		t.Errorf("expected ID 'evt-001', got '%s'", event.ID)
-	}
-	if !event.Timestamp.Equal(now) {
-		t.Errorf("timestamp mismatch")
-	}
-	if event.Error.Error() != "connection timeout" {
-		t.Errorf("unexpected error message: %s", event.Error.Error())
-	}
-	if len(event.Classification.Categories) != 1 || event.Classification.Categories[0] != ErrorCategoryNetwork {
-		t.Errorf("unexpected classification categories")
-	}
-	if event.Classification.Severity != SeverityHigh {
-		t.Errorf("expected Severity=%s, got %s", SeverityHigh, event.Classification.Severity)
-	}
-	if !event.Classification.Transient {
-		t.Error("expected Transient=true")
-	}
-	if !event.Classification.Retryable {
-		t.Error("expected Retryable=true")
-	}
-	if event.RetryCount != 2 {
-		t.Errorf("expected RetryCount=2, got %d", event.RetryCount)
-	}
-	if !event.FallbackUsed {
-		t.Error("expected FallbackUsed=true")
-	}
-	if !event.Handled {
-		t.Error("expected Handled=true")
-	}
+	assert.Equal(t, "evt-001", event.ID)
+	assert.True(t, event.Timestamp.Equal(now))
+	assert.Equal(t, "connection timeout", event.Error.Error())
+	assert.Equal(t, []ErrorCategory{ErrorCategoryNetwork}, event.Classification.Categories)
+	assert.Equal(t, SeverityHigh, event.Classification.Severity)
+	assert.True(t, event.Classification.Transient)
+	assert.True(t, event.Classification.Retryable)
+	assert.Equal(t, 2, event.RetryCount)
+	assert.True(t, event.FallbackUsed)
+	assert.True(t, event.Handled)
 }
 
 func TestCircuitState_Defaults(t *testing.T) {
 	t.Parallel()
 	cs := &CircuitState{}
 
-	if cs.State != "" {
-		t.Errorf("expected empty State, got %s", cs.State)
-	}
-	if cs.FailureCount != 0 {
-		t.Errorf("expected FailureCount=0, got %d", cs.FailureCount)
-	}
-	if cs.SuccessCount != 0 {
-		t.Errorf("expected SuccessCount=0, got %d", cs.SuccessCount)
-	}
-	if cs.Metrics != nil {
-		t.Error("expected nil Metrics")
-	}
+	assert.Empty(t, cs.State)
+	assert.Zero(t, cs.FailureCount)
+	assert.Zero(t, cs.SuccessCount)
+	assert.Nil(t, cs.Metrics)
 }
 
 func TestCircuitState_Full(t *testing.T) {
@@ -1399,41 +965,21 @@ func TestCircuitState_Full(t *testing.T) {
 		Metrics:      &CircuitMetrics{TotalCalls: 100, SuccessCalls: 95, FailureCalls: 5},
 	}
 
-	if cs.Name != "db_circuit" {
-		t.Errorf("expected Name 'db_circuit', got '%s'", cs.Name)
-	}
-	if cs.State != CircuitClosed {
-		t.Errorf("expected State=%s, got %s", CircuitClosed, cs.State)
-	}
-	if cs.FailureCount != 0 {
-		t.Errorf("expected FailureCount=0, got %d", cs.FailureCount)
-	}
-	if cs.SuccessCount != 5 {
-		t.Errorf("expected SuccessCount=5, got %d", cs.SuccessCount)
-	}
-	if cs.Timeout != 10*time.Second {
-		t.Errorf("expected Timeout=10s, got %v", cs.Timeout)
-	}
-	if cs.Metrics.TotalCalls != 100 {
-		t.Errorf("expected TotalCalls=100, got %d", cs.Metrics.TotalCalls)
-	}
-	if cs.Metrics.SuccessCalls != 95 {
-		t.Errorf("expected SuccessCalls=95, got %d", cs.Metrics.SuccessCalls)
-	}
+	assert.Equal(t, "db_circuit", cs.Name)
+	assert.Equal(t, CircuitClosed, cs.State)
+	assert.Zero(t, cs.FailureCount)
+	assert.Equal(t, 5, cs.SuccessCount)
+	assert.Equal(t, 10*time.Second, cs.Timeout)
+	assert.Equal(t, int64(100), cs.Metrics.TotalCalls)
+	assert.Equal(t, int64(95), cs.Metrics.SuccessCalls)
 }
 
 func TestCircuitStateEnumValues(t *testing.T) {
 	t.Parallel()
 
-	if CircuitClosed != "closed" {
-		t.Errorf("CircuitClosed = %q, want %q", CircuitClosed, "closed")
-	}
-	if CircuitOpen != "open" {
-		t.Errorf("CircuitOpen = %q, want %q", CircuitOpen, "open")
-	}
-	if CircuitHalfOpen != "half_open" {
-		t.Errorf("CircuitHalfOpen = %q, want %q", CircuitHalfOpen, "half_open")
-	}
+	assert.Equal(t, CircuitStateEnum("closed"), CircuitClosed)
+	assert.Equal(t, CircuitStateEnum("open"), CircuitOpen)
+	assert.Equal(t, CircuitStateEnum("half_open"), CircuitHalfOpen)
 }
 
 func TestErrorCategoryValues(t *testing.T) {
@@ -1456,50 +1002,28 @@ func TestErrorCategoryValues(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if tt.got != tt.want {
-			t.Errorf("ErrorCategory(%q) mismatch: got %q, want %q", tt.got, tt.got, tt.want)
-		}
+		assert.Equal(t, tt.want, tt.got, "ErrorCategory(%q) mismatch", tt.got)
 	}
 }
 
 func TestErrorSeverityValues(t *testing.T) {
 	t.Parallel()
 
-	if SeverityLow != "low" {
-		t.Errorf("SeverityLow = %q, want %q", SeverityLow, "low")
-	}
-	if SeverityMedium != "medium" {
-		t.Errorf("SeverityMedium = %q, want %q", SeverityMedium, "medium")
-	}
-	if SeverityHigh != "high" {
-		t.Errorf("SeverityHigh = %q, want %q", SeverityHigh, "high")
-	}
-	if SeverityCritical != "critical" {
-		t.Errorf("SeverityCritical = %q, want %q", SeverityCritical, "critical")
-	}
-	if SeverityFatal != "fatal" {
-		t.Errorf("SeverityFatal = %q, want %q", SeverityFatal, "fatal")
-	}
+	assert.Equal(t, ErrorSeverity("low"), SeverityLow)
+	assert.Equal(t, ErrorSeverity("medium"), SeverityMedium)
+	assert.Equal(t, ErrorSeverity("high"), SeverityHigh)
+	assert.Equal(t, ErrorSeverity("critical"), SeverityCritical)
+	assert.Equal(t, ErrorSeverity("fatal"), SeverityFatal)
 }
 
 func TestHealthStatusValues(t *testing.T) {
 	t.Parallel()
 
-	if HealthHealthy != "healthy" {
-		t.Errorf("HealthHealthy = %q, want %q", HealthHealthy, "healthy")
-	}
-	if HealthDegraded != "degraded" {
-		t.Errorf("HealthDegraded = %q, want %q", HealthDegraded, "degraded")
-	}
-	if HealthUnhealthy != "unhealthy" {
-		t.Errorf("HealthUnhealthy = %q, want %q", HealthUnhealthy, "unhealthy")
-	}
-	if HealthCritical != "critical" {
-		t.Errorf("HealthCritical = %q, want %q", HealthCritical, "critical")
-	}
-	if HealthUnknown != "unknown" {
-		t.Errorf("HealthUnknown = %q, want %q", HealthUnknown, "unknown")
-	}
+	assert.Equal(t, HealthStatus("healthy"), HealthHealthy)
+	assert.Equal(t, HealthStatus("degraded"), HealthDegraded)
+	assert.Equal(t, HealthStatus("unhealthy"), HealthUnhealthy)
+	assert.Equal(t, HealthStatus("critical"), HealthCritical)
+	assert.Equal(t, HealthStatus("unknown"), HealthUnknown)
 }
 
 func TestDegradationLevelValues(t *testing.T) {
@@ -1517,144 +1041,76 @@ func TestDegradationLevelValues(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		if tt.got != tt.want {
-			t.Errorf("DegradationLevel(%q) mismatch: got %q, want %q", tt.got, tt.got, tt.want)
-		}
+		assert.Equal(t, tt.want, tt.got, "DegradationLevel(%q) mismatch", tt.got)
 	}
 }
 
 func TestRecoveryTypeValues(t *testing.T) {
 	t.Parallel()
 
-	if RecoveryAutomatic != "automatic" {
-		t.Errorf("RecoveryAutomatic = %q, want %q", RecoveryAutomatic, "automatic")
-	}
-	if RecoveryManual != "manual" {
-		t.Errorf("RecoveryManual = %q, want %q", RecoveryManual, "manual")
-	}
-	if RecoveryForced != "forced" {
-		t.Errorf("RecoveryForced = %q, want %q", RecoveryForced, "forced")
-	}
+	assert.Equal(t, RecoveryType("automatic"), RecoveryAutomatic)
+	assert.Equal(t, RecoveryType("manual"), RecoveryManual)
+	assert.Equal(t, RecoveryType("forced"), RecoveryForced)
 }
 
 func TestRecoveryStatusValues(t *testing.T) {
 	t.Parallel()
 
-	if RecoveryPending != "pending" {
-		t.Errorf("RecoveryPending = %q, want %q", RecoveryPending, "pending")
-	}
-	if RecoveryRunning != "running" {
-		t.Errorf("RecoveryRunning = %q, want %q", RecoveryRunning, "running")
-	}
-	if RecoveryCompleted != "completed" {
-		t.Errorf("RecoveryCompleted = %q, want %q", RecoveryCompleted, "completed")
-	}
-	if RecoveryFailed != "failed" {
-		t.Errorf("RecoveryFailed = %q, want %q", RecoveryFailed, "failed")
-	}
+	assert.Equal(t, RecoveryStatus("pending"), RecoveryPending)
+	assert.Equal(t, RecoveryStatus("running"), RecoveryRunning)
+	assert.Equal(t, RecoveryStatus("completed"), RecoveryCompleted)
+	assert.Equal(t, RecoveryStatus("failed"), RecoveryFailed)
 }
 
 func TestTestStatusValues(t *testing.T) {
 	t.Parallel()
 
-	if TestPassed != "passed" {
-		t.Errorf("TestPassed = %q, want %q", TestPassed, "passed")
-	}
-	if TestFailed != "failed" {
-		t.Errorf("TestFailed = %q, want %q", TestFailed, "failed")
-	}
-	if TestSkipped != "skipped" {
-		t.Errorf("TestSkipped = %q, want %q", TestSkipped, "skipped")
-	}
-	if TestTimeout != "timeout" {
-		t.Errorf("TestTimeout = %q, want %q", TestTimeout, "timeout")
-	}
+	assert.Equal(t, TestStatus("passed"), TestPassed)
+	assert.Equal(t, TestStatus("failed"), TestFailed)
+	assert.Equal(t, TestStatus("skipped"), TestSkipped)
+	assert.Equal(t, TestStatus("timeout"), TestTimeout)
 }
 
 func TestEmergencyTypeValues(t *testing.T) {
 	t.Parallel()
 
-	if EmergencySystemCrash != "system_crash" {
-		t.Errorf("EmergencySystemCrash = %q, want %q", EmergencySystemCrash, "system_crash")
-	}
-	if EmergencyResourceExhaustion != "resource_exhaustion" {
-		t.Errorf("EmergencyResourceExhaustion = %q, want %q", EmergencyResourceExhaustion, "resource_exhaustion")
-	}
-	if EmergencySecurityBreach != "security_breach" {
-		t.Errorf("EmergencySecurityBreach = %q, want %q", EmergencySecurityBreach, "security_breach")
-	}
-	if EmergencyNetworkFailure != "network_failure" {
-		t.Errorf("EmergencyNetworkFailure = %q, want %q", EmergencyNetworkFailure, "network_failure")
-	}
-	if EmergencyDataLoss != "data_loss" {
-		t.Errorf("EmergencyDataLoss = %q, want %q", EmergencyDataLoss, "data_loss")
-	}
-	if EmergencyServiceOutage != "service_outage" {
-		t.Errorf("EmergencyServiceOutage = %q, want %q", EmergencyServiceOutage, "service_outage")
-	}
+	assert.Equal(t, EmergencyType("system_crash"), EmergencySystemCrash)
+	assert.Equal(t, EmergencyType("resource_exhaustion"), EmergencyResourceExhaustion)
+	assert.Equal(t, EmergencyType("security_breach"), EmergencySecurityBreach)
+	assert.Equal(t, EmergencyType("network_failure"), EmergencyNetworkFailure)
+	assert.Equal(t, EmergencyType("data_loss"), EmergencyDataLoss)
+	assert.Equal(t, EmergencyType("service_outage"), EmergencyServiceOutage)
 }
 
 func TestFaultTypeValues(t *testing.T) {
 	t.Parallel()
 
-	if FaultNetwork != "network" {
-		t.Errorf("FaultNetwork = %q, want %q", FaultNetwork, "network")
-	}
-	if FaultDisk != "disk" {
-		t.Errorf("FaultDisk = %q, want %q", FaultDisk, "disk")
-	}
-	if FaultMemory != "memory" {
-		t.Errorf("FaultMemory = %q, want %q", FaultMemory, "memory")
-	}
-	if FaultCPU != "cpu" {
-		t.Errorf("FaultCPU = %q, want %q", FaultCPU, "cpu")
-	}
-	if FaultProcess != "process" {
-		t.Errorf("FaultProcess = %q, want %q", FaultProcess, "process")
-	}
-	if FaultService != "service" {
-		t.Errorf("FaultService = %q, want %q", FaultService, "service")
-	}
+	assert.Equal(t, FaultType("network"), FaultNetwork)
+	assert.Equal(t, FaultType("disk"), FaultDisk)
+	assert.Equal(t, FaultType("memory"), FaultMemory)
+	assert.Equal(t, FaultType("cpu"), FaultCPU)
+	assert.Equal(t, FaultType("process"), FaultProcess)
+	assert.Equal(t, FaultType("service"), FaultService)
 }
 
 func TestDiagnosticTypeValues(t *testing.T) {
 	t.Parallel()
 
-	if DiagnosticSystem != "system" {
-		t.Errorf("DiagnosticSystem = %q, want %q", DiagnosticSystem, "system")
-	}
-	if DiagnosticNetwork != "network" {
-		t.Errorf("DiagnosticNetwork = %q, want %q", DiagnosticNetwork, "network")
-	}
-	if DiagnosticStorage != "storage" {
-		t.Errorf("DiagnosticStorage = %q, want %q", DiagnosticStorage, "storage")
-	}
-	if DiagnosticMemory != "memory" {
-		t.Errorf("DiagnosticMemory = %q, want %q", DiagnosticMemory, "memory")
-	}
-	if DiagnosticCPU != "cpu" {
-		t.Errorf("DiagnosticCPU = %q, want %q", DiagnosticCPU, "cpu")
-	}
-	if DiagnosticSecurity != "security" {
-		t.Errorf("DiagnosticSecurity = %q, want %q", DiagnosticSecurity, "security")
-	}
+	assert.Equal(t, DiagnosticType("system"), DiagnosticSystem)
+	assert.Equal(t, DiagnosticType("network"), DiagnosticNetwork)
+	assert.Equal(t, DiagnosticType("storage"), DiagnosticStorage)
+	assert.Equal(t, DiagnosticType("memory"), DiagnosticMemory)
+	assert.Equal(t, DiagnosticType("cpu"), DiagnosticCPU)
+	assert.Equal(t, DiagnosticType("security"), DiagnosticSecurity)
 }
 
 func TestAlertSeverityValues(t *testing.T) {
 	t.Parallel()
 
-	if AlertLow != "low" {
-		t.Errorf("AlertLow = %q, want %q", AlertLow, "low")
-	}
-	if AlertMedium != "medium" {
-		t.Errorf("AlertMedium = %q, want %q", AlertMedium, "medium")
-	}
-	if AlertHigh != "high" {
-		t.Errorf("AlertHigh = %q, want %q", AlertHigh, "high")
-	}
-	if AlertCritical != "critical" {
-		t.Errorf("AlertCritical = %q, want %q", AlertCritical, "critical")
-	}
+	assert.Equal(t, AlertSeverity("low"), AlertLow)
+	assert.Equal(t, AlertSeverity("medium"), AlertMedium)
+	assert.Equal(t, AlertSeverity("high"), AlertHigh)
+	assert.Equal(t, AlertSeverity("critical"), AlertCritical)
 }
 
 func TestSystemHealthStatus_Defaults(t *testing.T) {
@@ -1662,18 +1118,10 @@ func TestSystemHealthStatus_Defaults(t *testing.T) {
 
 	hs := &SystemHealthStatus{}
 
-	if hs.OverallStatus != "" {
-		t.Errorf("expected empty OverallStatus, got %s", hs.OverallStatus)
-	}
-	if hs.ComponentStatus != nil {
-		t.Error("expected nil ComponentStatus")
-	}
-	if hs.Metrics != nil {
-		t.Error("expected nil Metrics")
-	}
-	if hs.Alerts != nil {
-		t.Error("expected nil Alerts")
-	}
+	assert.Empty(t, hs.OverallStatus)
+	assert.Nil(t, hs.ComponentStatus)
+	assert.Nil(t, hs.Metrics)
+	assert.Nil(t, hs.Alerts)
 }
 
 func TestHealthMetrics_Defaults(t *testing.T) {
@@ -1681,18 +1129,10 @@ func TestHealthMetrics_Defaults(t *testing.T) {
 
 	hm := &HealthMetrics{}
 
-	if hm.Uptime != 0 {
-		t.Errorf("expected Uptime=0, got %v", hm.Uptime)
-	}
-	if hm.ErrorRate != 0 {
-		t.Errorf("expected ErrorRate=0, got %f", hm.ErrorRate)
-	}
-	if hm.Throughput != 0 {
-		t.Errorf("expected Throughput=0, got %f", hm.Throughput)
-	}
-	if hm.ResourceUsage != nil {
-		t.Error("expected nil ResourceUsage")
-	}
+	assert.Zero(t, hm.Uptime)
+	assert.Zero(t, hm.ErrorRate)
+	assert.Zero(t, hm.Throughput)
+	assert.Nil(t, hm.ResourceUsage)
 }
 
 func TestHealthMetrics_Full(t *testing.T) {
@@ -1713,30 +1153,14 @@ func TestHealthMetrics_Full(t *testing.T) {
 		Reliability:  0.999,
 	}
 
-	if hm.Uptime != 24*time.Hour {
-		t.Errorf("expected Uptime=24h, got %v", hm.Uptime)
-	}
-	if hm.ResponseTime != 200*time.Millisecond {
-		t.Errorf("expected ResponseTime=200ms, got %v", hm.ResponseTime)
-	}
-	if hm.ErrorRate != 0.03 {
-		t.Errorf("expected ErrorRate=0.03, got %f", hm.ErrorRate)
-	}
-	if hm.Throughput != 1500.0 {
-		t.Errorf("expected Throughput=1500, got %f", hm.Throughput)
-	}
-	if hm.ResourceUsage.CPU != 50.0 {
-		t.Errorf("expected CPU=50, got %f", hm.ResourceUsage.CPU)
-	}
-	if hm.ResourceUsage.Memory != 70.0 {
-		t.Errorf("expected Memory=70, got %f", hm.ResourceUsage.Memory)
-	}
-	if hm.Availability != 0.9999 {
-		t.Errorf("expected Availability=0.9999, got %f", hm.Availability)
-	}
-	if hm.Reliability != 0.999 {
-		t.Errorf("expected Reliability=0.999, got %f", hm.Reliability)
-	}
+	assert.Equal(t, 24*time.Hour, hm.Uptime)
+	assert.Equal(t, 200*time.Millisecond, hm.ResponseTime)
+	assert.Equal(t, 0.03, hm.ErrorRate)
+	assert.Equal(t, 1500.0, hm.Throughput)
+	assert.Equal(t, 50.0, hm.ResourceUsage.CPU)
+	assert.Equal(t, 70.0, hm.ResourceUsage.Memory)
+	assert.Equal(t, 0.9999, hm.Availability)
+	assert.Equal(t, 0.999, hm.Reliability)
 }
 
 func TestResourceUsage_Defaults(t *testing.T) {
@@ -1744,18 +1168,10 @@ func TestResourceUsage_Defaults(t *testing.T) {
 
 	ru := &ResourceUsage{}
 
-	if ru.CPU != 0 {
-		t.Errorf("expected CPU=0, got %f", ru.CPU)
-	}
-	if ru.Memory != 0 {
-		t.Errorf("expected Memory=0, got %f", ru.Memory)
-	}
-	if ru.Disk != 0 {
-		t.Errorf("expected Disk=0, got %f", ru.Disk)
-	}
-	if ru.Network != 0 {
-		t.Errorf("expected Network=0, got %f", ru.Network)
-	}
+	assert.Zero(t, ru.CPU)
+	assert.Zero(t, ru.Memory)
+	assert.Zero(t, ru.Disk)
+	assert.Zero(t, ru.Network)
 }
 
 func TestRobustnessConfig_Defaults(t *testing.T) {
@@ -1763,24 +1179,12 @@ func TestRobustnessConfig_Defaults(t *testing.T) {
 
 	cfg := RobustnessConfig{}
 
-	if cfg.EnableErrorHandling {
-		t.Error("expected EnableErrorHandling=false")
-	}
-	if cfg.EnableSelfHealing {
-		t.Error("expected EnableSelfHealing=false")
-	}
-	if cfg.EnableFaultInjection {
-		t.Error("expected EnableFaultInjection=false")
-	}
-	if cfg.EnableHealthMonitoring {
-		t.Error("expected EnableHealthMonitoring=false")
-	}
-	if cfg.EnableDegradation {
-		t.Error("expected EnableDegradation=false")
-	}
-	if cfg.EnableEmergencyProtocols {
-		t.Error("expected EnableEmergencyProtocols=false")
-	}
+	assert.False(t, cfg.EnableErrorHandling)
+	assert.False(t, cfg.EnableSelfHealing)
+	assert.False(t, cfg.EnableFaultInjection)
+	assert.False(t, cfg.EnableHealthMonitoring)
+	assert.False(t, cfg.EnableDegradation)
+	assert.False(t, cfg.EnableEmergencyProtocols)
 }
 
 func TestAnomaly_Defaults(t *testing.T) {
@@ -1788,12 +1192,8 @@ func TestAnomaly_Defaults(t *testing.T) {
 
 	a := &Anomaly{}
 
-	if a.Type != "" {
-		t.Errorf("expected empty Type, got %s", a.Type)
-	}
-	if a.Severity != "" {
-		t.Errorf("expected empty Severity, got %s", a.Severity)
-	}
+	assert.Empty(t, a.Type)
+	assert.Empty(t, a.Severity)
 }
 
 func TestErrorClassification_Defaults(t *testing.T) {
@@ -1801,18 +1201,10 @@ func TestErrorClassification_Defaults(t *testing.T) {
 
 	ec := &ErrorClassification{}
 
-	if len(ec.Categories) != 0 {
-		t.Errorf("expected 0 Categories, got %d", len(ec.Categories))
-	}
-	if ec.Severity != "" {
-		t.Errorf("expected empty Severity, got %s", ec.Severity)
-	}
-	if ec.Transient {
-		t.Error("expected Transient=false")
-	}
-	if ec.Retryable {
-		t.Error("expected Retryable=false")
-	}
+	assert.Empty(t, ec.Categories)
+	assert.Empty(t, ec.Severity)
+	assert.False(t, ec.Transient)
+	assert.False(t, ec.Retryable)
 }
 
 func TestNewErrorClassifier_EmptyRules(t *testing.T) {
@@ -1820,9 +1212,7 @@ func TestNewErrorClassifier_EmptyRules(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ec := NewErrorClassifier(logger, []ClassificationRule{})
 
-	if len(ec.rules) != 0 {
-		t.Errorf("expected 0 rules, got %d", len(ec.rules))
-	}
+	assert.Empty(t, ec.rules)
 }
 
 func TestNewErrorClassifier_NilRules(t *testing.T) {
@@ -1830,12 +1220,8 @@ func TestNewErrorClassifier_NilRules(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ec := NewErrorClassifier(logger, nil)
 
-	if ec.logger != logger {
-		t.Error("logger not stored")
-	}
-	if ec.cache == nil {
-		t.Error("expected non-nil cache map")
-	}
+	assert.Equal(t, logger, ec.logger)
+	assert.NotNil(t, ec.cache, "expected non-nil cache map")
 }
 
 func TestNewErrorReporter_NilConfig(t *testing.T) {
@@ -1843,9 +1229,7 @@ func TestNewErrorReporter_NilConfig(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	er := NewErrorReporter(logger, ErrorReportingConfig{})
 
-	if er.config != (ErrorReportingConfig{}) {
-		t.Error("expected empty config")
-	}
+	assert.Equal(t, ErrorReportingConfig{}, er.config, "expected empty config")
 }
 
 func TestNewRetryManager_NilPolicies(t *testing.T) {
@@ -1853,12 +1237,8 @@ func TestNewRetryManager_NilPolicies(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	rm := NewRetryManager(logger, nil)
 
-	if rm.metrics == nil {
-		t.Error("expected non-nil metrics")
-	}
-	if rm.executors == nil {
-		t.Error("expected non-nil executors map")
-	}
+	assert.NotNil(t, rm.metrics, "expected non-nil metrics")
+	assert.NotNil(t, rm.executors, "expected non-nil executors map")
 }
 
 func TestNewFallbackSystem_NilStrategies(t *testing.T) {
@@ -1866,12 +1246,8 @@ func TestNewFallbackSystem_NilStrategies(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	fs := NewFallbackSystem(logger, nil)
 
-	if fs.metrics == nil {
-		t.Error("expected non-nil metrics")
-	}
-	if fs.executors == nil {
-		t.Error("expected non-nil executors map")
-	}
+	assert.NotNil(t, fs.metrics, "expected non-nil metrics")
+	assert.NotNil(t, fs.executors, "expected non-nil executors map")
 }
 
 func TestRobustnessManager_ConcurrentStop(t *testing.T) {
@@ -1880,13 +1256,9 @@ func TestRobustnessManager_ConcurrentStop(t *testing.T) {
 		EnableHealthMonitoring: true,
 		EnableErrorHandling:    true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if err := rm.Start(); err != nil {
-		t.Fatalf("Start() failed: %v", err)
-	}
+	require.NoError(t, rm.Start(), "Start() should succeed")
 
 	var wg sync.WaitGroup
 	for i := 0; i < 5; i++ {
@@ -1898,9 +1270,7 @@ func TestRobustnessManager_ConcurrentStop(t *testing.T) {
 	}
 	wg.Wait()
 
-	if rm.isRunning {
-		t.Error("expected isRunning=false after Stop()")
-	}
+	assert.False(t, rm.isRunning, "expected isRunning=false after Stop()")
 }
 
 func TestRobustnessManager_GetErrorPolicyName(t *testing.T) {
@@ -1928,9 +1298,7 @@ func TestRobustnessManager_GetErrorPolicyName(t *testing.T) {
 				},
 			}
 			result := rm.getErrorPolicyName(event)
-			if result != tt.expected {
-				t.Errorf("getErrorPolicyName() = %q, want %q", result, tt.expected)
-			}
+			assert.Equal(t, tt.expected, result)
 		})
 	}
 }
@@ -1940,18 +1308,10 @@ func TestRecoveryEvent_Defaults(t *testing.T) {
 
 	re := &RecoveryEvent{}
 
-	if re.ID != "" {
-		t.Errorf("expected empty ID, got %s", re.ID)
-	}
-	if re.Success {
-		t.Error("expected Success=false")
-	}
-	if re.Status != "" {
-		t.Errorf("expected empty Status, got %s", re.Status)
-	}
-	if re.Duration != 0 {
-		t.Errorf("expected Duration=0, got %v", re.Duration)
-	}
+	assert.Empty(t, re.ID)
+	assert.False(t, re.Success)
+	assert.Empty(t, re.Status)
+	assert.Zero(t, re.Duration)
 }
 
 func TestDiagnosticResult_Defaults(t *testing.T) {
@@ -1959,18 +1319,10 @@ func TestDiagnosticResult_Defaults(t *testing.T) {
 
 	dr := &DiagnosticResult{}
 
-	if dr.TestName != "" {
-		t.Errorf("expected empty TestName, got %s", dr.TestName)
-	}
-	if dr.Status != "" {
-		t.Errorf("expected empty Status, got %s", dr.Status)
-	}
-	if dr.Duration != 0 {
-		t.Errorf("expected Duration=0, got %v", dr.Duration)
-	}
-	if dr.Issues != nil {
-		t.Error("expected nil Issues")
-	}
+	assert.Empty(t, dr.TestName)
+	assert.Empty(t, dr.Status)
+	assert.Zero(t, dr.Duration)
+	assert.Nil(t, dr.Issues)
 }
 
 func TestRetryPolicy_Defaults(t *testing.T) {
@@ -1978,18 +1330,10 @@ func TestRetryPolicy_Defaults(t *testing.T) {
 
 	rp := RetryPolicy{}
 
-	if rp.MaxAttempts != 0 {
-		t.Errorf("expected MaxAttempts=0, got %d", rp.MaxAttempts)
-	}
-	if rp.InitialDelay != 0 {
-		t.Errorf("expected InitialDelay=0, got %v", rp.InitialDelay)
-	}
-	if rp.BackoffFactor != 0 {
-		t.Errorf("expected BackoffFactor=0, got %f", rp.BackoffFactor)
-	}
-	if rp.Jitter {
-		t.Error("expected Jitter=false")
-	}
+	assert.Zero(t, rp.MaxAttempts)
+	assert.Zero(t, rp.InitialDelay)
+	assert.Zero(t, rp.BackoffFactor)
+	assert.False(t, rp.Jitter)
 }
 
 func TestRetryPolicy_Full(t *testing.T) {
@@ -2005,27 +1349,13 @@ func TestRetryPolicy_Full(t *testing.T) {
 		Condition:     "error == transient",
 	}
 
-	if rp.MaxAttempts != 5 {
-		t.Errorf("expected MaxAttempts=5, got %d", rp.MaxAttempts)
-	}
-	if rp.InitialDelay != 200*time.Millisecond {
-		t.Errorf("expected InitialDelay=200ms, got %v", rp.InitialDelay)
-	}
-	if rp.MaxDelay != 10*time.Second {
-		t.Errorf("expected MaxDelay=10s, got %v", rp.MaxDelay)
-	}
-	if rp.BackoffFactor != 3.0 {
-		t.Errorf("expected BackoffFactor=3.0, got %f", rp.BackoffFactor)
-	}
-	if !rp.Jitter {
-		t.Error("expected Jitter=true")
-	}
-	if rp.Timeout != 30*time.Second {
-		t.Errorf("expected Timeout=30s, got %v", rp.Timeout)
-	}
-	if rp.Condition != "error == transient" {
-		t.Errorf("expected condition 'error == transient', got '%s'", rp.Condition)
-	}
+	assert.Equal(t, 5, rp.MaxAttempts)
+	assert.Equal(t, 200*time.Millisecond, rp.InitialDelay)
+	assert.Equal(t, 10*time.Second, rp.MaxDelay)
+	assert.Equal(t, 3.0, rp.BackoffFactor)
+	assert.True(t, rp.Jitter)
+	assert.Equal(t, 30*time.Second, rp.Timeout)
+	assert.Equal(t, "error == transient", rp.Condition)
 }
 
 func TestCircuitBreakerConfig_Defaults(t *testing.T) {
@@ -2033,21 +1363,11 @@ func TestCircuitBreakerConfig_Defaults(t *testing.T) {
 
 	cfg := CircuitBreakerConfig{}
 
-	if cfg.FailureThreshold != 0 {
-		t.Errorf("expected FailureThreshold=0, got %d", cfg.FailureThreshold)
-	}
-	if cfg.SuccessThreshold != 0 {
-		t.Errorf("expected SuccessThreshold=0, got %d", cfg.SuccessThreshold)
-	}
-	if cfg.Timeout != 0 {
-		t.Errorf("expected Timeout=0, got %v", cfg.Timeout)
-	}
-	if cfg.HalfOpenMaxCalls != 0 {
-		t.Errorf("expected HalfOpenMaxCalls=0, got %d", cfg.HalfOpenMaxCalls)
-	}
-	if cfg.ResetTimeout != 0 {
-		t.Errorf("expected ResetTimeout=0, got %v", cfg.ResetTimeout)
-	}
+	assert.Zero(t, cfg.FailureThreshold)
+	assert.Zero(t, cfg.SuccessThreshold)
+	assert.Zero(t, cfg.Timeout)
+	assert.Zero(t, cfg.HalfOpenMaxCalls)
+	assert.Zero(t, cfg.ResetTimeout)
 }
 
 func TestCircuitBreakerConfig_Full(t *testing.T) {
@@ -2062,24 +1382,12 @@ func TestCircuitBreakerConfig_Full(t *testing.T) {
 		MetricsWindow:    1 * time.Hour,
 	}
 
-	if cfg.FailureThreshold != 10 {
-		t.Errorf("expected FailureThreshold=10, got %d", cfg.FailureThreshold)
-	}
-	if cfg.SuccessThreshold != 5 {
-		t.Errorf("expected SuccessThreshold=5, got %d", cfg.SuccessThreshold)
-	}
-	if cfg.Timeout != 15*time.Second {
-		t.Errorf("expected Timeout=15s, got %v", cfg.Timeout)
-	}
-	if cfg.HalfOpenMaxCalls != 3 {
-		t.Errorf("expected HalfOpenMaxCalls=3, got %d", cfg.HalfOpenMaxCalls)
-	}
-	if cfg.ResetTimeout != 30*time.Second {
-		t.Errorf("expected ResetTimeout=30s, got %v", cfg.ResetTimeout)
-	}
-	if cfg.MetricsWindow != 1*time.Hour {
-		t.Errorf("expected MetricsWindow=1h, got %v", cfg.MetricsWindow)
-	}
+	assert.Equal(t, 10, cfg.FailureThreshold)
+	assert.Equal(t, 5, cfg.SuccessThreshold)
+	assert.Equal(t, 15*time.Second, cfg.Timeout)
+	assert.Equal(t, 3, cfg.HalfOpenMaxCalls)
+	assert.Equal(t, 30*time.Second, cfg.ResetTimeout)
+	assert.Equal(t, 1*time.Hour, cfg.MetricsWindow)
 }
 
 func TestErrorHandlingConfig_Defaults(t *testing.T) {
@@ -2087,15 +1395,9 @@ func TestErrorHandlingConfig_Defaults(t *testing.T) {
 
 	cfg := ErrorHandlingConfig{}
 
-	if len(cfg.ClassificationRules) != 0 {
-		t.Errorf("expected 0 ClassificationRules, got %d", len(cfg.ClassificationRules))
-	}
-	if len(cfg.RetryPolicies) != 0 {
-		t.Errorf("expected 0 RetryPolicies, got %d", len(cfg.RetryPolicies))
-	}
-	if len(cfg.FallbackStrategies) != 0 {
-		t.Errorf("expected 0 FallbackStrategies, got %d", len(cfg.FallbackStrategies))
-	}
+	assert.Empty(t, cfg.ClassificationRules)
+	assert.Empty(t, cfg.RetryPolicies)
+	assert.Empty(t, cfg.FallbackStrategies)
 }
 
 func TestRobustnessManager_CollectHealthMetrics(t *testing.T) {
@@ -2109,45 +1411,23 @@ func TestRobustnessManager_CollectHealthMetrics(t *testing.T) {
 	}
 
 	metrics := rm.collectHealthMetrics()
-	if metrics == nil {
-		t.Fatal("expected non-nil HealthMetrics")
-	}
+	require.NotNil(t, metrics)
 
-	if metrics.Uptime <= 0 {
-		t.Errorf("expected positive Uptime, got %v", metrics.Uptime)
-	}
-	if metrics.ResponseTime <= 0 {
-		t.Errorf("expected positive ResponseTime, got %v", metrics.ResponseTime)
-	}
-	if metrics.ErrorRate < 0 || metrics.ErrorRate > 1 {
-		t.Errorf("expected ErrorRate in [0,1], got %f", metrics.ErrorRate)
-	}
-	if metrics.Throughput < 0 {
-		t.Errorf("expected non-negative Throughput, got %f", metrics.Throughput)
-	}
-	if metrics.ResourceUsage == nil {
-		t.Fatal("expected non-nil ResourceUsage")
-	}
-	if metrics.ResourceUsage.CPU < 0 || metrics.ResourceUsage.CPU > 100 {
-		t.Errorf("expected CPU in [0,100], got %f", metrics.ResourceUsage.CPU)
-	}
-	if metrics.ResourceUsage.Memory < 0 || metrics.ResourceUsage.Memory > 100 {
-		t.Errorf("expected Memory in [0,100], got %f", metrics.ResourceUsage.Memory)
-	}
-	if metrics.Availability < 0.9 || metrics.Availability > 1.0 {
-		t.Errorf("expected Availability in [0.9, 1.0], got %f", metrics.Availability)
-	}
-	if metrics.Reliability < 0.95 || metrics.Reliability > 1.0 {
-		t.Errorf("expected Reliability in [0.95, 1.0], got %f", metrics.Reliability)
-	}
+	assert.True(t, metrics.Uptime > 0)
+	assert.True(t, metrics.ResponseTime > 0)
+	assert.True(t, metrics.ErrorRate >= 0 && metrics.ErrorRate <= 1)
+	assert.True(t, metrics.Throughput >= 0)
+	require.NotNil(t, metrics.ResourceUsage)
+	assert.True(t, metrics.ResourceUsage.CPU >= 0 && metrics.ResourceUsage.CPU <= 100)
+	assert.True(t, metrics.ResourceUsage.Memory >= 0 && metrics.ResourceUsage.Memory <= 100)
+	assert.True(t, metrics.Availability >= 0.9 && metrics.Availability <= 1.0)
+	assert.True(t, metrics.Reliability >= 0.95 && metrics.Reliability <= 1.0)
 }
 
 func TestRobustnessManager_PerformResilienceAnalysis(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	rm, err := NewRobustnessManager(logger, RobustnessConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	rm.performResilienceAnalysis()
 }
@@ -2155,9 +1435,7 @@ func TestRobustnessManager_PerformResilienceAnalysis(t *testing.T) {
 func TestRobustnessManager_ProcessErrors(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	rm, err := NewRobustnessManager(logger, RobustnessConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	rm.processErrors()
 
@@ -2183,9 +1461,7 @@ func TestRobustnessManager_TryFallback(t *testing.T) {
 	}
 
 	result := rm.tryFallback(err)
-	if result {
-		t.Error("expected tryFallback to return false when executeFallback returns false")
-	}
+	assert.False(t, result)
 }
 
 func TestRobustnessManager_TriggerRecovery(t *testing.T) {
@@ -2260,18 +1536,10 @@ func TestFallbackStrategy_Defaults(t *testing.T) {
 
 	fs := FallbackStrategy{}
 
-	if fs.Name != "" {
-		t.Errorf("expected empty Name, got %s", fs.Name)
-	}
-	if fs.Priority != 0 {
-		t.Errorf("expected Priority=0, got %d", fs.Priority)
-	}
-	if fs.Timeout != 0 {
-		t.Errorf("expected Timeout=0, got %v", fs.Timeout)
-	}
-	if fs.Metrics != nil {
-		t.Error("expected nil Metrics")
-	}
+	assert.Empty(t, fs.Name)
+	assert.Zero(t, fs.Priority)
+	assert.Zero(t, fs.Timeout)
+	assert.Nil(t, fs.Metrics)
 }
 
 func TestClassificationRule_Defaults(t *testing.T) {
@@ -2279,21 +1547,11 @@ func TestClassificationRule_Defaults(t *testing.T) {
 
 	cr := ClassificationRule{}
 
-	if cr.Name != "" {
-		t.Errorf("expected empty Name, got %s", cr.Name)
-	}
-	if len(cr.Patterns) != 0 {
-		t.Errorf("expected 0 Patterns, got %d", len(cr.Patterns))
-	}
-	if len(cr.Categories) != 0 {
-		t.Errorf("expected 0 Categories, got %d", len(cr.Categories))
-	}
-	if cr.Severity != "" {
-		t.Errorf("expected empty Severity, got %s", cr.Severity)
-	}
-	if cr.Timeout != 0 {
-		t.Errorf("expected Timeout=0, got %v", cr.Timeout)
-	}
+	assert.Empty(t, cr.Name)
+	assert.Empty(t, cr.Patterns)
+	assert.Empty(t, cr.Categories)
+	assert.Empty(t, cr.Severity)
+	assert.Zero(t, cr.Timeout)
 }
 
 func TestNewFaultInjector_EmptyConfig(t *testing.T) {
@@ -2301,89 +1559,47 @@ func TestNewFaultInjector_EmptyConfig(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	fi := NewFaultInjector(logger, FaultInjectionConfig{})
 
-	if fi.injectionPoints == nil {
-		t.Error("expected non-nil injectionPoints")
-	}
-	if fi.scenarios == nil {
-		t.Error("expected non-nil scenarios")
-	}
-	if fi.activeInjections == nil {
-		t.Error("expected non-nil activeInjections")
-	}
+	assert.NotNil(t, fi.injectionPoints)
+	assert.NotNil(t, fi.scenarios)
+	assert.NotNil(t, fi.activeInjections)
 }
 
 func TestServiceTypeValues(t *testing.T) {
 	t.Parallel()
 
-	if ServiceCore != "core" {
-		t.Errorf("ServiceCore = %q, want %q", ServiceCore, "core")
-	}
-	if ServiceSecondary != "secondary" {
-		t.Errorf("ServiceSecondary = %q, want %q", ServiceSecondary, "secondary")
-	}
-	if ServiceAuxiliary != "auxiliary" {
-		t.Errorf("ServiceAuxiliary = %q, want %q", ServiceAuxiliary, "auxiliary")
-	}
-	if ServiceDebug != "debug" {
-		t.Errorf("ServiceDebug = %q, want %q", ServiceDebug, "debug")
-	}
+	assert.Equal(t, ServiceType("core"), ServiceCore)
+	assert.Equal(t, ServiceType("secondary"), ServiceSecondary)
+	assert.Equal(t, ServiceType("auxiliary"), ServiceAuxiliary)
+	assert.Equal(t, ServiceType("debug"), ServiceDebug)
 }
 
 func TestRepairTypeValues(t *testing.T) {
 	t.Parallel()
 
-	if RepairRestart != "restart" {
-		t.Errorf("RepairRestart = %q, want %q", RepairRestart, "restart")
-	}
-	if RepairReconfigure != "reconfigure" {
-		t.Errorf("RepairReconfigure = %q, want %q", RepairReconfigure, "reconfigure")
-	}
-	if RepairReplace != "replace" {
-		t.Errorf("RepairReplace = %q, want %q", RepairReplace, "replace")
-	}
-	if RepairCleanup != "cleanup" {
-		t.Errorf("RepairCleanup = %q, want %q", RepairCleanup, "cleanup")
-	}
-	if RepairUpdate != "update" {
-		t.Errorf("RepairUpdate = %q, want %q", RepairUpdate, "update")
-	}
+	assert.Equal(t, RepairType("restart"), RepairRestart)
+	assert.Equal(t, RepairType("reconfigure"), RepairReconfigure)
+	assert.Equal(t, RepairType("replace"), RepairReplace)
+	assert.Equal(t, RepairType("cleanup"), RepairCleanup)
+	assert.Equal(t, RepairType("update"), RepairUpdate)
 }
 
 func TestEmergencyStatusValues(t *testing.T) {
 	t.Parallel()
 
-	if EmergencyDetected != "detected" {
-		t.Errorf("EmergencyDetected = %q, want %q", EmergencyDetected, "detected")
-	}
-	if EmergencyResponding != "responding" {
-		t.Errorf("EmergencyResponding = %q, want %q", EmergencyResponding, "responding")
-	}
-	if EmergencyResolved != "resolved" {
-		t.Errorf("EmergencyResolved = %q, want %q", EmergencyResolved, "resolved")
-	}
-	if EmergencyFailed != "failed" {
-		t.Errorf("EmergencyFailed = %q, want %q", EmergencyFailed, "failed")
-	}
+	assert.Equal(t, EmergencyStatus("detected"), EmergencyDetected)
+	assert.Equal(t, EmergencyStatus("responding"), EmergencyResponding)
+	assert.Equal(t, EmergencyStatus("resolved"), EmergencyResolved)
+	assert.Equal(t, EmergencyStatus("failed"), EmergencyFailed)
 }
 
 func TestStepStatusValues(t *testing.T) {
 	t.Parallel()
 
-	if StepPending != "pending" {
-		t.Errorf("StepPending = %q, want %q", StepPending, "pending")
-	}
-	if StepExecuting != "executing" {
-		t.Errorf("StepExecuting = %q, want %q", StepExecuting, "executing")
-	}
-	if StepCompleted != "completed" {
-		t.Errorf("StepCompleted = %q, want %q", StepCompleted, "completed")
-	}
-	if StepFailed != "failed" {
-		t.Errorf("StepFailed = %q, want %q", StepFailed, "failed")
-	}
-	if StepSkipped != "skipped" {
-		t.Errorf("StepSkipped = %q, want %q", StepSkipped, "skipped")
-	}
+	assert.Equal(t, StepStatus("pending"), StepPending)
+	assert.Equal(t, StepStatus("executing"), StepExecuting)
+	assert.Equal(t, StepStatus("completed"), StepCompleted)
+	assert.Equal(t, StepStatus("failed"), StepFailed)
+	assert.Equal(t, StepStatus("skipped"), StepSkipped)
 }
 
 func TestResilienceAnalysis_Defaults(t *testing.T) {
@@ -2391,21 +1607,11 @@ func TestResilienceAnalysis_Defaults(t *testing.T) {
 
 	ra := &ResilienceAnalysis{}
 
-	if ra.ID != "" {
-		t.Errorf("expected empty ID, got %s", ra.ID)
-	}
-	if ra.Results != nil {
-		t.Error("expected nil Results")
-	}
-	if ra.Metrics != nil {
-		t.Error("expected nil Metrics")
-	}
-	if len(ra.Findings) != 0 {
-		t.Errorf("expected 0 Findings, got %d", len(ra.Findings))
-	}
-	if ra.Implemented {
-		t.Error("expected Implemented=false")
-	}
+	assert.Empty(t, ra.ID)
+	assert.Nil(t, ra.Results)
+	assert.Nil(t, ra.Metrics)
+	assert.Empty(t, ra.Findings)
+	assert.False(t, ra.Implemented)
 }
 
 func TestResilienceMetrics_Defaults(t *testing.T) {
@@ -2413,18 +1619,10 @@ func TestResilienceMetrics_Defaults(t *testing.T) {
 
 	rm := &ResilienceMetrics{}
 
-	if rm.MTBF != 0 {
-		t.Errorf("expected MTBF=0, got %v", rm.MTBF)
-	}
-	if rm.MTTR != 0 {
-		t.Errorf("expected MTTR=0, got %v", rm.MTTR)
-	}
-	if rm.Availability != 0 {
-		t.Errorf("expected Availability=0, got %f", rm.Availability)
-	}
-	if rm.Reliability != 0 {
-		t.Errorf("expected Reliability=0, got %f", rm.Reliability)
-	}
+	assert.Zero(t, rm.MTBF)
+	assert.Zero(t, rm.MTTR)
+	assert.Zero(t, rm.Availability)
+	assert.Zero(t, rm.Reliability)
 }
 
 func TestNewHealthMonitor_HealthStatusInitialization(t *testing.T) {
@@ -2432,18 +1630,10 @@ func TestNewHealthMonitor_HealthStatusInitialization(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	hm := NewHealthMonitor(logger, HealthMonitoringConfig{})
 
-	if hm.healthStatus.OverallStatus != HealthUnknown {
-		t.Errorf("expected OverallStatus=%s, got %s", HealthUnknown, hm.healthStatus.OverallStatus)
-	}
-	if hm.healthStatus.ComponentStatus != nil {
-		t.Error("expected nil ComponentStatus")
-	}
-	if hm.healthStatus.Metrics != nil {
-		t.Error("expected nil Metrics")
-	}
-	if hm.healthStatus.Alerts != nil {
-		t.Error("expected nil Alerts")
-	}
+	assert.Equal(t, HealthUnknown, hm.healthStatus.OverallStatus)
+	assert.Nil(t, hm.healthStatus.ComponentStatus)
+	assert.Nil(t, hm.healthStatus.Metrics)
+	assert.Nil(t, hm.healthStatus.Alerts)
 }
 
 func TestNewHealthChecker(t *testing.T) {
@@ -2451,21 +1641,11 @@ func TestNewHealthChecker(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	hc := NewHealthChecker(logger)
 
-	if hc == nil {
-		t.Fatal("expected non-nil HealthChecker")
-	}
-	if hc.logger != logger {
-		t.Error("logger not stored")
-	}
-	if hc.checks == nil {
-		t.Error("expected non-nil checks")
-	}
-	if hc.evaluator == nil {
-		t.Error("expected non-nil evaluator")
-	}
-	if hc.reporter == nil {
-		t.Error("expected non-nil reporter")
-	}
+	require.NotNil(t, hc)
+	assert.Equal(t, logger, hc.logger)
+	assert.NotNil(t, hc.checks)
+	assert.NotNil(t, hc.evaluator)
+	assert.NotNil(t, hc.reporter)
 }
 
 func TestNewMetricsCollector(t *testing.T) {
@@ -2473,18 +1653,10 @@ func TestNewMetricsCollector(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	mc := NewMetricsCollector(logger)
 
-	if mc == nil {
-		t.Fatal("expected non-nil MetricsCollector")
-	}
-	if mc.collectors == nil {
-		t.Error("expected non-nil collectors")
-	}
-	if mc.aggregator == nil {
-		t.Error("expected non-nil aggregator")
-	}
-	if mc.exporter == nil {
-		t.Error("expected non-nil exporter")
-	}
+	require.NotNil(t, mc)
+	assert.NotNil(t, mc.collectors)
+	assert.NotNil(t, mc.aggregator)
+	assert.NotNil(t, mc.exporter)
 }
 
 func TestNewAnomalyDetector(t *testing.T) {
@@ -2492,18 +1664,10 @@ func TestNewAnomalyDetector(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ad := NewAnomalyDetector(logger)
 
-	if ad == nil {
-		t.Fatal("expected non-nil AnomalyDetector")
-	}
-	if ad.detectors == nil {
-		t.Error("expected non-nil detectors")
-	}
-	if ad.profiler == nil {
-		t.Error("expected non-nil profiler")
-	}
-	if ad.alertEngine == nil {
-		t.Error("expected non-nil alertEngine")
-	}
+	require.NotNil(t, ad)
+	assert.NotNil(t, ad.detectors)
+	assert.NotNil(t, ad.profiler)
+	assert.NotNil(t, ad.alertEngine)
 }
 
 func TestNewAlertManager(t *testing.T) {
@@ -2511,18 +1675,10 @@ func TestNewAlertManager(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	am := NewAlertManager(logger)
 
-	if am == nil {
-		t.Fatal("expected non-nil AlertManager")
-	}
-	if am.channels == nil {
-		t.Error("expected non-nil channels")
-	}
-	if am.router == nil {
-		t.Error("expected non-nil router")
-	}
-	if am.escalator == nil {
-		t.Error("expected non-nil escalator")
-	}
+	require.NotNil(t, am)
+	assert.NotNil(t, am.channels)
+	assert.NotNil(t, am.router)
+	assert.NotNil(t, am.escalator)
 }
 
 func TestHealthAlert_Defaults(t *testing.T) {
@@ -2530,15 +1686,9 @@ func TestHealthAlert_Defaults(t *testing.T) {
 
 	ha := &HealthAlert{}
 
-	if ha.ID != "" {
-		t.Errorf("expected empty ID, got %s", ha.ID)
-	}
-	if ha.Severity != "" {
-		t.Errorf("expected empty Severity, got %s", ha.Severity)
-	}
-	if ha.Resolved {
-		t.Error("expected Resolved=false")
-	}
+	assert.Empty(t, ha.ID)
+	assert.Empty(t, ha.Severity)
+	assert.False(t, ha.Resolved)
 }
 
 func TestHealthAlert_Full(t *testing.T) {
@@ -2556,21 +1706,11 @@ func TestHealthAlert_Full(t *testing.T) {
 		ResolutionTime: now.Add(5 * time.Minute),
 	}
 
-	if ha.ID != "alert-999" {
-		t.Errorf("expected ID 'alert-999', got '%s'", ha.ID)
-	}
-	if ha.Component != "api-gateway" {
-		t.Errorf("expected Component 'api-gateway', got '%s'", ha.Component)
-	}
-	if ha.Status != HealthCritical {
-		t.Errorf("expected Status=%s, got %s", HealthCritical, ha.Status)
-	}
-	if ha.Severity != AlertHigh {
-		t.Errorf("expected Severity=%s, got %s", AlertHigh, ha.Severity)
-	}
-	if !ha.Resolved {
-		t.Error("expected Resolved=true")
-	}
+	assert.Equal(t, "alert-999", ha.ID)
+	assert.Equal(t, "api-gateway", ha.Component)
+	assert.Equal(t, HealthCritical, ha.Status)
+	assert.Equal(t, AlertHigh, ha.Severity)
+	assert.True(t, ha.Resolved)
 }
 
 func TestNewModeSelector(t *testing.T) {
@@ -2578,18 +1718,10 @@ func TestNewModeSelector(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ms := NewModeSelector(logger)
 
-	if ms == nil {
-		t.Fatal("expected non-nil ModeSelector")
-	}
-	if ms.modes == nil {
-		t.Error("expected non-nil modes")
-	}
-	if ms.selector == nil {
-		t.Error("expected non-nil selector")
-	}
-	if ms.transitions == nil {
-		t.Error("expected non-nil transitions")
-	}
+	require.NotNil(t, ms)
+	assert.NotNil(t, ms.modes)
+	assert.NotNil(t, ms.selector)
+	assert.NotNil(t, ms.transitions)
 }
 
 func TestNewResourceScaler(t *testing.T) {
@@ -2597,18 +1729,10 @@ func TestNewResourceScaler(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	rs := NewResourceScaler(logger)
 
-	if rs == nil {
-		t.Fatal("expected non-nil ResourceScaler")
-	}
-	if rs.scalers == nil {
-		t.Error("expected non-nil scalers")
-	}
-	if rs.controller == nil {
-		t.Error("expected non-nil controller")
-	}
-	if rs.optimizer == nil {
-		t.Error("expected non-nil optimizer")
-	}
+	require.NotNil(t, rs)
+	assert.NotNil(t, rs.scalers)
+	assert.NotNil(t, rs.controller)
+	assert.NotNil(t, rs.optimizer)
 }
 
 func TestNewQualityManager(t *testing.T) {
@@ -2616,18 +1740,10 @@ func TestNewQualityManager(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	qm := NewQualityManager(logger)
 
-	if qm == nil {
-		t.Fatal("expected non-nil QualityManager")
-	}
-	if qm.qualityMetrics == nil {
-		t.Error("expected non-nil qualityMetrics")
-	}
-	if qm.controller == nil {
-		t.Error("expected non-nil controller")
-	}
-	if qm.prioritizer == nil {
-		t.Error("expected non-nil prioritizer")
-	}
+	require.NotNil(t, qm)
+	assert.NotNil(t, qm.qualityMetrics)
+	assert.NotNil(t, qm.controller)
+	assert.NotNil(t, qm.prioritizer)
 }
 
 func TestNewEmergencyResponseEngine(t *testing.T) {
@@ -2635,18 +1751,10 @@ func TestNewEmergencyResponseEngine(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ere := NewEmergencyResponseEngine(logger)
 
-	if ere == nil {
-		t.Fatal("expected non-nil EmergencyResponseEngine")
-	}
-	if ere.responsePlans == nil {
-		t.Error("expected non-nil responsePlans")
-	}
-	if ere.executor == nil {
-		t.Error("expected non-nil executor")
-	}
-	if ere.coordinator == nil {
-		t.Error("expected non-nil coordinator")
-	}
+	require.NotNil(t, ere)
+	assert.NotNil(t, ere.responsePlans)
+	assert.NotNil(t, ere.executor)
+	assert.NotNil(t, ere.coordinator)
 }
 
 func TestNewEmergencyCoordination(t *testing.T) {
@@ -2654,18 +1762,10 @@ func TestNewEmergencyCoordination(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ec := NewEmergencyCoordination(logger)
 
-	if ec == nil {
-		t.Fatal("expected non-nil EmergencyCoordination")
-	}
-	if ec.coordinators == nil {
-		t.Error("expected non-nil coordinators")
-	}
-	if ec.synchronizer == nil {
-		t.Error("expected non-nil synchronizer")
-	}
-	if ec.communicator == nil {
-		t.Error("expected non-nil communicator")
-	}
+	require.NotNil(t, ec)
+	assert.NotNil(t, ec.coordinators)
+	assert.NotNil(t, ec.synchronizer)
+	assert.NotNil(t, ec.communicator)
 }
 
 func TestNewEscalationManager(t *testing.T) {
@@ -2673,18 +1773,10 @@ func TestNewEscalationManager(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	em := NewEscalationManager(logger)
 
-	if em == nil {
-		t.Fatal("expected non-nil EscalationManager")
-	}
-	if em.escalationPaths == nil {
-		t.Error("expected non-nil escalationPaths")
-	}
-	if em.trigger == nil {
-		t.Error("expected non-nil trigger")
-	}
-	if em.notifier == nil {
-		t.Error("expected non-nil notifier")
-	}
+	require.NotNil(t, em)
+	assert.NotNil(t, em.escalationPaths)
+	assert.NotNil(t, em.trigger)
+	assert.NotNil(t, em.notifier)
 }
 
 func TestNewStressTester(t *testing.T) {
@@ -2692,18 +1784,10 @@ func TestNewStressTester(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	st := NewStressTester(logger)
 
-	if st == nil {
-		t.Fatal("expected non-nil StressTester")
-	}
-	if st.testScenarios == nil {
-		t.Error("expected non-nil testScenarios")
-	}
-	if st.executor == nil {
-		t.Error("expected non-nil executor")
-	}
-	if st.analyzer == nil {
-		t.Error("expected non-nil analyzer")
-	}
+	require.NotNil(t, st)
+	assert.NotNil(t, st.testScenarios)
+	assert.NotNil(t, st.executor)
+	assert.NotNil(t, st.analyzer)
 }
 
 func TestNewFailureAnalyzer(t *testing.T) {
@@ -2711,18 +1795,10 @@ func TestNewFailureAnalyzer(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	fa := NewFailureAnalyzer(logger)
 
-	if fa == nil {
-		t.Fatal("expected non-nil FailureAnalyzer")
-	}
-	if fa.analyzers == nil {
-		t.Error("expected non-nil analyzers")
-	}
-	if fa.correlator == nil {
-		t.Error("expected non-nil correlator")
-	}
-	if fa.predictor == nil {
-		t.Error("expected non-nil predictor")
-	}
+	require.NotNil(t, fa)
+	assert.NotNil(t, fa.analyzers)
+	assert.NotNil(t, fa.correlator)
+	assert.NotNil(t, fa.predictor)
 }
 
 func TestNewImprovementEngine(t *testing.T) {
@@ -2730,18 +1806,10 @@ func TestNewImprovementEngine(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ie := NewImprovementEngine(logger)
 
-	if ie == nil {
-		t.Fatal("expected non-nil ImprovementEngine")
-	}
-	if ie.improvementStrategies == nil {
-		t.Error("expected non-nil improvementStrategies")
-	}
-	if ie.prioritizer == nil {
-		t.Error("expected non-nil prioritizer")
-	}
-	if ie.implementer == nil {
-		t.Error("expected non-nil implementer")
-	}
+	require.NotNil(t, ie)
+	assert.NotNil(t, ie.improvementStrategies)
+	assert.NotNil(t, ie.prioritizer)
+	assert.NotNil(t, ie.implementer)
 }
 
 func TestNewDiagnosticEngine(t *testing.T) {
@@ -2749,18 +1817,10 @@ func TestNewDiagnosticEngine(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	de := NewDiagnosticEngine(logger)
 
-	if de == nil {
-		t.Fatal("expected non-nil DiagnosticEngine")
-	}
-	if de.diagnosticTests == nil {
-		t.Error("expected non-nil diagnosticTests")
-	}
-	if de.analyzer == nil {
-		t.Error("expected non-nil analyzer")
-	}
-	if de.reporter == nil {
-		t.Error("expected non-nil reporter")
-	}
+	require.NotNil(t, de)
+	assert.NotNil(t, de.diagnosticTests)
+	assert.NotNil(t, de.analyzer)
+	assert.NotNil(t, de.reporter)
 }
 
 func TestNewRepairCoordinator(t *testing.T) {
@@ -2768,21 +1828,11 @@ func TestNewRepairCoordinator(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	rc := NewRepairCoordinator(logger)
 
-	if rc == nil {
-		t.Fatal("expected non-nil RepairCoordinator")
-	}
-	if rc.repairActions == nil {
-		t.Error("expected non-nil repairActions")
-	}
-	if rc.scheduler == nil {
-		t.Error("expected non-nil scheduler")
-	}
-	if rc.executor == nil {
-		t.Error("expected non-nil executor")
-	}
-	if rc.validator == nil {
-		t.Error("expected non-nil validator")
-	}
+	require.NotNil(t, rc)
+	assert.NotNil(t, rc.repairActions)
+	assert.NotNil(t, rc.scheduler)
+	assert.NotNil(t, rc.executor)
+	assert.NotNil(t, rc.validator)
 }
 
 func TestNewRestoreManager(t *testing.T) {
@@ -2790,18 +1840,10 @@ func TestNewRestoreManager(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	rm := NewRestoreManager(logger)
 
-	if rm == nil {
-		t.Fatal("expected non-nil RestoreManager")
-	}
-	if rm.restorePoints == nil {
-		t.Error("expected non-nil restorePoints")
-	}
-	if rm.backupManager == nil {
-		t.Error("expected non-nil backupManager")
-	}
-	if rm.recoveryPlanner == nil {
-		t.Error("expected non-nil recoveryPlanner")
-	}
+	require.NotNil(t, rm)
+	assert.NotNil(t, rm.restorePoints)
+	assert.NotNil(t, rm.backupManager)
+	assert.NotNil(t, rm.recoveryPlanner)
 }
 
 func TestNewMitigationEngine(t *testing.T) {
@@ -2809,18 +1851,10 @@ func TestNewMitigationEngine(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	me := NewMitigationEngine(logger)
 
-	if me == nil {
-		t.Fatal("expected non-nil MitigationEngine")
-	}
-	if me.mitigationStrategies == nil {
-		t.Error("expected non-nil mitigationStrategies")
-	}
-	if me.impactAssessor == nil {
-		t.Error("expected non-nil impactAssessor")
-	}
-	if me.priorityManager == nil {
-		t.Error("expected non-nil priorityManager")
-	}
+	require.NotNil(t, me)
+	assert.NotNil(t, me.mitigationStrategies)
+	assert.NotNil(t, me.impactAssessor)
+	assert.NotNil(t, me.priorityManager)
 }
 
 func TestNewPreventionSystem(t *testing.T) {
@@ -2828,18 +1862,10 @@ func TestNewPreventionSystem(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	ps := NewPreventionSystem(logger)
 
-	if ps == nil {
-		t.Fatal("expected non-nil PreventionSystem")
-	}
-	if ps.preventionRules == nil {
-		t.Error("expected non-nil preventionRules")
-	}
-	if ps.learningEngine == nil {
-		t.Error("expected non-nil learningEngine")
-	}
-	if ps.riskAssessor == nil {
-		t.Error("expected non-nil riskAssessor")
-	}
+	require.NotNil(t, ps)
+	assert.NotNil(t, ps.preventionRules)
+	assert.NotNil(t, ps.learningEngine)
+	assert.NotNil(t, ps.riskAssessor)
 }
 
 func TestRobustnessConfig_DeepCopy(t *testing.T) {
@@ -2860,15 +1886,9 @@ func TestRobustnessConfig_DeepCopy(t *testing.T) {
 
 	cfg2 := cfg1
 
-	if cfg2.EnableErrorHandling != cfg1.EnableErrorHandling {
-		t.Error("EnableErrorHandling should match")
-	}
-	if cfg2.ErrorHandlingConfig.CircuitBreakerConfig.FailureThreshold != cfg1.ErrorHandlingConfig.CircuitBreakerConfig.FailureThreshold {
-		t.Error("FailureThreshold should match")
-	}
+	assert.Equal(t, cfg1.EnableErrorHandling, cfg2.EnableErrorHandling)
+	assert.Equal(t, cfg1.ErrorHandlingConfig.CircuitBreakerConfig.FailureThreshold, cfg2.ErrorHandlingConfig.CircuitBreakerConfig.FailureThreshold)
 
 	cfg1.EnableErrorHandling = false
-	if cfg2.EnableErrorHandling == cfg1.EnableErrorHandling {
-		t.Error("cfg2 should be independent after copy")
-	}
+	assert.NotEqual(t, cfg1.EnableErrorHandling, cfg2.EnableErrorHandling)
 }

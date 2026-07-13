@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/naviNBRuas/APA/pkg/polymorphic"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTransformationManagerRoundTrip(t *testing.T) {
@@ -12,21 +13,14 @@ func TestTransformationManagerRoundTrip(t *testing.T) {
 	tm := NewTransformationManager(eng, slog.Default())
 	original := []byte("print('hi')")
 	variant1, fp1, err := tm.NextVariant(original)
-	if err != nil || len(variant1) == 0 || fp1 == "" {
-		t.Fatalf("variant failed: %v", err)
-	}
+	require.NoError(t, err, "variant failed")
+	require.NotEmpty(t, variant1, "variant should have content")
+	require.NotEmpty(t, fp1, "variant should have fingerprint")
 	variant2, fp2, err := tm.NextVariant(original)
-	if err != nil {
-		t.Fatalf("variant2 failed: %v", err)
-	}
-	if fp1 == fp2 || len(variant2) == 0 {
-		t.Fatalf("expected differing fingerprints")
-	}
+	require.NoError(t, err, "variant2 failed")
+	require.NotEqual(t, fp1, fp2, "expected differing fingerprints")
+	require.NotEmpty(t, variant2, "variant2 should have content")
 	recovered, err := tm.ReverseVariant(variant1)
-	if err != nil {
-		t.Fatalf("reverse failed: %v", err)
-	}
-	if string(recovered) != string(original) {
-		t.Fatalf("recovered mismatch")
-	}
+	require.NoError(t, err, "reverse failed")
+	require.Equal(t, original, recovered, "recovered mismatch")
 }

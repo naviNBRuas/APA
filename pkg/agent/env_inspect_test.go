@@ -3,6 +3,8 @@ package agent
 import (
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestEnvInspectorProfiles(t *testing.T) {
@@ -13,10 +15,8 @@ func TestEnvInspectorProfiles(t *testing.T) {
 	hwHintReader = func() string { return "TestMachine" }
 
 	prof := EnvInspector{}.Inspect()
-	if prof.Uptime != 42*time.Second || !prof.Virtualized || !prof.EntropyAvailable {
-		t.Fatalf("unexpected profile: %+v", prof)
-	}
-	if !prof.ShouldPreferLowProfile() {
-		t.Fatalf("expected low-profile preference")
-	}
+	require.Equal(t, 42*time.Second, prof.Uptime, "unexpected profile")
+	require.True(t, prof.Virtualized, "unexpected profile")
+	require.True(t, prof.EntropyAvailable, "unexpected profile")
+	require.True(t, prof.ShouldPreferLowProfile(), "expected low-profile preference")
 }

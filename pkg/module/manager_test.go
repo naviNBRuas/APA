@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -94,7 +95,7 @@ trusted_authors:
 			assert.Equal(t, "v1.0.0", m.Version)
 			assert.NotEmpty(t, m.Hash)
 		} else {
-			t.Errorf("Unexpected module loaded: %s", m.Name)
+			assert.Fail(t, fmt.Sprintf("Unexpected module loaded: %s", m.Name))
 		}
 	}
 }

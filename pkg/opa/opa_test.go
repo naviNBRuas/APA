@@ -4,16 +4,14 @@ import (
 	"context"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewOPAPolicyEngine(t *testing.T) {
 	engine := NewOPAPolicyEngine()
-	if engine == nil {
-		t.Fatal("expected non-nil engine")
-	}
-	if engine.loaded {
-		t.Fatal("expected engine to be unloaded initially")
-	}
+	require.NotNil(t, engine, "expected non-nil engine")
+	require.False(t, engine.loaded, "expected engine to be unloaded initially")
 }
 
 func TestAuthorizeWithoutPolicy(t *testing.T) {
@@ -22,12 +20,8 @@ func TestAuthorizeWithoutPolicy(t *testing.T) {
 
 	t.Run("allows by default", func(t *testing.T) {
 		allowed, err := engine.Authorize(ctx, map[string]interface{}{"user": "test"})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if !allowed {
-			t.Fatal("expected allowed when no policy loaded")
-		}
+		require.NoError(t, err, "unexpected error: %v", err)
+		require.True(t, allowed, "expected allowed when no policy loaded")
 	})
 }
 
@@ -37,9 +31,7 @@ func TestLoadPolicyAndAuthorize(t *testing.T) {
 
 	t.Run("load valid policy", func(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "policy-*.rego")
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		_, err = f.WriteString(`package apa.authz
 
 default allow = false
@@ -51,17 +43,11 @@ allow {
 allow {
 	input.user == "admin"
 }`)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		f.Close()
 
-		if err := engine.LoadPolicy(ctx, f.Name()); err != nil {
-			t.Fatalf("unexpected error loading policy: %v", err)
-		}
-		if !engine.loaded {
-			t.Fatal("expected engine to be loaded after LoadPolicy")
-		}
+		require.NoError(t, engine.LoadPolicy(ctx, f.Name()), "unexpected error loading policy")
+		require.True(t, engine.loaded, "expected engine to be loaded after LoadPolicy")
 	})
 
 	t.Run("authorized health path", func(t *testing.T) {
@@ -69,12 +55,8 @@ allow {
 			"path": "/admin/health",
 			"user": "anonymous",
 		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if !allowed {
-			t.Fatal("expected allowed for health path")
-		}
+		require.NoError(t, err, "unexpected error: %v", err)
+		require.True(t, allowed, "expected allowed for health path")
 	})
 
 	t.Run("authorized admin user", func(t *testing.T) {
@@ -82,12 +64,8 @@ allow {
 			"path": "/admin/secrets",
 			"user": "admin",
 		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if !allowed {
-			t.Fatal("expected allowed for admin user")
-		}
+		require.NoError(t, err, "unexpected error: %v", err)
+		require.True(t, allowed, "expected allowed for admin user")
 	})
 
 	t.Run("denied unauthorized user", func(t *testing.T) {
@@ -95,12 +73,8 @@ allow {
 			"path": "/admin/secrets",
 			"user": "attacker",
 		})
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if allowed {
-			t.Fatal("expected denied for unauthorized user")
-		}
+		require.NoError(t, err, "unexpected error: %v", err)
+		require.False(t, allowed, "expected denied for unauthorized user")
 	})
 }
 
@@ -110,25 +84,18 @@ func TestLoadPolicyFromInvalidFile(t *testing.T) {
 
 	t.Run("missing file", func(t *testing.T) {
 		err := engine.LoadPolicy(ctx, "/nonexistent/missing.rego")
-		if err == nil {
-			t.Fatal("expected error for missing file")
-		}
+		require.Error(t, err, "expected error for missing file")
 	})
 
 	t.Run("syntax error in policy", func(t *testing.T) {
 		f, err := os.CreateTemp(t.TempDir(), "bad-*.rego")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := f.WriteString("package bad\n\nx = 1 + "); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+		_, err = f.WriteString("package bad\n\nx = 1 + ")
+		require.NoError(t, err)
 		f.Close()
 
 		err = engine.LoadPolicy(ctx, f.Name())
-		if err == nil {
-			t.Fatal("expected error for syntactically invalid policy")
-		}
+		require.Error(t, err, "expected error for syntactically invalid policy")
 	})
 }
 
@@ -137,23 +104,15 @@ func TestPolicyDecisionFormat(t *testing.T) {
 	ctx := context.Background()
 
 	f, err := os.CreateTemp(t.TempDir(), "format-*.rego")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	_, err = f.WriteString(`package apa.authz
 
 default allow = "maybe"`)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	f.Close()
 
-	if err := engine.LoadPolicy(ctx, f.Name()); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, engine.LoadPolicy(ctx, f.Name()), "unexpected error: %v", err)
 
 	_, err = engine.Authorize(ctx, map[string]interface{}{"user": "test"})
-	if err == nil {
-		t.Fatal("expected error for non-boolean allow value")
-	}
+	require.Error(t, err, "expected error for non-boolean allow value")
 }
