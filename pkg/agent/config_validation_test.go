@@ -1,12 +1,15 @@
 package agent
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestValidateConfig(t *testing.T) {
 	cfg := &Config{}
-	if err := validateConfig(cfg); err == nil {
-		t.Fatalf("expected error for empty config")
-	}
+	err := validateConfig(cfg)
+	require.Error(t, err, "expected error for empty config")
 
 	cfg.AdminListenAddress = ":8080"
 	cfg.ModulePath = "modules"
@@ -14,13 +17,11 @@ func TestValidateConfig(t *testing.T) {
 	cfg.PolicyPath = "policy"
 	cfg.ControllerPath = "controllers"
 
-	if err := validateConfig(cfg); err != nil {
-		t.Fatalf("unexpected error after populating required fields: %v", err)
-	}
+	err = validateConfig(cfg)
+	require.NoError(t, err, "unexpected error after populating required fields")
 
 	cfg.AdminTLSRequireClientCert = true
 	cfg.AdminTLSClientCA = ""
-	if err := validateConfig(cfg); err == nil {
-		t.Fatalf("expected error when client cert required without CA")
-	}
+	err = validateConfig(cfg)
+	require.Error(t, err, "expected error when client cert required without CA")
 }

@@ -7,13 +7,15 @@ import (
 	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPatchManager(t *testing.T) {
 	logger := slog.Default()
 	patchManager := NewPatchManager(logger)
 
-	// Create a test patch
 	content := []byte("This is a test patch content")
 	hasher := sha256.New()
 	hasher.Write(content)
@@ -31,61 +33,36 @@ func TestPatchManager(t *testing.T) {
 		CreatedAt:   time.Now(),
 	}
 
-	// Test adding a patch
 	err := patchManager.AddPatch(patch)
-	if err != nil {
-		t.Fatalf("Failed to add patch: %v", err)
-	}
+	require.NoError(t, err, "Failed to add patch")
 
-	// Test applying a patch
 	err = patchManager.ApplyPatch(context.Background(), patch.ID)
-	if err != nil {
-		t.Errorf("Failed to apply patch: %v", err)
-	}
+	assert.NoError(t, err, "Failed to apply patch")
 
-	// Test rolling back a patch
 	err = patchManager.RollbackPatch(context.Background(), patch.ID)
-	if err != nil {
-		t.Errorf("Failed to rollback patch: %v", err)
-	}
+	assert.NoError(t, err, "Failed to rollback patch")
 
-	// Test patch priority
 	priority := patchManager.GetPatchPriority(patch)
-	if priority != 3 { // medium severity should be priority 3
-		t.Errorf("Expected priority 3 for medium severity patch, got %d", priority)
-	}
+	assert.Equal(t, 3, priority)
 
-	// Test getting patches by priority
 	patches := patchManager.GetPatchesByPriority()
-	if len(patches) != 1 {
-		t.Errorf("Expected 1 patch, got %d", len(patches))
-	}
+	assert.Equal(t, 1, len(patches))
 
-	// Test getting patches by severity
 	mediumPatches := patchManager.GetPatchesBySeverity("medium")
-	if len(mediumPatches) != 1 {
-		t.Errorf("Expected 1 medium severity patch, got %d", len(mediumPatches))
-	}
+	assert.Equal(t, 1, len(mediumPatches))
 
-	// Test distributing a patch
 	peerAddresses := []string{"192.168.1.100:4001", "192.168.1.101:4001"}
 	err = patchManager.DistributePatch(context.Background(), patch.ID, peerAddresses)
-	if err != nil {
-		t.Errorf("Failed to distribute patch: %v", err)
-	}
+	assert.NoError(t, err, "Failed to distribute patch")
 
-	// Test verifying a patch
 	err = patchManager.VerifyPatch(patch.ID)
-	if err == nil {
-		t.Error("Expected verification to fail for non-applied patch")
-	}
+	assert.Error(t, err, "Expected verification to fail for non-applied patch")
 }
 
 func TestPatchIntegrityVerification(t *testing.T) {
 	logger := slog.Default()
 	patchManager := NewPatchManager(logger)
 
-	// Create a test patch with incorrect hash
 	content := []byte("This is a test patch content")
 	wrongHash := "incorrect-hash"
 
@@ -101,18 +78,14 @@ func TestPatchIntegrityVerification(t *testing.T) {
 		CreatedAt:   time.Now(),
 	}
 
-	// Test adding a patch with incorrect hash
 	err := patchManager.AddPatch(patch)
-	if err == nil {
-		t.Error("Expected patch addition to fail with incorrect hash")
-	}
+	assert.Error(t, err, "Expected patch addition to fail with incorrect hash")
 }
 
 func TestPatchPrioritization(t *testing.T) {
 	logger := slog.Default()
 	patchManager := NewPatchManager(logger)
 
-	// Create patches with different severities
 	criticalContent := []byte("critical patch content")
 	criticalHasher := sha256.New()
 	criticalHasher.Write(criticalContent)
@@ -155,35 +128,19 @@ func TestPatchPrioritization(t *testing.T) {
 		Hash:     mediumHash,
 	}
 
-	// Add patches
 	if err := patchManager.AddPatch(criticalPatch); err != nil {
-		t.Errorf("Failed to add critical patch: %v", err)
+		assert.NoError(t, err, "Failed to add critical patch")
 	}
 	if err := patchManager.AddPatch(highPatch); err != nil {
-		t.Errorf("Failed to add high patch: %v", err)
+		assert.NoError(t, err, "Failed to add high patch")
 	}
 	if err := patchManager.AddPatch(mediumPatch); err != nil {
-		t.Errorf("Failed to add medium patch: %v", err)
+		assert.NoError(t, err, "Failed to add medium patch")
 	}
 
-	// Get patches by priority
 	patches := patchManager.GetPatchesByPriority()
-	if len(patches) != 3 {
-		t.Errorf("Expected 3 patches, got %d", len(patches))
-	}
-
-	// Check that critical patch is first (highest priority)
-	if patches[0].ID != "critical-patch" {
-		t.Errorf("Expected critical patch first, got %s", patches[0].ID)
-	}
-
-	// Check that high patch is second
-	if patches[1].ID != "high-patch" {
-		t.Errorf("Expected high patch second, got %s", patches[1].ID)
-	}
-
-	// Check that medium patch is third
-	if patches[2].ID != "medium-patch" {
-		t.Errorf("Expected medium patch third, got %s", patches[2].ID)
-	}
+	assert.Equal(t, 3, len(patches))
+	assert.Equal(t, "critical-patch", patches[0].ID)
+	assert.Equal(t, "high-patch", patches[1].ID)
+	assert.Equal(t, "medium-patch", patches[2].ID)
 }

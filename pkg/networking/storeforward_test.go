@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/require"
 )
 
 func sfLogger() *slog.Logger {
@@ -18,18 +19,12 @@ func TestEnqueueAndNextForPeerMarksSeen(t *testing.T) {
 	env := sf.Enqueue([]byte("hello"), 3)
 
 	out := sf.NextForPeer(peer.ID("peer-1"), 5)
-	if len(out) != 1 {
-		t.Fatalf("expected one envelope, got %d", len(out))
-	}
-	if out[0].ID != env.ID {
-		t.Fatalf("unexpected envelope id")
-	}
+	require.Len(t, out, 1, "expected one envelope, got %d", len(out))
+	require.Equal(t, env.ID, out[0].ID, "unexpected envelope id")
 
 	// second call should not return same envelope for same peer
 	out2 := sf.NextForPeer(peer.ID("peer-1"), 5)
-	if len(out2) != 0 {
-		t.Fatalf("expected no envelopes after seen, got %d", len(out2))
-	}
+	require.Empty(t, out2, "expected no envelopes after seen, got %d", len(out2))
 }
 
 func TestExpireAndEvict(t *testing.T) {
@@ -39,11 +34,8 @@ func TestExpireAndEvict(t *testing.T) {
 	sf.Enqueue([]byte("c"), 2) // should evict oldest to stay within cache after prune attempt
 
 	time.Sleep(15 * time.Millisecond)
-	// trigger prune
 	_ = sf.NextForPeer(peer.ID("p"), 10)
-	if len(sf.tasks) > 2 {
-		t.Fatalf("expected cache to stay within limit, got %d", len(sf.tasks))
-	}
+	require.LessOrEqual(t, len(sf.tasks), 2, "expected cache to stay within limit, got %d", len(sf.tasks))
 }
 
 func TestMaxHopsRespected(t *testing.T) {
@@ -51,16 +43,11 @@ func TestMaxHopsRespected(t *testing.T) {
 	env := sf.Enqueue([]byte("x"), 1)
 
 	out := sf.NextForPeer(peer.ID("peer-1"), 10)
-	if len(out) != 1 {
-		t.Fatalf("expected envelope available")
-	}
-	// push it beyond max hops
+	require.Len(t, out, 1, "expected envelope available")
 	sf.Receive(TaskEnvelope{ID: env.ID, Payload: env.Payload, ExpiresAt: time.Now().Add(time.Minute), Hops: 1, MaxHops: 1}, "peer-1")
 
 	out2 := sf.NextForPeer(peer.ID("peer-2"), 10)
-	if len(out2) != 0 {
-		t.Fatalf("expected no forwarding when max hops reached")
-	}
+	require.Empty(t, out2, "expected no forwarding when max hops reached")
 }
 
 // gate allows only a fixed number of forwards.
@@ -83,12 +70,8 @@ func TestDeciderBlocksForwarding(t *testing.T) {
 	sf.Enqueue([]byte("b"), 2)
 
 	out1 := sf.NextForPeer(peer.ID("p"), 10)
-	if len(out1) != 1 {
-		t.Fatalf("expected decider to allow only one, got %d", len(out1))
-	}
+	require.Len(t, out1, 1, "expected decider to allow only one, got %d", len(out1))
 
 	out2 := sf.NextForPeer(peer.ID("p2"), 10)
-	if len(out2) != 0 {
-		t.Fatalf("expected decider to block remaining after budget, got %d", len(out2))
-	}
+	require.Empty(t, out2, "expected decider to block remaining after budget, got %d", len(out2))
 }

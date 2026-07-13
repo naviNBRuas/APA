@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"log/slog"
+
+	"github.com/stretchr/testify/require"
 )
 
 type mockTransport struct {
@@ -38,7 +40,6 @@ func (b *topicBus) publish(topic string, payload []byte) error {
 	chans := append([]chan []byte(nil), b.subs[topic]...)
 	b.mu.RUnlock()
 	for _, ch := range chans {
-		// best-effort non-blocking send
 		select {
 		case ch <- payload:
 		default:
@@ -68,28 +69,20 @@ func TestLeaderlessReplication(t *testing.T) {
 	cp1 := New(logger, t1, cfg)
 	cp2 := New(logger, t2, cfg)
 
-	if err := cp1.Start(ctx); err != nil {
-		t.Fatalf("start cp1: %v", err)
-	}
-	if err := cp2.Start(ctx); err != nil {
-		t.Fatalf("start cp2: %v", err)
-	}
+	require.NoError(t, cp1.Start(ctx), "start cp1")
+	require.NoError(t, cp2.Start(ctx), "start cp2")
 
-	if err := cp1.Set(ctx, "alpha", []byte("v1"), time.Second); err != nil {
-		t.Fatalf("set: %v", err)
-	}
+	require.NoError(t, cp1.Set(ctx, "alpha", []byte("v1"), time.Second), "set")
 
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		if val, ok := cp2.Get("alpha"); ok {
-			if string(val) != "v1" {
-				t.Fatalf("unexpected value: %s", string(val))
-			}
+			require.Equal(t, "v1", string(val))
 			return
 		}
 		time.Sleep(20 * time.Millisecond)
 	}
-	t.Fatalf("replication did not arrive")
+	require.Fail(t, "replication did not arrive")
 }
 
 func TestTTLExpiry(t *testing.T) {
@@ -99,20 +92,14 @@ func TestTTLExpiry(t *testing.T) {
 	defer cancel()
 
 	cp := New(logger, &mockTransport{id: "nodeA", bus: bus}, Config{EntryTTL: 100 * time.Millisecond})
-	if err := cp.Start(ctx); err != nil {
-		t.Fatalf("start: %v", err)
-	}
+	require.NoError(t, cp.Start(ctx), "start")
 
-	if err := cp.Set(ctx, "temp", []byte("x"), 50*time.Millisecond); err != nil {
-		t.Fatalf("set: %v", err)
-	}
-	if _, ok := cp.Get("temp"); !ok {
-		t.Fatalf("expected value present")
-	}
+	require.NoError(t, cp.Set(ctx, "temp", []byte("x"), 50*time.Millisecond), "set")
+	_, ok := cp.Get("temp")
+	require.True(t, ok, "expected value present")
 	time.Sleep(200 * time.Millisecond)
-	if _, ok := cp.Get("temp"); ok {
-		t.Fatalf("expected value expired")
-	}
+	_, ok = cp.Get("temp")
+	require.False(t, ok, "expected value expired")
 }
 
 func TestElectedModeRoutesThroughLeader(t *testing.T) {
@@ -128,14 +115,9 @@ func TestElectedModeRoutesThroughLeader(t *testing.T) {
 	follower := New(logger, &mockTransport{id: "follower", bus: bus}, cfg)
 	follower.SetLeaderRank(1)
 
-	if err := leader.Start(ctx); err != nil {
-		t.Fatalf("leader start: %v", err)
-	}
-	if err := follower.Start(ctx); err != nil {
-		t.Fatalf("follower start: %v", err)
-	}
+	require.NoError(t, leader.Start(ctx), "leader start")
+	require.NoError(t, follower.Start(ctx), "follower start")
 
-	// wait for election
 	ticker := time.NewTicker(50 * time.Millisecond)
 	deadline := time.Now().Add(500 * time.Millisecond)
 	for time.Now().Before(deadline) {
@@ -144,31 +126,22 @@ func TestElectedModeRoutesThroughLeader(t *testing.T) {
 		if l && !f {
 			break
 		}
-		// print status
 		t.Logf("election status leader=%v follower=%v", l, f)
 		<-ticker.C
 	}
 	ticker.Stop()
-	if !leader.IsLeader() {
-		t.Fatalf("leader should win election")
-	}
-	if follower.IsLeader() {
-		t.Fatalf("follower should not be leader")
-	}
+	require.True(t, leader.IsLeader(), "leader should win election")
+	require.False(t, follower.IsLeader(), "follower should not be leader")
 
-	if err := follower.Set(ctx, "k", []byte("v"), time.Second); err != nil {
-		t.Fatalf("follower set: %v", err)
-	}
+	require.NoError(t, follower.Set(ctx, "k", []byte("v"), time.Second), "follower set")
 
 	deadline2 := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline2) {
 		if val, ok := leader.Get("k"); ok {
-			if string(val) != "v" {
-				t.Fatalf("unexpected value %s", string(val))
-			}
+			require.Equal(t, "v", string(val))
 			return
 		}
 		time.Sleep(25 * time.Millisecond)
 	}
-	t.Fatalf("leader did not apply follower update")
+	require.Fail(t, "leader did not apply follower update")
 }

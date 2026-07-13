@@ -4,36 +4,26 @@ import (
 	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAnomalyDetector(t *testing.T) {
 	logger := slog.Default()
 	detector := NewAnomalyDetector(logger)
 
-	// Test creating a detector
-	if detector == nil {
-		t.Fatal("Failed to create anomaly detector")
-	}
+	require.NotNil(t, detector, "Failed to create anomaly detector")
 
-	// Test that fields are initialized
-	if detector.eventCounts == nil {
-		t.Error("Event counts map not initialized")
-	}
-
-	if detector.totalEvents != 0 {
-		t.Errorf("Expected totalEvents to be 0, got %d", detector.totalEvents)
-	}
-
-	if detector.threshold != 2.0 {
-		t.Errorf("Expected threshold to be 2.0, got %f", detector.threshold)
-	}
+	assert.NotNil(t, detector.eventCounts, "Event counts map not initialized")
+	assert.Equal(t, 0, detector.totalEvents)
+	assert.Equal(t, 2.0, detector.threshold)
 }
 
 func TestAnalyzeEvent(t *testing.T) {
 	logger := slog.Default()
 	detector := NewAnomalyDetector(logger)
 
-	// Create test events
 	event1 := &Event{
 		ID:        "event-001",
 		Type:      "process",
@@ -52,55 +42,37 @@ func TestAnalyzeEvent(t *testing.T) {
 		Severity:  "high",
 	}
 
-	// Test analyzing normal events
 	isAnomaly1 := detector.AnalyzeEvent(event1)
-	if isAnomaly1 {
-		t.Error("Normal event should not be flagged as anomaly")
-	}
+	assert.False(t, isAnomaly1, "Normal event should not be flagged as anomaly")
 
-	// Test analyzing suspicious events
 	isAnomaly2 := detector.AnalyzeEvent(event2)
 	if isAnomaly2 {
-		// This might be flagged as anomaly depending on the implementation
-		// For now, we'll just log it
 		t.Log("Suspicious event may be flagged as anomaly")
 	}
 
-	// Check that total events count is updated
-	if detector.totalEvents != 2 {
-		t.Errorf("Expected totalEvents to be 2, got %d", detector.totalEvents)
-	}
+	assert.Equal(t, 2, detector.totalEvents)
 }
 
 func TestUpdateThreshold(t *testing.T) {
 	logger := slog.Default()
 	detector := NewAnomalyDetector(logger)
 
-	// Test updating threshold
 	newThreshold := 3.0
 	detector.UpdateThreshold(newThreshold)
 
-	if detector.threshold != newThreshold {
-		t.Errorf("Expected threshold to be %f, got %f", newThreshold, detector.threshold)
-	}
+	assert.Equal(t, newThreshold, detector.threshold)
 }
 
 func TestGetAnomalyStats(t *testing.T) {
 	logger := slog.Default()
 	detector := NewAnomalyDetector(logger)
 
-	// Test getting stats with no events
 	stats := detector.GetAnomalyStats()
-	if stats == nil {
-		t.Error("Expected stats map, got nil")
-	}
+	assert.NotNil(t, stats, "Expected stats map, got nil")
 
-	// Check that all expected keys are present
 	expectedKeys := []string{"total_events", "unique_event_types", "current_threshold", "detected_anomalies"}
 	for _, key := range expectedKeys {
-		if _, exists := stats[key]; !exists {
-			t.Errorf("Expected key %s in stats", key)
-		}
+		assert.Contains(t, stats, key, "Expected key %s in stats", key)
 	}
 }
 
@@ -108,12 +80,8 @@ func TestMachineLearningDetector(t *testing.T) {
 	logger := slog.Default()
 	mlDetector := NewMachineLearningDetector(logger)
 
-	// Test creating ML detector
-	if mlDetector == nil {
-		t.Fatal("Failed to create ML detector")
-	}
+	require.NotNil(t, mlDetector, "Failed to create ML detector")
 
-	// Test training model
 	trainingData := []Event{
 		{
 			ID:        "train-001",
@@ -126,11 +94,8 @@ func TestMachineLearningDetector(t *testing.T) {
 	}
 
 	err := mlDetector.TrainModel(trainingData)
-	if err != nil {
-		t.Errorf("Failed to train model: %v", err)
-	}
+	assert.NoError(t, err, "Failed to train model")
 
-	// Test detecting anomaly
 	testEvent := &Event{
 		ID:        "test-001",
 		Type:      "process",
@@ -141,10 +106,7 @@ func TestMachineLearningDetector(t *testing.T) {
 	}
 
 	_, _ = mlDetector.DetectAnomaly(testEvent)
-	// We don't check the return values since they're placeholders
-	// In a real implementation, we would validate them
 
-	// Test updating model
 	newData := []Event{
 		{
 			ID:        "update-001",
@@ -157,7 +119,5 @@ func TestMachineLearningDetector(t *testing.T) {
 	}
 
 	err = mlDetector.UpdateModel(newData)
-	if err != nil {
-		t.Errorf("Failed to update model: %v", err)
-	}
+	assert.NoError(t, err, "Failed to update model")
 }

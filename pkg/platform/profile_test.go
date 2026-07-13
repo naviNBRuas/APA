@@ -3,28 +3,22 @@ package platform
 import (
 	"runtime"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestCurrentProfile(t *testing.T) {
 	p := Current()
-	if p.Minimal {
-		t.Fatal("expected MinimalBuild to be false in default build")
-	}
-	if p.TinyGo {
-		t.Fatal("expected TinyGoBuild to be false in standard Go build")
-	}
+	require.False(t, p.Minimal, "expected MinimalBuild to be false in default build")
+	require.False(t, p.TinyGo, "expected TinyGoBuild to be false in standard Go build")
 }
 
 func TestMinimalBuildConst(t *testing.T) {
-	if MinimalBuild {
-		t.Fatal("expected MinimalBuild to be false without 'minimal' build tag")
-	}
+	require.False(t, MinimalBuild, "expected MinimalBuild to be false without 'minimal' build tag")
 }
 
 func TestTinyGoBuildConst(t *testing.T) {
-	if TinyGoBuild {
-		t.Fatal("expected TinyGoBuild to be false in standard Go build")
-	}
+	require.False(t, TinyGoBuild, "expected TinyGoBuild to be false in standard Go build")
 }
 
 func TestPlatformTypeConstants(t *testing.T) {
@@ -35,9 +29,7 @@ func TestPlatformTypeConstants(t *testing.T) {
 		PlatformFreeBSDAMD64, PlatformAndroidARM64, PlatformIOSARM64,
 		PlatformUnknown,
 	}
-	if len(platforms) != 14 {
-		t.Fatalf("expected 14 platform constants, got %d", len(platforms))
-	}
+	require.Equal(t, 14, len(platforms))
 
 	current := PlatformUnknown
 	switch runtime.GOOS + "/" + runtime.GOARCH {
@@ -71,12 +63,9 @@ func TestPlatformTypeConstants(t *testing.T) {
 
 func TestAcceleratorTypeConstants(t *testing.T) {
 	types := []AcceleratorType{AcceleratorGPU, AcceleratorTPU, AcceleratorFPGA, AcceleratorASIC, AcceleratorNeural}
-	if len(types) != 5 {
-		t.Fatalf("expected 5 accelerator types, got %d", len(types))
-	}
-	if AcceleratorGPU != "gpu" || AcceleratorNeural != "neural_processor" {
-		t.Fatal("unexpected accelerator type values")
-	}
+	require.Equal(t, 5, len(types))
+	require.Equal(t, AcceleratorType("gpu"), AcceleratorGPU)
+	require.Equal(t, AcceleratorType("neural_processor"), AcceleratorNeural)
 }
 
 func TestPlatformProfileStruct(t *testing.T) {
@@ -85,10 +74,6 @@ func TestPlatformProfileStruct(t *testing.T) {
 		Architecture: Architecture{Type: "amd64", NumCPUs: 4},
 		Runtime:      RuntimeEnvironment{GoVersion: runtime.Version()},
 	}
-	if p.OS.Name != "linux" {
-		t.Fatalf("unexpected OS name: %s", p.OS.Name)
-	}
-	if p.Runtime.GoVersion != runtime.Version() {
-		t.Fatalf("unexpected Go version: %s", p.Runtime.GoVersion)
-	}
+	require.Equal(t, "linux", p.OS.Name)
+	require.Equal(t, runtime.Version(), p.Runtime.GoVersion)
 }

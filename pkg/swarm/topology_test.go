@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newTestLogger() *slog.Logger {
@@ -45,19 +47,12 @@ func TestEdgePrefersRelayAndBackbone(t *testing.T) {
 	tm.UpdateEdge(local, edgeNeighbor, 5*time.Millisecond, 100, 0.95)
 
 	connect, disconnect := tm.SuggestTierAdjustments(local, NodeTierEdge)
-	if len(disconnect) != 0 {
-		t.Fatalf("expected no disconnects for under-connected node, got %v", disconnect)
-	}
-
-	if len(connect) != 2 {
-		t.Fatalf("expected 2 suggested connections, got %d", len(connect))
-	}
+	require.Empty(t, disconnect, "expected no disconnects for under-connected node")
+	require.Len(t, connect, 2, "expected 2 suggested connections")
 
 	for _, peerID := range connect {
 		tier := tm.topology.Nodes[peerID].Tier
-		if tier == NodeTierEdge {
-			t.Fatalf("edge node should not prefer another edge; got suggestion %s", peerID)
-		}
+		assert.NotEqualf(t, NodeTierEdge, tier, "edge node should not prefer another edge; got suggestion %s", peerID)
 	}
 }
 
@@ -91,16 +86,9 @@ func TestOverConnectedRelaySuggestsLowestScoreDisconnect(t *testing.T) {
 	tm.UpdateEdge(local, backbone, 25*time.Millisecond, 200, 0.85)
 
 	connect, disconnect := tm.SuggestTierAdjustments(local, NodeTierRelay)
-	if len(connect) != 0 {
-		t.Fatalf("expected no connect suggestions when over-connected, got %v", connect)
-	}
-	if len(disconnect) != 1 {
-		t.Fatalf("expected 1 disconnect suggestion, got %d", len(disconnect))
-	}
-
-	if disconnect[0] != edgeWeak {
-		t.Fatalf("expected weakest connection %s to be suggested for removal, got %s", edgeWeak, disconnect[0])
-	}
+	require.Empty(t, connect, "expected no connect suggestions when over-connected")
+	require.Len(t, disconnect, 1, "expected 1 disconnect suggestion")
+	assert.Equal(t, edgeWeak, disconnect[0], "expected weakest connection to be suggested for removal")
 }
 
 func TestRegionBiasInfluencesScoring(t *testing.T) {
@@ -125,11 +113,6 @@ func TestRegionBiasInfluencesScoring(t *testing.T) {
 	tm.UpdateEdge(local, relayFar, 10*time.Millisecond, 100, 0.9)
 
 	connect, _ := tm.SuggestTierAdjustments(local, NodeTierEdge)
-	if len(connect) != 1 {
-		t.Fatalf("expected single suggestion, got %d", len(connect))
-	}
-
-	if connect[0] != relaySame {
-		t.Fatalf("expected region bias to favor %s, got %s", relaySame, connect[0])
-	}
+	require.Len(t, connect, 1, "expected single suggestion")
+	assert.Equal(t, relaySame, connect[0], "expected region bias to favor same-region relay")
 }

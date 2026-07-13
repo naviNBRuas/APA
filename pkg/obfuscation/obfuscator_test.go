@@ -3,6 +3,9 @@ package obfuscation
 import (
 	"log/slog"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestObfuscate(t *testing.T) {
@@ -14,15 +17,8 @@ func TestObfuscate(t *testing.T) {
 
 	// Obfuscate the code
 	obfuscated, err := obfuscator.Obfuscate(original)
-	if err != nil {
-		t.Fatalf("Failed to obfuscate code: %v", err)
-	}
-
-	// Check that the obfuscated code has the correct length
-	// We expect it to be larger due to the dummy bytes we insert
-	if len(obfuscated) <= len(original) {
-		t.Errorf("Expected obfuscated code to be larger than original, got %d <= %d", len(obfuscated), len(original))
-	}
+	require.NoError(t, err, "Failed to obfuscate code: %v", err)
+	assert.Greater(t, len(obfuscated), len(original), "Expected obfuscated code to be larger than original, got %d <= %d", len(obfuscated), len(original))
 }
 
 func TestAntiAnalysis(t *testing.T) {
@@ -31,9 +27,7 @@ func TestAntiAnalysis(t *testing.T) {
 
 	// Test debugger detection
 	debuggerDetected := antiAnalysis.DetectDebugger()
-	if debuggerDetected {
-		t.Error("Debugger detection should return false in test environment")
-	}
+	assert.False(t, debuggerDetected, "Debugger detection should return false in test environment")
 
 	// Test sandbox detection
 	// Note: this test runs in a CI environment which is a VM, so sandbox detection
@@ -51,13 +45,8 @@ func TestAntiTampering(t *testing.T) {
 	// Test integrity verification
 	code := []byte("This is a test message")
 	integrityOK := antiTampering.VerifyIntegrity(code)
-	if !integrityOK {
-		t.Error("Integrity verification should return true in test environment")
-	}
+	assert.True(t, integrityOK, "Integrity verification should return true in test environment")
 
-	// Test memory protection
 	err := antiTampering.ProtectMemory()
-	if err != nil {
-		t.Errorf("Memory protection should not fail in test environment: %v", err)
-	}
+	assert.NoError(t, err, "Memory protection should not fail in test environment: %v", err)
 }

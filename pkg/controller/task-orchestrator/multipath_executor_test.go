@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 type stubWorker struct {
@@ -41,12 +43,8 @@ func TestMultiPathExecutorMajorityWins(t *testing.T) {
 	}
 	exec := NewMultiPathExecutor(mpLogger(), workers, 2)
 	res, err := exec.Execute(context.Background(), "task1", []byte("payload"), 3)
-	if err != nil {
-		t.Fatalf("expected quorum, got error: %v", err)
-	}
-	if string(res) != "ok" {
-		t.Fatalf("expected majority result 'ok', got %q", string(res))
-	}
+	require.NoError(t, err, "expected quorum, got error: %v", err)
+	require.Equal(t, "ok", string(res), "expected majority result 'ok'")
 }
 
 func TestMultiPathExecutorFailsWithoutQuorum(t *testing.T) {
@@ -56,9 +54,8 @@ func TestMultiPathExecutorFailsWithoutQuorum(t *testing.T) {
 		stubWorker{err: errors.New("boom")},
 	}
 	exec := NewMultiPathExecutor(mpLogger(), workers, 2)
-	if _, err := exec.Execute(context.Background(), "task2", []byte("payload"), 3); err == nil {
-		t.Fatalf("expected quorum failure")
-	}
+	_, err := exec.Execute(context.Background(), "task2", []byte("payload"), 3)
+	require.Error(t, err, "expected quorum failure")
 }
 
 func TestMultiPathExecutorTimeout(t *testing.T) {
@@ -67,7 +64,6 @@ func TestMultiPathExecutorTimeout(t *testing.T) {
 		stubWorker{res: []byte("slow"), delay: 200 * time.Millisecond},
 	}
 	exec := NewMultiPathExecutor(mpLogger(), workers, 2)
-	if _, err := exec.WithTimeout("task3", []byte("payload"), 2, 50*time.Millisecond); err == nil {
-		t.Fatalf("expected timeout error")
-	}
+	_, err := exec.WithTimeout("task3", []byte("payload"), 2, 50*time.Millisecond)
+	require.Error(t, err, "expected timeout error")
 }

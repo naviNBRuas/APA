@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/shopspring/decimal"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // ---------------------------------------------------------------------------
@@ -17,9 +19,7 @@ import (
 func TestNewIntelligenceEngine_NilLogger(t *testing.T) {
 	t.Parallel()
 	_, err := NewIntelligenceEngine(nil, IntelligenceConfig{})
-	if err == nil {
-		t.Fatal("expected error for nil logger")
-	}
+	require.Error(t, err)
 }
 
 func TestNewIntelligenceEngine_ValidConfig(t *testing.T) {
@@ -29,96 +29,40 @@ func TestNewIntelligenceEngine_ValidConfig(t *testing.T) {
 		EnablePredictiveAnalytics:    true,
 		EnableAnomalyDetection:       true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if eng == nil {
-		t.Fatal("expected non-nil engine")
-	}
-	if eng.logger == nil {
-		t.Error("logger should be set")
-	}
-	if eng.decisionMaker == nil {
-		t.Error("decisionMaker should be initialized when enabled")
-	}
-	if eng.predictiveEngine == nil {
-		t.Error("predictiveEngine should be initialized when enabled")
-	}
-	if eng.anomalyDetector == nil {
-		t.Error("anomalyDetector should be initialized when enabled")
-	}
-	if eng.learningSystem != nil {
-		t.Error("learningSystem should be nil when not enabled")
-	}
-	if eng.behaviorAnalyzer != nil {
-		t.Error("behaviorAnalyzer should be nil when not enabled")
-	}
-	if eng.optimizationEngine != nil {
-		t.Error("optimizationEngine should be nil when not enabled")
-	}
-	if eng.strategyPlanner != nil {
-		t.Error("strategyPlanner should be nil when not enabled")
-	}
-	if eng.knowledgeBase == nil {
-		t.Error("knowledgeBase should always be initialized")
-	}
-	if eng.knowledgeBase.Facts == nil {
-		t.Error("knowledgeBase.Facts should be initialized")
-	}
-	if eng.knowledgeBase.Rules == nil {
-		t.Error("knowledgeBase.Rules should be initialized")
-	}
-	if eng.knowledgeBase.Concepts == nil {
-		t.Error("knowledgeBase.Concepts should be initialized")
-	}
-	if eng.knowledgeBase.Relationships == nil {
-		t.Error("knowledgeBase.Relationships should be initialized")
-	}
-	if eng.knowledgeBase.Theories == nil {
-		t.Error("knowledgeBase.Theories should be initialized")
-	}
-	if eng.knowledgeBase.Version != "1.0.0" {
-		t.Errorf("expected version 1.0.0, got %s", eng.knowledgeBase.Version)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, eng)
+	assert.NotNil(t, eng.logger, "logger should be set")
+	assert.NotNil(t, eng.decisionMaker, "decisionMaker should be initialized when enabled")
+	assert.NotNil(t, eng.predictiveEngine, "predictiveEngine should be initialized when enabled")
+	assert.NotNil(t, eng.anomalyDetector, "anomalyDetector should be initialized when enabled")
+	assert.Nil(t, eng.learningSystem, "learningSystem should be nil when not enabled")
+	assert.Nil(t, eng.behaviorAnalyzer, "behaviorAnalyzer should be nil when not enabled")
+	assert.Nil(t, eng.optimizationEngine, "optimizationEngine should be nil when not enabled")
+	assert.Nil(t, eng.strategyPlanner, "strategyPlanner should be nil when not enabled")
+	assert.NotNil(t, eng.knowledgeBase, "knowledgeBase should always be initialized")
+	assert.NotNil(t, eng.knowledgeBase.Facts, "knowledgeBase.Facts should be initialized")
+	assert.NotNil(t, eng.knowledgeBase.Rules, "knowledgeBase.Rules should be initialized")
+	assert.NotNil(t, eng.knowledgeBase.Concepts, "knowledgeBase.Concepts should be initialized")
+	assert.NotNil(t, eng.knowledgeBase.Relationships, "knowledgeBase.Relationships should be initialized")
+	assert.NotNil(t, eng.knowledgeBase.Theories, "knowledgeBase.Theories should be initialized")
+	assert.Equal(t, "1.0.0", eng.knowledgeBase.Version, "expected version 1.0.0")
 }
 
 func TestNewIntelligenceEngine_DefaultConfig(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if eng.isRunning {
-		t.Error("engine should not be running after creation")
-	}
-	if eng.decisionMaker != nil {
-		t.Error("decisionMaker should be nil with default config")
-	}
-	if eng.learningSystem != nil {
-		t.Error("learningSystem should be nil with default config")
-	}
-	if eng.predictiveEngine != nil {
-		t.Error("predictiveEngine should be nil with default config")
-	}
-	if eng.behaviorAnalyzer != nil {
-		t.Error("behaviorAnalyzer should be nil with default config")
-	}
-	if eng.optimizationEngine != nil {
-		t.Error("optimizationEngine should be nil with default config")
-	}
-	if eng.strategyPlanner != nil {
-		t.Error("strategyPlanner should be nil with default config")
-	}
-	if eng.anomalyDetector != nil {
-		t.Error("anomalyDetector should be nil with default config")
-	}
+	require.NoError(t, err)
+	assert.False(t, eng.isRunning, "engine should not be running after creation")
+	assert.Nil(t, eng.decisionMaker, "decisionMaker should be nil with default config")
+	assert.Nil(t, eng.learningSystem, "learningSystem should be nil with default config")
+	assert.Nil(t, eng.predictiveEngine, "predictiveEngine should be nil with default config")
+	assert.Nil(t, eng.behaviorAnalyzer, "behaviorAnalyzer should be nil with default config")
+	assert.Nil(t, eng.optimizationEngine, "optimizationEngine should be nil with default config")
+	assert.Nil(t, eng.strategyPlanner, "strategyPlanner should be nil with default config")
+	assert.Nil(t, eng.anomalyDetector, "anomalyDetector should be nil with default config")
 	// verify channel / context
-	if eng.ctx == nil {
-		t.Error("ctx should be initialized")
-	}
-	if eng.cancel == nil {
-		t.Error("cancel should be initialized")
-	}
+	assert.NotNil(t, eng.ctx, "ctx should be initialized")
+	assert.NotNil(t, eng.cancel, "cancel should be initialized")
 }
 
 func TestNewIntelligenceEngine_AllEnabled(t *testing.T) {
@@ -132,30 +76,14 @@ func TestNewIntelligenceEngine_AllEnabled(t *testing.T) {
 		EnableStrategicPlanning:      true,
 		EnableAnomalyDetection:       true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if eng.decisionMaker == nil {
-		t.Error("decisionMaker should be initialized")
-	}
-	if eng.learningSystem == nil {
-		t.Error("learningSystem should be initialized")
-	}
-	if eng.predictiveEngine == nil {
-		t.Error("predictiveEngine should be initialized")
-	}
-	if eng.behaviorAnalyzer == nil {
-		t.Error("behaviorAnalyzer should be initialized")
-	}
-	if eng.optimizationEngine == nil {
-		t.Error("optimizationEngine should be initialized")
-	}
-	if eng.strategyPlanner == nil {
-		t.Error("strategyPlanner should be initialized")
-	}
-	if eng.anomalyDetector == nil {
-		t.Error("anomalyDetector should be initialized")
-	}
+	require.NoError(t, err)
+	assert.NotNil(t, eng.decisionMaker, "decisionMaker should be initialized")
+	assert.NotNil(t, eng.learningSystem, "learningSystem should be initialized")
+	assert.NotNil(t, eng.predictiveEngine, "predictiveEngine should be initialized")
+	assert.NotNil(t, eng.behaviorAnalyzer, "behaviorAnalyzer should be initialized")
+	assert.NotNil(t, eng.optimizationEngine, "optimizationEngine should be initialized")
+	assert.NotNil(t, eng.strategyPlanner, "strategyPlanner should be initialized")
+	assert.NotNil(t, eng.anomalyDetector, "anomalyDetector should be initialized")
 }
 
 // ---------------------------------------------------------------------------
@@ -169,29 +97,21 @@ func TestEngineStartStop(t *testing.T) {
 		EnablePredictiveAnalytics:    true,
 		EnableAnomalyDetection:       true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if err := eng.Start(); err != nil {
-		t.Fatalf("Start() should succeed: %v", err)
-	}
+	require.NoError(t, eng.Start())
 
 	eng.mu.RLock()
 	running := eng.isRunning
 	eng.mu.RUnlock()
-	if !running {
-		t.Error("engine should be running after Start()")
-	}
+	assert.True(t, running, "engine should be running after Start()")
 
 	eng.Stop()
 
 	eng.mu.RLock()
 	running = eng.isRunning
 	eng.mu.RUnlock()
-	if running {
-		t.Error("engine should not be running after Stop()")
-	}
+	assert.False(t, running, "engine should not be running after Stop()")
 }
 
 func TestEngineDoubleStart(t *testing.T) {
@@ -199,17 +119,11 @@ func TestEngineDoubleStart(t *testing.T) {
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{
 		EnableAdaptiveDecisionMaking: true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if err := eng.Start(); err != nil {
-		t.Fatalf("first Start() should succeed: %v", err)
-	}
+	require.NoError(t, eng.Start())
 
-	if err := eng.Start(); err == nil {
-		t.Error("second Start() should return error")
-	}
+	assert.Error(t, eng.Start(), "second Start() should return error")
 
 	eng.Stop()
 }
@@ -217,9 +131,7 @@ func TestEngineDoubleStart(t *testing.T) {
 func TestEngineStopWhenNotRunning(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	// Stop without Start should not panic
 	eng.Stop()
@@ -228,13 +140,9 @@ func TestEngineStopWhenNotRunning(t *testing.T) {
 func TestEngineStartStop_DefaultConfig(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if err := eng.Start(); err != nil {
-		t.Fatalf("Start() should succeed: %v", err)
-	}
+	require.NoError(t, eng.Start())
 
 	eng.Stop()
 	// verify no panic on second stop
@@ -252,13 +160,9 @@ func TestEngineStartStop_AllComponents(t *testing.T) {
 		EnableStrategicPlanning:      true,
 		EnableAnomalyDetection:       true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if err := eng.Start(); err != nil {
-		t.Fatalf("Start() should succeed: %v", err)
-	}
+	require.NoError(t, eng.Start())
 
 	eng.Stop()
 }
@@ -268,17 +172,13 @@ func TestEngineContextCancelPropagation(t *testing.T) {
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{
 		EnableAdaptiveDecisionMaking: true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if err := eng.Start(); err != nil {
-		t.Fatalf("Start() should succeed: %v", err)
-	}
+	require.NoError(t, eng.Start())
 
 	select {
 	case <-eng.ctx.Done():
-		t.Error("context should not be cancelled while engine is running")
+		assert.Fail(t, "context should not be cancelled while engine is running")
 	default:
 	}
 
@@ -288,7 +188,7 @@ func TestEngineContextCancelPropagation(t *testing.T) {
 	case <-eng.ctx.Done():
 		// expected after stop
 	default:
-		t.Error("context should be cancelled after Stop()")
+		assert.Fail(t, "context should be cancelled after Stop()")
 	}
 }
 
@@ -299,36 +199,16 @@ func TestEngineContextCancelPropagation(t *testing.T) {
 func TestNewAdaptiveDecisionMaker(t *testing.T) {
 	t.Parallel()
 	adm := NewAdaptiveDecisionMaker(slog.Default(), DecisionMakingConfig{})
-	if adm == nil {
-		t.Fatal("expected non-nil AdaptiveDecisionMaker")
-	}
-	if adm.logger == nil {
-		t.Error("logger should be set")
-	}
-	if adm.decisionModels == nil {
-		t.Error("decisionModels should be initialized")
-	}
-	if adm.contextAnalyzer == nil {
-		t.Error("contextAnalyzer should be initialized")
-	}
-	if adm.riskAssessor == nil {
-		t.Error("riskAssessor should be initialized")
-	}
-	if adm.utilityCalculator == nil {
-		t.Error("utilityCalculator should be initialized")
-	}
-	if adm.consensusBuilder == nil {
-		t.Error("consensusBuilder should be initialized")
-	}
-	if adm.decisionHistory == nil {
-		t.Error("decisionHistory should be initialized")
-	}
-	if adm.modelPerformance == nil {
-		t.Error("modelPerformance should be initialized")
-	}
-	if len(adm.decisionHistory) != 0 {
-		t.Errorf("expected empty decision history, got %d", len(adm.decisionHistory))
-	}
+	require.NotNil(t, adm)
+	assert.NotNil(t, adm.logger, "logger should be set")
+	assert.NotNil(t, adm.decisionModels, "decisionModels should be initialized")
+	assert.NotNil(t, adm.contextAnalyzer, "contextAnalyzer should be initialized")
+	assert.NotNil(t, adm.riskAssessor, "riskAssessor should be initialized")
+	assert.NotNil(t, adm.utilityCalculator, "utilityCalculator should be initialized")
+	assert.NotNil(t, adm.consensusBuilder, "consensusBuilder should be initialized")
+	assert.NotNil(t, adm.decisionHistory, "decisionHistory should be initialized")
+	assert.NotNil(t, adm.modelPerformance, "modelPerformance should be initialized")
+	assert.Empty(t, adm.decisionHistory, "expected empty decision history")
 }
 
 func TestAdaptiveDecisionMaker_Shutdown(t *testing.T) {
@@ -359,13 +239,9 @@ func TestAdaptiveDecisionMaker_DecisionDomains(t *testing.T) {
 		DecisionRouting:     true,
 		DecisionScheduling:  true,
 	}
-	if len(domains) != len(expected) {
-		t.Errorf("expected %d unique domains, got %d", len(expected), len(domains))
-	}
+	assert.Len(t, domains, len(expected), "expected unique domains")
 	for _, d := range domains {
-		if !expected[d] {
-			t.Errorf("unexpected domain: %s", d)
-		}
+	assert.True(t, expected[d], "unexpected domain: %s", d)
 		_ = d // suppress unused; we already verified via map
 	}
 }
@@ -390,18 +266,10 @@ func TestAdaptiveDecisionMaker_DecisionModelStruct(t *testing.T) {
 		LastUpdated: now,
 		Version:     "2.0.0",
 	}
-	if dm.Domain != DecisionSecurity {
-		t.Errorf("expected DecisionSecurity, got %s", dm.Domain)
-	}
-	if dm.ModelType != ModelBayesian {
-		t.Errorf("expected ModelBayesian, got %s", dm.ModelType)
-	}
-	if dm.Performance.Accuracy != 0.95 {
-		t.Errorf("expected accuracy 0.95, got %f", dm.Performance.Accuracy)
-	}
-	if dm.Version != "2.0.0" {
-		t.Errorf("expected version 2.0.0, got %s", dm.Version)
-	}
+	assert.Equal(t, DecisionSecurity, dm.Domain, "expected DecisionSecurity")
+	assert.Equal(t, ModelBayesian, dm.ModelType, "expected ModelBayesian")
+	assert.Equal(t, 0.95, dm.Performance.Accuracy, "expected accuracy 0.95")
+	assert.Equal(t, "2.0.0", dm.Version, "expected version 2.0.0")
 }
 
 func TestAdaptiveDecisionMaker_ModelPerformance(t *testing.T) {
@@ -416,15 +284,9 @@ func TestAdaptiveDecisionMaker_ModelPerformance(t *testing.T) {
 		SampleSize: 5000,
 		Confidence: 0.88,
 	}
-	if mp.F1Score <= 0 {
-		t.Error("F1Score should be positive")
-	}
-	if mp.SampleSize != 5000 {
-		t.Errorf("expected sample size 5000, got %d", mp.SampleSize)
-	}
-	if mp.Confidence != 0.88 {
-		t.Errorf("expected confidence 0.88, got %f", mp.Confidence)
-	}
+	assert.True(t, mp.F1Score > 0, "F1Score should be positive")
+	assert.Equal(t, 5000, mp.SampleSize, "expected sample size 5000")
+	assert.Equal(t, 0.88, mp.Confidence, "expected confidence 0.88")
 }
 
 func TestAdaptiveDecisionMaker_DecisionRecord(t *testing.T) {
@@ -442,18 +304,10 @@ func TestAdaptiveDecisionMaker_DecisionRecord(t *testing.T) {
 		Confidence: 0.85,
 		Learning:   &LearningFeedback{Reinforcement: 0.1, KnowledgeGain: decimal.NewFromFloat(0.15)},
 	}
-	if len(dr.Alternatives) != 2 {
-		t.Errorf("expected 2 alternatives, got %d", len(dr.Alternatives))
-	}
-	if dr.Selected.ID != "opt_a" {
-		t.Errorf("expected selected opt_a, got %s", dr.Selected.ID)
-	}
-	if dr.Confidence != 0.85 {
-		t.Errorf("expected confidence 0.85, got %f", dr.Confidence)
-	}
-	if dr.Learning.KnowledgeGain.InexactFloat64() != 0.15 {
-		t.Errorf("expected knowledge gain 0.15, got %s", dr.Learning.KnowledgeGain.String())
-	}
+	assert.Len(t, dr.Alternatives, 2, "expected 2 alternatives")
+	assert.Equal(t, "opt_a", dr.Selected.ID, "expected selected opt_a")
+	assert.Equal(t, 0.85, dr.Confidence, "expected confidence 0.85")
+	assert.Equal(t, 0.15, dr.Learning.KnowledgeGain.InexactFloat64(), "expected knowledge gain 0.15")
 }
 
 // ---------------------------------------------------------------------------
@@ -463,12 +317,8 @@ func TestAdaptiveDecisionMaker_DecisionRecord(t *testing.T) {
 func TestNewContextAnalyzer(t *testing.T) {
 	t.Parallel()
 	ca := NewContextAnalyzer(slog.Default())
-	if ca == nil {
-		t.Fatal("expected non-nil ContextAnalyzer")
-	}
-	if ca.logger == nil {
-		t.Error("logger should be set")
-	}
+	require.NotNil(t, ca)
+	assert.NotNil(t, ca.logger, "logger should be set")
 }
 
 func TestContextAnalyzer_ContextFactor(t *testing.T) {
@@ -481,45 +331,29 @@ func TestContextAnalyzer_ContextFactor(t *testing.T) {
 		Dynamic:    true,
 		UpdateRate: 30 * time.Second,
 	}
-	if cf.Name != "cpu_usage" {
-		t.Errorf("expected name cpu_usage, got %s", cf.Name)
-	}
-	if cf.Type != FactorNumerical {
-		t.Errorf("expected FactorNumerical, got %s", cf.Type)
-	}
-	if cf.Weight != 0.8 {
-		t.Errorf("expected weight 0.8, got %f", cf.Weight)
-	}
-	if cf.Importance != ImportanceHigh {
-		t.Errorf("expected ImportanceHigh, got %s", cf.Importance)
-	}
-	if !cf.Dynamic {
-		t.Error("Dynamic should be true")
-	}
+	assert.Equal(t, "cpu_usage", cf.Name, "expected name cpu_usage")
+	assert.Equal(t, FactorNumerical, cf.Type, "expected FactorNumerical")
+	assert.Equal(t, 0.8, cf.Weight, "expected weight 0.8")
+	assert.Equal(t, ImportanceHigh, cf.Importance, "expected ImportanceHigh")
+	assert.True(t, cf.Dynamic, "Dynamic should be true")
 }
 
 func TestContextAnalyzer_FactorTypes(t *testing.T) {
 	t.Parallel()
 	factors := []FactorType{FactorNumerical, FactorCategorical, FactorBoolean, FactorTemporal, FactorSpatial}
-	if len(factors) != 5 {
-		t.Errorf("expected 5 factor types, got %d", len(factors))
-	}
+	assert.Len(t, factors, 5, "expected 5 factor types")
 	seen := make(map[FactorType]bool)
 	for _, f := range factors {
 		seen[f] = true
 	}
-	if !seen[FactorNumerical] || !seen[FactorCategorical] || !seen[FactorBoolean] ||
-		!seen[FactorTemporal] || !seen[FactorSpatial] {
-		t.Error("missing factor types")
-	}
+	assert.True(t, seen[FactorNumerical] && seen[FactorCategorical] && seen[FactorBoolean] &&
+		seen[FactorTemporal] && seen[FactorSpatial], "missing factor types")
 }
 
 func TestContextAnalyzer_ImportanceLevels(t *testing.T) {
 	t.Parallel()
 	levels := []ImportanceLevel{ImportanceCritical, ImportanceHigh, ImportanceMedium, ImportanceLow}
-	if len(levels) != 4 {
-		t.Errorf("expected 4 importance levels, got %d", len(levels))
-	}
+	assert.Len(t, levels, 4, "expected 4 importance levels")
 }
 
 // ---------------------------------------------------------------------------
@@ -529,33 +363,21 @@ func TestContextAnalyzer_ImportanceLevels(t *testing.T) {
 func TestNewRiskAssessmentEngine(t *testing.T) {
 	t.Parallel()
 	rae := NewRiskAssessmentEngine(slog.Default())
-	if rae == nil {
-		t.Fatal("expected non-nil RiskAssessmentEngine")
-	}
-	if rae.logger == nil {
-		t.Error("logger should be set")
-	}
-	if rae.riskModels == nil {
-		t.Error("riskModels should be initialized")
-	}
-	if len(rae.riskModels) != 0 {
-		t.Errorf("expected empty riskModels, got %d", len(rae.riskModels))
-	}
+	require.NotNil(t, rae)
+	assert.NotNil(t, rae.logger, "logger should be set")
+	assert.NotNil(t, rae.riskModels, "riskModels should be initialized")
+	assert.Empty(t, rae.riskModels, "expected empty riskModels")
 }
 
 func TestRiskAssessmentEngine_RiskTypes(t *testing.T) {
 	t.Parallel()
 	types := []RiskType{RiskOperational, RiskSecurity, RiskFinancial, RiskReputational, RiskCompliance, RiskTechnical}
-	if len(types) != 6 {
-		t.Errorf("expected 6 risk types, got %d", len(types))
-	}
+	assert.Len(t, types, 6, "expected 6 risk types")
 	seen := make(map[RiskType]bool)
 	for _, rt := range types {
 		seen[rt] = true
 	}
-	if len(seen) != 6 {
-		t.Error("duplicate risk types detected")
-	}
+	assert.Len(t, seen, 6, "duplicate risk types detected")
 }
 
 func TestRiskAssessmentEngine_RiskModel(t *testing.T) {
@@ -563,15 +385,9 @@ func TestRiskAssessmentEngine_RiskModel(t *testing.T) {
 	rae := NewRiskAssessmentEngine(slog.Default())
 	rae.riskModels[RiskSecurity] = &RiskModel{}
 	rae.riskModels[RiskOperational] = &RiskModel{}
-	if len(rae.riskModels) != 2 {
-		t.Errorf("expected 2 risk models, got %d", len(rae.riskModels))
-	}
-	if _, ok := rae.riskModels[RiskSecurity]; !ok {
-		t.Error("RiskSecurity model should exist")
-	}
-	if _, ok := rae.riskModels[RiskOperational]; !ok {
-		t.Error("RiskOperational model should exist")
-	}
+	assert.Len(t, rae.riskModels, 2, "expected 2 risk models")
+	assert.Contains(t, rae.riskModels, RiskSecurity, "RiskSecurity model should exist")
+	assert.Contains(t, rae.riskModels, RiskOperational, "RiskOperational model should exist")
 }
 
 func TestRiskAssessmentEngine_RiskProfile(t *testing.T) {
@@ -587,33 +403,15 @@ func TestRiskAssessmentEngine_RiskProfile(t *testing.T) {
 func TestNewPredictiveAnalyticsEngine(t *testing.T) {
 	t.Parallel()
 	pae := NewPredictiveAnalyticsEngine(slog.Default(), PredictiveConfig{})
-	if pae == nil {
-		t.Fatal("expected non-nil PredictiveAnalyticsEngine")
-	}
-	if pae.logger == nil {
-		t.Error("logger should be set")
-	}
-	if pae.forecastingModels == nil {
-		t.Error("forecastingModels should be initialized")
-	}
-	if pae.timeSeriesEngine == nil {
-		t.Error("timeSeriesEngine should be initialized")
-	}
-	if pae.patternRecognizer == nil {
-		t.Error("patternRecognizer should be initialized")
-	}
-	if pae.confidenceEngine == nil {
-		t.Error("confidenceEngine should be initialized")
-	}
-	if pae.scenarioGenerator == nil {
-		t.Error("scenarioGenerator should be initialized")
-	}
-	if pae.predictions == nil {
-		t.Error("predictions should be initialized")
-	}
-	if pae.forecastAccuracy == nil {
-		t.Error("forecastAccuracy should be initialized")
-	}
+	require.NotNil(t, pae)
+	assert.NotNil(t, pae.logger, "logger should be set")
+	assert.NotNil(t, pae.forecastingModels, "forecastingModels should be initialized")
+	assert.NotNil(t, pae.timeSeriesEngine, "timeSeriesEngine should be initialized")
+	assert.NotNil(t, pae.patternRecognizer, "patternRecognizer should be initialized")
+	assert.NotNil(t, pae.confidenceEngine, "confidenceEngine should be initialized")
+	assert.NotNil(t, pae.scenarioGenerator, "scenarioGenerator should be initialized")
+	assert.NotNil(t, pae.predictions, "predictions should be initialized")
+	assert.NotNil(t, pae.forecastAccuracy, "forecastAccuracy should be initialized")
 }
 
 func TestPredictiveAnalyticsEngine_GenerateForecast(t *testing.T) {
@@ -626,12 +424,8 @@ func TestPredictiveAnalyticsEngine_GenerateForecast(t *testing.T) {
 	}
 	for _, ft := range forecastTypes {
 		pred := pae.GenerateForecast(ft, nil)
-		if pred == nil {
-			t.Errorf("GenerateForecast(%s) should not return nil", ft)
-		}
-		if pred.Type != ft {
-			t.Errorf("expected forecast type %s, got %s", ft, pred.Type)
-		}
+	assert.NotNil(t, pred, "GenerateForecast(%s) should not return nil")
+	assert.Equal(t, ft, pred.Type, "expected forecast type ft, got ft")
 	}
 }
 
@@ -645,13 +439,10 @@ func TestPredictiveAnalyticsEngine_ForecastValue(t *testing.T) {
 		UpperBound: 110.0,
 		Confidence: 0.95,
 	}
-	if fv.Confidence != 0.95 {
-		t.Errorf("expected confidence 0.95, got %f", fv.Confidence)
-	}
+	assert.Equal(t, 0.95, fv.Confidence, "expected confidence 0.95")
 	v, ok := fv.Value.(float64)
-	if !ok || v != 100.5 {
-		t.Errorf("expected value 100.5, got %v", fv.Value)
-	}
+	assert.True(t, ok, "type assertion should succeed")
+	assert.Equal(t, 100.5, v, "expected value 100.5")
 }
 
 func TestPredictiveAnalyticsEngine_AccuracyMetrics(t *testing.T) {
@@ -663,18 +454,10 @@ func TestPredictiveAnalyticsEngine_AccuracyMetrics(t *testing.T) {
 		RSquared:   0.94,
 		Confidence: 0.90,
 	}
-	if am.MAE != 1.5 {
-		t.Errorf("expected MAE 1.5, got %f", am.MAE)
-	}
-	if am.RMSE != 2.0 {
-		t.Errorf("expected RMSE 2.0, got %f", am.RMSE)
-	}
-	if am.MAPE != 3.5 {
-		t.Errorf("expected MAPE 3.5, got %f", am.MAPE)
-	}
-	if am.RSquared != 0.94 {
-		t.Errorf("expected R² 0.94, got %f", am.RSquared)
-	}
+	assert.Equal(t, 1.5, am.MAE, "expected MAE 1.5")
+	assert.Equal(t, 2.0, am.RMSE, "expected RMSE 2.0")
+	assert.Equal(t, 3.5, am.MAPE, "expected MAPE 3.5")
+	assert.Equal(t, 0.94, am.RSquared, "expected R² 0.94")
 }
 
 func TestPredictiveAnalyticsEngine_ForecastTypesComplete(t *testing.T) {
@@ -684,9 +467,7 @@ func TestPredictiveAnalyticsEngine_ForecastTypesComplete(t *testing.T) {
 	for _, ft := range types {
 		seen[ft] = true
 	}
-	if len(seen) != 6 {
-		t.Errorf("expected 6 unique forecast types, got %d", len(seen))
-	}
+	assert.Len(t, seen, 6, "expected 6 unique forecast types, got %d")
 }
 
 func TestPredictiveAnalyticsEngine_Shutdown(t *testing.T) {
@@ -702,42 +483,22 @@ func TestPredictiveAnalyticsEngine_Shutdown(t *testing.T) {
 func TestNewAdvancedAnomalyDetector(t *testing.T) {
 	t.Parallel()
 	aad := NewAdvancedAnomalyDetector(slog.Default(), AnomalyDetectionConfig{})
-	if aad == nil {
-		t.Fatal("expected non-nil AdvancedAnomalyDetector")
-	}
-	if aad.logger == nil {
-		t.Error("logger should be set")
-	}
-	if aad.detectors == nil {
-		t.Error("detectors should be initialized")
-	}
-	if aad.fusionEngine == nil {
-		t.Error("fusionEngine should be initialized")
-	}
-	if aad.contextEngine == nil {
-		t.Error("contextEngine should be initialized")
-	}
-	if aad.alertSystem == nil {
-		t.Error("alertSystem should be initialized")
-	}
-	if aad.anomalies == nil {
-		t.Error("anomalies should be initialized")
-	}
-	if aad.detectionRates == nil {
-		t.Error("detectionRates should be initialized")
-	}
+	require.NotNil(t, aad)
+	assert.NotNil(t, aad.logger, "logger should be set")
+	assert.NotNil(t, aad.detectors, "detectors should be initialized")
+	assert.NotNil(t, aad.fusionEngine, "fusionEngine should be initialized")
+	assert.NotNil(t, aad.contextEngine, "contextEngine should be initialized")
+	assert.NotNil(t, aad.alertSystem, "alertSystem should be initialized")
+	assert.NotNil(t, aad.anomalies, "anomalies should be initialized")
+	assert.NotNil(t, aad.detectionRates, "detectionRates should be initialized")
 }
 
 func TestAdvancedAnomalyDetector_DetectMultiple(t *testing.T) {
 	t.Parallel()
 	aad := NewAdvancedAnomalyDetector(slog.Default(), AnomalyDetectionConfig{})
 	results := aad.DetectMultiple(map[string]interface{}{"cpu": 0.95, "memory": 0.88})
-	if results == nil {
-		t.Fatal("DetectMultiple should not return nil")
-	}
-	if len(results) != 0 {
-		t.Errorf("expected empty results, got %d", len(results))
-	}
+	require.NotNil(t, results)
+	assert.Len(t, results, 0, "expected empty results, got %d")
 }
 
 func TestAdvancedAnomalyDetector_UpdateModels(t *testing.T) {
@@ -767,30 +528,20 @@ func TestAdvancedAnomalyDetector_DetectedAnomaly(t *testing.T) {
 		Impact:          ImpactAssessment{},
 		Recommendations: []string{"restart process", "increase memory limit"},
 	}
-	if a.Severity != AnomalySeverityCritical {
-		t.Errorf("expected critical severity, got %s", a.Severity)
-	}
-	if len(a.Recommendations) != 2 {
-		t.Errorf("expected 2 recommendations, got %d", len(a.Recommendations))
-	}
-	if len(a.Evidence) != 2 {
-		t.Errorf("expected 2 evidence entries, got %d", len(a.Evidence))
-	}
+	assert.Equal(t, AnomalySeverityCritical, a.Severity, "expected critical severity")
+	assert.Len(t, a.Recommendations, 2, "expected 2 recommendations, got %d")
+	assert.Len(t, a.Evidence, 2, "expected 2 evidence entries, got %d")
 }
 
 func TestAdvancedAnomalyDetector_AnomalyTypes(t *testing.T) {
 	t.Parallel()
 	types := []AnomalyType{AnomalyStatistical, AnomalyBehavioral, AnomalyContextual, AnomalyCollective, AnomalyConceptDrift}
-	if len(types) != 5 {
-		t.Errorf("expected 5 anomaly types, got %d", len(types))
-	}
+	assert.Len(t, types, 5, "expected 5 anomaly types, got %d")
 	seen := make(map[AnomalyType]bool)
 	for _, at := range types {
 		seen[at] = true
 	}
-	if len(seen) != 5 {
-		t.Error("duplicate anomaly types detected")
-	}
+	assert.Len(t, seen, 5, "duplicate anomaly types detected")
 }
 
 func TestAdvancedAnomalyDetector_AnomalyAlgorithms(t *testing.T) {
@@ -799,17 +550,13 @@ func TestAdvancedAnomalyDetector_AnomalyAlgorithms(t *testing.T) {
 		AlgorithmIsolationForest, AlgorithmOneClassSVM, AlgorithmAutoencoder,
 		AlgorithmLOF, AlgorithmARIMA, AlgorithmKalmanFilter,
 	}
-	if len(algos) != 6 {
-		t.Errorf("expected 6 anomaly algorithms, got %d", len(algos))
-	}
+	assert.Len(t, algos, 6, "expected 6 anomaly algorithms, got %d")
 }
 
 func TestAdvancedAnomalyDetector_AnomalySeverityValues(t *testing.T) {
 	t.Parallel()
 	severities := []AnomalySeverity{AnomalySeverityLow, AnomalySeverityMedium, AnomalySeverityHigh, AnomalySeverityCritical}
-	if len(severities) != 4 {
-		t.Errorf("expected 4 severity levels, got %d", len(severities))
-	}
+	assert.Len(t, severities, 4, "expected 4 severity levels, got %d")
 }
 
 func TestAdvancedAnomalyDetector_Shutdown(t *testing.T) {
@@ -825,141 +572,93 @@ func TestAdvancedAnomalyDetector_Shutdown(t *testing.T) {
 func TestKnowledgeBase_StoreAndRetrieveFacts(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	kb := eng.knowledgeBase
 	kb.Facts["fact-1"] = &Fact{}
 	kb.Facts["fact-2"] = &Fact{}
 
-	if len(kb.Facts) != 2 {
-		t.Errorf("expected 2 facts, got %d", len(kb.Facts))
-	}
-	if _, ok := kb.Facts["fact-1"]; !ok {
-		t.Error("fact-1 should exist")
-	}
-	if _, ok := kb.Facts["fact-2"]; !ok {
-		t.Error("fact-2 should exist")
-	}
+	assert.Len(t, kb.Facts, 2, "expected 2 facts, got %d")
+	assert.Contains(t, kb.Facts, "fact-1", "fact-1 should exist")
+	assert.Contains(t, kb.Facts, "fact-2", "fact-2 should exist")
 
 	delete(kb.Facts, "fact-1")
-	if len(kb.Facts) != 1 {
-		t.Errorf("expected 1 fact after delete, got %d", len(kb.Facts))
-	}
+	assert.Len(t, kb.Facts, 1, "expected 1 fact after delete, got %d")
 }
 
 func TestKnowledgeBase_StoreAndRetrieveRules(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	kb := eng.knowledgeBase
 	kb.Rules["rule-high-cpu"] = &Rule{}
 	kb.Rules["rule-high-mem"] = &Rule{}
 
-	if len(kb.Rules) != 2 {
-		t.Errorf("expected 2 rules, got %d", len(kb.Rules))
-	}
-	if _, ok := kb.Rules["rule-high-cpu"]; !ok {
-		t.Error("rule-high-cpu should exist")
-	}
+	assert.Len(t, kb.Rules, 2, "expected 2 rules, got %d")
+	assert.Contains(t, kb.Rules, "rule-high-cpu", "rule-high-cpu should exist")
 }
 
 func TestKnowledgeBase_StoreAndRetrieveConcepts(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	kb := eng.knowledgeBase
 	kb.Concepts["anomaly"] = &Concept{}
 	kb.Concepts["baseline"] = &Concept{}
 
-	if len(kb.Concepts) != 2 {
-		t.Errorf("expected 2 concepts, got %d", len(kb.Concepts))
-	}
+	assert.Len(t, kb.Concepts, 2, "expected 2 concepts, got %d")
 }
 
 func TestKnowledgeBase_StoreAndRetrieveRelationships(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	kb := eng.knowledgeBase
 	kb.Relationships["rel-cpu-mem"] = &Relationship{}
 	kb.Relationships["rel-network-latency"] = &Relationship{}
 
-	if len(kb.Relationships) != 2 {
-		t.Errorf("expected 2 relationships, got %d", len(kb.Relationships))
-	}
+	assert.Len(t, kb.Relationships, 2, "expected 2 relationships, got %d")
 }
 
 func TestKnowledgeBase_StoreAndRetrieveTheories(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	kb := eng.knowledgeBase
 	kb.Theories["theory-cpu-correlation"] = &Theory{}
 	kb.Theories["theory-memory-leak"] = &Theory{}
 
-	if len(kb.Theories) != 2 {
-		t.Errorf("expected 2 theories, got %d", len(kb.Theories))
-	}
+	assert.Len(t, kb.Theories, 2, "expected 2 theories, got %d")
 }
 
 func TestKnowledgeBase_Version(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if eng.knowledgeBase.Version != "1.0.0" {
-		t.Errorf("expected version 1.0.0, got %s", eng.knowledgeBase.Version)
-	}
+	require.NoError(t, err)
+	assert.Equal(t, "1.0.0", eng.knowledgeBase.Version, "expected version 1.0.0")
 }
 
 func TestKnowledgeBase_LastUpdated(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if eng.knowledgeBase.LastUpdated.IsZero() {
-		t.Error("LastUpdated should not be zero")
-	}
+	require.NoError(t, err)
+	assert.False(t, eng.knowledgeBase.LastUpdated.IsZero(), "LastUpdated should not be zero")
 }
 
 func TestKnowledgeBase_EmptyOnInit(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	kb := eng.knowledgeBase
-	if len(kb.Facts) != 0 {
-		t.Errorf("expected 0 facts, got %d", len(kb.Facts))
-	}
-	if len(kb.Rules) != 0 {
-		t.Errorf("expected 0 rules, got %d", len(kb.Rules))
-	}
-	if len(kb.Concepts) != 0 {
-		t.Errorf("expected 0 concepts, got %d", len(kb.Concepts))
-	}
-	if len(kb.Relationships) != 0 {
-		t.Errorf("expected 0 relationships, got %d", len(kb.Relationships))
-	}
-	if len(kb.Theories) != 0 {
-		t.Errorf("expected 0 theories, got %d", len(kb.Theories))
-	}
+	assert.Len(t, kb.Facts, 0, "expected 0 facts, got %d")
+	assert.Len(t, kb.Rules, 0, "expected 0 rules, got %d")
+	assert.Len(t, kb.Concepts, 0, "expected 0 concepts, got %d")
+	assert.Len(t, kb.Relationships, 0, "expected 0 relationships, got %d")
+	assert.Len(t, kb.Theories, 0, "expected 0 theories, got %d")
 }
 
 // ---------------------------------------------------------------------------
@@ -969,26 +668,16 @@ func TestKnowledgeBase_EmptyOnInit(t *testing.T) {
 func TestNewUtilityCalculator(t *testing.T) {
 	t.Parallel()
 	uc := NewUtilityCalculator(slog.Default())
-	if uc == nil {
-		t.Fatal("expected non-nil UtilityCalculator")
-	}
-	if uc.utilityFunctions == nil {
-		t.Error("utilityFunctions should be initialized")
-	}
-	if uc.multiCriteriaEngine == nil {
-		t.Error("multiCriteriaEngine should be initialized")
-	}
-	if uc.sensitivityAnalyzer == nil {
-		t.Error("sensitivityAnalyzer should be initialized")
-	}
+	require.NotNil(t, uc)
+	assert.NotNil(t, uc.utilityFunctions, "utilityFunctions should be initialized")
+	assert.NotNil(t, uc.multiCriteriaEngine, "multiCriteriaEngine should be initialized")
+	assert.NotNil(t, uc.sensitivityAnalyzer, "sensitivityAnalyzer should be initialized")
 }
 
 func TestUtilityCalculator_UtilityTypes(t *testing.T) {
 	t.Parallel()
 	types := []UtilityType{UtilityLinear, UtilityExponential, UtilityLogarithmic, UtilityQuadratic, UtilitySigmoid}
-	if len(types) != 5 {
-		t.Errorf("expected 5 utility types, got %d", len(types))
-	}
+	assert.Len(t, types, 5, "expected 5 utility types, got %d")
 }
 
 // ---------------------------------------------------------------------------
@@ -998,20 +687,14 @@ func TestUtilityCalculator_UtilityTypes(t *testing.T) {
 func TestNewConsensusBuilder(t *testing.T) {
 	t.Parallel()
 	cb := NewConsensusBuilder(slog.Default())
-	if cb == nil {
-		t.Fatal("expected non-nil ConsensusBuilder")
-	}
-	if cb.logger == nil {
-		t.Error("logger should be set")
-	}
+	require.NotNil(t, cb)
+	assert.NotNil(t, cb.logger, "logger should be set")
 }
 
 func TestConsensusBuilder_Methods(t *testing.T) {
 	t.Parallel()
 	methods := []ConsensusMethod{ConsensusVoting, ConsensusWeighted, ConsensusBayesian, ConsensusGameTheory, ConsensusFuzzyLogic}
-	if len(methods) != 5 {
-		t.Errorf("expected 5 consensus methods, got %d", len(methods))
-	}
+	assert.Len(t, methods, 5, "expected 5 consensus methods, got %d")
 }
 
 // ---------------------------------------------------------------------------
@@ -1021,14 +704,10 @@ func TestConsensusBuilder_Methods(t *testing.T) {
 func TestEngineGenerateAlternatives_Network(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	ctx := eng.gatherDecisionContext()
 	alts := eng.generateAlternatives(DecisionNetwork, ctx)
-	if len(alts) == 0 {
-		t.Fatal("expected at least 1 alternative for network domain")
-	}
+	require.NotEmpty(t, alts, "expected at least 1 alternative for network domain")
 	found := false
 	for _, a := range alts {
 		if a.ID == "network_route_1" {
@@ -1036,46 +715,32 @@ func TestEngineGenerateAlternatives_Network(t *testing.T) {
 			break
 		}
 	}
-	if !found {
-		t.Error("expected network_route_1 alternative")
-	}
+	assert.True(t, found, "expected network_route_1 alternative")
 }
 
 func TestEngineGenerateAlternatives_Resource(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	ctx := eng.gatherDecisionContext()
 	alts := eng.generateAlternatives(DecisionResource, ctx)
-	if len(alts) == 0 {
-		t.Fatal("expected at least 1 alternative for resource domain")
-	}
+	require.NotEmpty(t, alts, "expected at least 1 alternative for resource domain")
 }
 
 func TestEngineGenerateAlternatives_UnknownDomain(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	ctx := eng.gatherDecisionContext()
 	alts := eng.generateAlternatives("unknown_domain", ctx)
-	if alts == nil {
-		t.Fatal("should return non-nil slice")
-	}
-	if len(alts) != 0 {
-		t.Errorf("expected empty alternatives for unknown domain, got %d", len(alts))
-	}
+	require.NotNil(t, alts)
+	assert.Len(t, alts, 0, "expected empty alternatives for unknown domain, got %d")
 }
 
 func TestEngineEvaluateAlternatives(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	ctx := eng.gatherDecisionContext()
 	alts := []*DecisionAlternative{
 		{ID: "low", ExpectedUtility: 0.3},
@@ -1083,77 +748,52 @@ func TestEngineEvaluateAlternatives(t *testing.T) {
 		{ID: "mid", ExpectedUtility: 0.6},
 	}
 	evaluated := eng.evaluateAlternatives(alts, ctx)
-	if len(evaluated) != 3 {
-		t.Fatalf("expected 3 evaluated alternatives, got %d", len(evaluated))
-	}
+	require.Len(t, evaluated, 3)
 	// verify sorted by expected utility descending
-	if evaluated[0].ID != "high" || evaluated[1].ID != "mid" || evaluated[2].ID != "low" {
-		t.Errorf("alternatives not sorted by ExpectedUtility descending: got %s %s %s",
-			evaluated[0].ID, evaluated[1].ID, evaluated[2].ID)
-	}
+	assert.Equal(t, "high", evaluated[0].ID, "first element should be high")
+	assert.Equal(t, "mid", evaluated[1].ID, "second element should be mid")
+	assert.Equal(t, "low", evaluated[2].ID, "third element should be low")
 }
 
 func TestEngineSelectBestAlternative(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	ctx := eng.gatherDecisionContext()
 	alts := []*DecisionAlternative{
 		{ID: "a", ExpectedUtility: 0.5},
 		{ID: "b", ExpectedUtility: 0.9},
 	}
 	best := eng.selectBestAlternative(alts, ctx)
-	if best == nil {
-		t.Fatal("expected non-nil best alternative")
-	}
-	if best.ID != "a" {
-		t.Errorf("expected first element 'a', got '%s'", best.ID)
-	}
+	require.NotNil(t, best)
+	assert.Equal(t, "a", best.ID, "expected first element a")
 }
 
 func TestEngineSelectBestAlternative_Empty(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	best := eng.selectBestAlternative([]*DecisionAlternative{}, eng.gatherDecisionContext())
-	if best != nil {
-		t.Error("expected nil for empty alternatives")
-	}
+	assert.Nil(t, best, "expected nil for empty alternatives")
 }
 
 func TestEngineExecuteDecision(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	alt := &DecisionAlternative{ID: "test", ExpectedUtility: 0.75}
 	ctx := eng.gatherDecisionContext()
 	outcome := eng.executeDecision(alt, ctx)
-	if outcome == nil {
-		t.Fatal("expected non-nil outcome")
-	}
-	if outcome.Performance == nil {
-		t.Error("Performance map should be initialized")
-	}
-	if outcome.ResourceUsage == nil {
-		t.Error("ResourceUsage map should be initialized")
-	}
-	if outcome.Duration <= 0 {
-		t.Error("Duration should be positive")
-	}
+	require.NotNil(t, outcome)
+	assert.NotNil(t, outcome.Performance, "Performance map should be initialized")
+	assert.NotNil(t, outcome.ResourceUsage, "ResourceUsage map should be initialized")
+	assert.True(t, outcome.Duration > 0, "Duration should be positive")
 }
 
 func TestEngineLearnFromOutcome(t *testing.T) {
 	t.Parallel()
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	alt := &DecisionAlternative{
 		ID:              "test",
 		ExpectedUtility: 0.5,
@@ -1165,20 +805,12 @@ func TestEngineLearnFromOutcome(t *testing.T) {
 	}
 	eng.learnFromOutcome(alt, outcome, eng.gatherDecisionContext())
 	fb, ok := alt.Attributes["learning_feedback"]
-	if !ok {
-		t.Fatal("expected learning_feedback in attributes")
-	}
+	require.True(t, ok, "expected learning_feedback in attributes")
 	lf, ok := fb.(*LearningFeedback)
-	if !ok {
-		t.Fatalf("expected *LearningFeedback, got %T", fb)
-	}
-	if math.Abs(lf.Reinforcement-0.3) > 1e-9 {
-		t.Errorf("expected reinforcement ~0.3, got %.15f", lf.Reinforcement)
-	}
+	require.True(t, ok, "expected *LearningFeedback, got %T", fb)
+	assert.InDelta(t, 0.3, lf.Reinforcement, 1e-9, "expected reinforcement ~0.3")
 	expectedKG := decimal.NewFromFloat(math.Abs(outcome.ActualUtility - alt.ExpectedUtility))
-	if !lf.KnowledgeGain.Equal(expectedKG) {
-		t.Errorf("expected knowledge gain %s, got %s", expectedKG.String(), lf.KnowledgeGain.String())
-	}
+	assert.True(t, lf.KnowledgeGain.Equal(expectedKG), "expected knowledge gain %s", expectedKG.String())
 }
 
 func TestEngineRecordDecision(t *testing.T) {
@@ -1186,9 +818,7 @@ func TestEngineRecordDecision(t *testing.T) {
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{
 		EnableAdaptiveDecisionMaking: true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 	record := &DecisionRecord{
 		ID:         "rec-1",
 		Domain:     DecisionNetwork,
@@ -1196,12 +826,8 @@ func TestEngineRecordDecision(t *testing.T) {
 		Outcome:    &DecisionOutcome{Success: true},
 	}
 	eng.recordDecision(record)
-	if len(eng.decisionMaker.decisionHistory) != 1 {
-		t.Fatalf("expected 1 decision in history, got %d", len(eng.decisionMaker.decisionHistory))
-	}
-	if eng.decisionMaker.decisionHistory[0].ID != "rec-1" {
-		t.Errorf("expected record ID rec-1, got %s", eng.decisionMaker.decisionHistory[0].ID)
-	}
+	require.Len(t, eng.decisionMaker.decisionHistory, 1)
+	assert.Equal(t, "rec-1", eng.decisionMaker.decisionHistory[0].ID, "expected record ID rec-1")
 }
 
 // ---------------------------------------------------------------------------
@@ -1211,9 +837,7 @@ func TestEngineRecordDecision(t *testing.T) {
 func TestModelTypes(t *testing.T) {
 	t.Parallel()
 	types := []ModelType{ModelSupervised, ModelUnsupervised, ModelReinforcement, ModelEnsemble, ModelDeepLearning, ModelBayesian}
-	if len(types) != 6 {
-		t.Errorf("expected 6 model types, got %d", len(types))
-	}
+	assert.Len(t, types, 6, "expected 6 model types, got %d")
 }
 
 func TestAlgorithmTypes(t *testing.T) {
@@ -1223,9 +847,7 @@ func TestAlgorithmTypes(t *testing.T) {
 		AlgorithmGradientBoosting, AlgorithmKMeans, AlgorithmPCA,
 		AlgorithmLSTM, AlgorithmQLearning,
 	}
-	if len(types) != 8 {
-		t.Errorf("expected 8 algorithm types, got %d", len(types))
-	}
+	assert.Len(t, types, 8, "expected 8 algorithm types, got %d")
 }
 
 func TestDeploymentStatusValues(t *testing.T) {
@@ -1234,9 +856,7 @@ func TestDeploymentStatusValues(t *testing.T) {
 		DeploymentDevelopment, DeploymentTesting, DeploymentStaging,
 		DeploymentProduction, DeploymentRetired,
 	}
-	if len(statuses) != 5 {
-		t.Errorf("expected 5 deployment statuses, got %d", len(statuses))
-	}
+	assert.Len(t, statuses, 5, "expected 5 deployment statuses, got %d")
 }
 
 func TestBehaviorTypes(t *testing.T) {
@@ -1245,9 +865,7 @@ func TestBehaviorTypes(t *testing.T) {
 		BehaviorNetwork, BehaviorResource, BehaviorUser, BehaviorSystem,
 		BehaviorSecurity, BehaviorPerformance,
 	}
-	if len(types) != 6 {
-		t.Errorf("expected 6 behavior types, got %d", len(types))
-	}
+	assert.Len(t, types, 6, "expected 6 behavior types, got %d")
 }
 
 func TestPatternTypes(t *testing.T) {
@@ -1256,9 +874,7 @@ func TestPatternTypes(t *testing.T) {
 		PatternSequential, PatternTemporal, PatternSpatial,
 		PatternBehavioral, PatternAnomalous, PatternRecurring,
 	}
-	if len(types) != 6 {
-		t.Errorf("expected 6 pattern types, got %d", len(types))
-	}
+	assert.Len(t, types, 6, "expected 6 pattern types, got %d")
 }
 
 func TestOptimizationTypes(t *testing.T) {
@@ -1267,9 +883,7 @@ func TestOptimizationTypes(t *testing.T) {
 		OptimizationLinear, OptimizationNonlinear, OptimizationInteger,
 		OptimizationMultiObjective, OptimizationGenetic, OptimizationSwarm,
 	}
-	if len(types) != 6 {
-		t.Errorf("expected 6 optimization types, got %d", len(types))
-	}
+	assert.Len(t, types, 6, "expected 6 optimization types, got %d")
 }
 
 func TestOptimizationAlgorithms(t *testing.T) {
@@ -1278,9 +892,7 @@ func TestOptimizationAlgorithms(t *testing.T) {
 		AlgorithmGradientDescent, AlgorithmGenetic, AlgorithmSimulatedAnnealing,
 		AlgorithmParticleSwarm, AlgorithmAntColony, AlgorithmTabuSearch,
 	}
-	if len(algos) != 6 {
-		t.Errorf("expected 6 optimization algorithms, got %d", len(algos))
-	}
+	assert.Len(t, algos, 6, "expected 6 optimization algorithms, got %d")
 }
 
 func TestPlanningHorizons(t *testing.T) {
@@ -1288,9 +900,7 @@ func TestPlanningHorizons(t *testing.T) {
 	horizons := []PlanningHorizon{
 		HorizonShortTerm, HorizonMediumTerm, HorizonLongTerm, HorizonStrategic,
 	}
-	if len(horizons) != 4 {
-		t.Errorf("expected 4 planning horizons, got %d", len(horizons))
-	}
+	assert.Len(t, horizons, 4, "expected 4 planning horizons, got %d")
 }
 
 // ---------------------------------------------------------------------------
@@ -1306,12 +916,8 @@ func TestExperienceRecord(t *testing.T) {
 		Success:  true,
 		Learning: &LearningInsight{},
 	}
-	if exp.Reward != 0.85 {
-		t.Errorf("expected reward 0.85, got %f", exp.Reward)
-	}
-	if !exp.Success {
-		t.Error("expected success to be true")
-	}
+	assert.Equal(t, 0.85, exp.Reward, "expected reward 0.85")
+	assert.True(t, exp.Success, "expected success to be true")
 }
 
 func TestLearningFeedbackDecimal(t *testing.T) {
@@ -1320,17 +926,11 @@ func TestLearningFeedbackDecimal(t *testing.T) {
 		Reinforcement: 0.25,
 		KnowledgeGain: decimal.NewFromFloat(0.5),
 	}
-	if lf.KnowledgeGain.InexactFloat64() != 0.5 {
-		t.Errorf("expected knowledge gain 0.5, got %v", lf.KnowledgeGain)
-	}
+	assert.Equal(t, 0.5, lf.KnowledgeGain.InexactFloat64(), "expected knowledge gain 0.5")
 	d, err := decimal.NewFromString("0.75")
-	if err != nil {
-		t.Fatalf("failed to create decimal: %v", err)
-	}
+	require.NoError(t, err)
 	lf.KnowledgeGain = d
-	if lf.KnowledgeGain.InexactFloat64() != 0.75 {
-		t.Errorf("expected knowledge gain 0.75, got %v", lf.KnowledgeGain)
-	}
+	assert.Equal(t, 0.75, lf.KnowledgeGain.InexactFloat64(), "expected knowledge gain 0.75")
 }
 
 // ---------------------------------------------------------------------------
@@ -1340,30 +940,14 @@ func TestLearningFeedbackDecimal(t *testing.T) {
 func TestNewMachineLearningSystem(t *testing.T) {
 	t.Parallel()
 	mls := NewMachineLearningSystem(slog.Default(), LearningConfig{})
-	if mls == nil {
-		t.Fatal("expected non-nil MachineLearningSystem")
-	}
-	if mls.models == nil {
-		t.Error("models should be initialized")
-	}
-	if mls.trainingEngine == nil {
-		t.Error("trainingEngine should be initialized")
-	}
-	if mls.featureEngine == nil {
-		t.Error("featureEngine should be initialized")
-	}
-	if mls.modelSelector == nil {
-		t.Error("modelSelector should be initialized")
-	}
-	if mls.ensembleSystem == nil {
-		t.Error("ensembleSystem should be initialized")
-	}
-	if mls.learningEvents == nil {
-		t.Error("learningEvents should be initialized")
-	}
-	if mls.modelMetrics == nil {
-		t.Error("modelMetrics should be initialized")
-	}
+	require.NotNil(t, mls)
+	assert.NotNil(t, mls.models, "models should be initialized")
+	assert.NotNil(t, mls.trainingEngine, "trainingEngine should be initialized")
+	assert.NotNil(t, mls.featureEngine, "featureEngine should be initialized")
+	assert.NotNil(t, mls.modelSelector, "modelSelector should be initialized")
+	assert.NotNil(t, mls.ensembleSystem, "ensembleSystem should be initialized")
+	assert.NotNil(t, mls.learningEvents, "learningEvents should be initialized")
+	assert.NotNil(t, mls.modelMetrics, "modelMetrics should be initialized")
 }
 
 func TestMachineLearningSystem_ProcessExperience(t *testing.T) {
@@ -1404,12 +988,8 @@ func TestMachineLearningSystem_MLModel(t *testing.T) {
 		DeploymentStatus:  DeploymentDevelopment,
 		Version:           "0.1.0",
 	}
-	if len(model.Features) != 3 {
-		t.Errorf("expected 3 features, got %d", len(model.Features))
-	}
-	if model.DeploymentStatus != DeploymentDevelopment {
-		t.Errorf("expected Development, got %s", model.DeploymentStatus)
-	}
+	assert.Len(t, model.Features, 3, "expected 3 features, got %d")
+	assert.Equal(t, DeploymentDevelopment, model.DeploymentStatus, "expected Development")
 }
 
 // ---------------------------------------------------------------------------
@@ -1419,51 +999,29 @@ func TestMachineLearningSystem_MLModel(t *testing.T) {
 func TestNewBehavioralAnalysisSystem(t *testing.T) {
 	t.Parallel()
 	bas := NewBehavioralAnalysisSystem(slog.Default(), BehavioralConfig{})
-	if bas == nil {
-		t.Fatal("expected non-nil BehavioralAnalysisSystem")
-	}
-	if bas.behaviorModels == nil {
-		t.Error("behaviorModels should be initialized")
-	}
-	if bas.patternMatcher == nil {
-		t.Error("patternMatcher should be initialized")
-	}
-	if bas.anomalyEngine == nil {
-		t.Error("anomalyEngine should be initialized")
-	}
-	if bas.trendAnalyzer == nil {
-		t.Error("trendAnalyzer should be initialized")
-	}
-	if bas.clusteringEngine == nil {
-		t.Error("clusteringEngine should be initialized")
-	}
-	if bas.behaviorProfiles == nil {
-		t.Error("behaviorProfiles should be initialized")
-	}
-	if bas.analysisResults == nil {
-		t.Error("analysisResults should be initialized")
-	}
+	require.NotNil(t, bas)
+	assert.NotNil(t, bas.behaviorModels, "behaviorModels should be initialized")
+	assert.NotNil(t, bas.patternMatcher, "patternMatcher should be initialized")
+	assert.NotNil(t, bas.anomalyEngine, "anomalyEngine should be initialized")
+	assert.NotNil(t, bas.trendAnalyzer, "trendAnalyzer should be initialized")
+	assert.NotNil(t, bas.clusteringEngine, "clusteringEngine should be initialized")
+	assert.NotNil(t, bas.behaviorProfiles, "behaviorProfiles should be initialized")
+	assert.NotNil(t, bas.analysisResults, "analysisResults should be initialized")
 }
 
 func TestBehavioralAnalysisSystem_AnalyzePatterns(t *testing.T) {
 	t.Parallel()
 	bas := NewBehavioralAnalysisSystem(slog.Default(), BehavioralConfig{})
 	results := bas.AnalyzePatterns(map[string]interface{}{"value": 42})
-	if results == nil {
-		t.Fatal("expected non-nil results")
-	}
-	if len(results) != 0 {
-		t.Errorf("expected empty results, got %d", len(results))
-	}
+	require.NotNil(t, results)
+	require.Empty(t, results)
 }
 
 func TestBehavioralAnalysisSystem_DetectAnomalies(t *testing.T) {
 	t.Parallel()
 	bas := NewBehavioralAnalysisSystem(slog.Default(), BehavioralConfig{})
 	results := bas.DetectAnomalies([]interface{}{})
-	if results == nil {
-		t.Fatal("expected non-nil results")
-	}
+	require.NotNil(t, results)
 }
 
 func TestBehavioralAnalysisSystem_UpdateProfiles(t *testing.T) {
@@ -1476,9 +1034,7 @@ func TestBehavioralAnalysisSystem_GenerateInsights(t *testing.T) {
 	t.Parallel()
 	bas := NewBehavioralAnalysisSystem(slog.Default(), BehavioralConfig{})
 	insights := bas.GenerateInsights([]interface{}{}, []interface{}{})
-	if insights == nil {
-		t.Fatal("expected non-nil insights")
-	}
+	require.NotNil(t, insights)
 }
 
 func TestBehavioralAnalysisSystem_Shutdown(t *testing.T) {
@@ -1503,12 +1059,8 @@ func TestBehavioralAnalysisSystem_BehaviorProfile(t *testing.T) {
 		},
 		Confidence: 0.92,
 	}
-	if len(bp.Patterns) != 1 {
-		t.Errorf("expected 1 pattern, got %d", len(bp.Patterns))
-	}
-	if bp.Confidence != 0.92 {
-		t.Errorf("expected confidence 0.92, got %f", bp.Confidence)
-	}
+	assert.Len(t, bp.Patterns, 1, "expected 1 pattern, got %d")
+	assert.Equal(t, 0.92, bp.Confidence, "expected confidence 0.92")
 }
 
 // ---------------------------------------------------------------------------
@@ -1518,39 +1070,21 @@ func TestBehavioralAnalysisSystem_BehaviorProfile(t *testing.T) {
 func TestNewOptimizationEngine(t *testing.T) {
 	t.Parallel()
 	oe := NewOptimizationEngine(slog.Default(), OptimizationConfig{})
-	if oe == nil {
-		t.Fatal("expected non-nil OptimizationEngine")
-	}
-	if oe.optimizers == nil {
-		t.Error("optimizers should be initialized")
-	}
-	if oe.constraintEngine == nil {
-		t.Error("constraintEngine should be initialized")
-	}
-	if oe.objectiveEngine == nil {
-		t.Error("objectiveEngine should be initialized")
-	}
-	if oe.solutionSpace == nil {
-		t.Error("solutionSpace should be initialized")
-	}
-	if oe.metaOptimizer == nil {
-		t.Error("metaOptimizer should be initialized")
-	}
-	if oe.optimizationRuns == nil {
-		t.Error("optimizationRuns should be initialized")
-	}
-	if oe.bestSolutions == nil {
-		t.Error("bestSolutions should be initialized")
-	}
+	require.NotNil(t, oe)
+	assert.NotNil(t, oe.optimizers, "optimizers should be initialized")
+	assert.NotNil(t, oe.constraintEngine, "constraintEngine should be initialized")
+	assert.NotNil(t, oe.objectiveEngine, "objectiveEngine should be initialized")
+	assert.NotNil(t, oe.solutionSpace, "solutionSpace should be initialized")
+	assert.NotNil(t, oe.metaOptimizer, "metaOptimizer should be initialized")
+	assert.NotNil(t, oe.optimizationRuns, "optimizationRuns should be initialized")
+	assert.NotNil(t, oe.bestSolutions, "bestSolutions should be initialized")
 }
 
 func TestOptimizationEngine_Solve(t *testing.T) {
 	t.Parallel()
 	oe := NewOptimizationEngine(slog.Default(), OptimizationConfig{})
 	solution := oe.Solve("test_problem")
-	if solution == nil {
-		t.Fatal("expected non-nil solution")
-	}
+	require.NotNil(t, solution)
 }
 
 func TestOptimizationEngine_Shutdown(t *testing.T) {
@@ -1568,12 +1102,8 @@ func TestOptimizationEngine_OptimalSolution(t *testing.T) {
 		Optimality:     0.98,
 		Confidence:     0.95,
 	}
-	if !sol.Feasibility {
-		t.Error("expected feasible solution")
-	}
-	if sol.Optimality != 0.98 {
-		t.Errorf("expected optimality 0.98, got %f", sol.Optimality)
-	}
+	assert.True(t, sol.Feasibility, "expected feasible solution")
+	assert.Equal(t, 0.98, sol.Optimality, "expected optimality 0.98")
 }
 
 // ---------------------------------------------------------------------------
@@ -1583,51 +1113,29 @@ func TestOptimizationEngine_OptimalSolution(t *testing.T) {
 func TestNewStrategicPlanningEngine(t *testing.T) {
 	t.Parallel()
 	spe := NewStrategicPlanningEngine(slog.Default(), StrategicConfig{})
-	if spe == nil {
-		t.Fatal("expected non-nil StrategicPlanningEngine")
-	}
-	if spe.planningModels == nil {
-		t.Error("planningModels should be initialized")
-	}
-	if spe.goalHierarchy == nil {
-		t.Error("goalHierarchy should be initialized")
-	}
-	if spe.resourceAllocator == nil {
-		t.Error("resourceAllocator should be initialized")
-	}
-	if spe.scenarioPlanner == nil {
-		t.Error("scenarioPlanner should be initialized")
-	}
-	if spe.planExecutor == nil {
-		t.Error("planExecutor should be initialized")
-	}
-	if spe.strategicPlans == nil {
-		t.Error("strategicPlans should be initialized")
-	}
-	if spe.planProgress == nil {
-		t.Error("planProgress should be initialized")
-	}
+	require.NotNil(t, spe)
+	assert.NotNil(t, spe.planningModels, "planningModels should be initialized")
+	assert.NotNil(t, spe.goalHierarchy, "goalHierarchy should be initialized")
+	assert.NotNil(t, spe.resourceAllocator, "resourceAllocator should be initialized")
+	assert.NotNil(t, spe.scenarioPlanner, "scenarioPlanner should be initialized")
+	assert.NotNil(t, spe.planExecutor, "planExecutor should be initialized")
+	assert.NotNil(t, spe.strategicPlans, "strategicPlans should be initialized")
+	assert.NotNil(t, spe.planProgress, "planProgress should be initialized")
 }
 
 func TestStrategicPlanningEngine_GetCurrentPlans(t *testing.T) {
 	t.Parallel()
 	spe := NewStrategicPlanningEngine(slog.Default(), StrategicConfig{})
 	plans := spe.GetCurrentPlans()
-	if plans == nil {
-		t.Fatal("expected non-nil plans")
-	}
-	if len(plans) != 0 {
-		t.Errorf("expected 0 plans, got %d", len(plans))
-	}
+	require.NotNil(t, plans)
+	assert.Len(t, plans, 0, "expected 0 plans, got %d")
 }
 
 func TestStrategicPlanningEngine_CreatePlan(t *testing.T) {
 	t.Parallel()
 	spe := NewStrategicPlanningEngine(slog.Default(), StrategicConfig{})
 	plan := spe.CreatePlan("initiative-1")
-	if plan == nil {
-		t.Fatal("expected non-nil plan")
-	}
+	require.NotNil(t, plan)
 }
 
 func TestStrategicPlanningEngine_UpdatePlanProgress(t *testing.T) {
@@ -1655,15 +1163,9 @@ func TestStrategicPlanningEngine_StrategicPlan(t *testing.T) {
 		Budget:   500000,
 		Status:   PlanStatus("active"),
 	}
-	if plan.Horizon != HorizonLongTerm {
-		t.Errorf("expected long-term horizon, got %s", plan.Horizon)
-	}
-	if plan.Budget != 500000 {
-		t.Errorf("expected budget 500000, got %f", plan.Budget)
-	}
-	if len(plan.Goals) != 1 {
-		t.Errorf("expected 1 goal, got %d", len(plan.Goals))
-	}
+	assert.Equal(t, HorizonLongTerm, plan.Horizon, "expected long-term horizon")
+	assert.Equal(t, 500000.0, plan.Budget, "expected budget 500000")
+	assert.Len(t, plan.Goals, 1, "expected 1 goal, got %d")
 }
 
 // ---------------------------------------------------------------------------
@@ -1679,12 +1181,8 @@ func TestDecisionContext(t *testing.T) {
 		RiskFactors: []RiskFactor{{}},
 		RealTime:    map[string]interface{}{"cpu": 0.85},
 	}
-	if len(dc.Constraints) != 2 {
-		t.Errorf("expected 2 constraints, got %d", len(dc.Constraints))
-	}
-	if len(dc.Objectives) != 1 {
-		t.Errorf("expected 1 objective, got %d", len(dc.Objectives))
-	}
+	assert.Len(t, dc.Constraints, 2, "expected 2 constraints, got %d")
+	assert.Len(t, dc.Objectives, 1, "expected 1 objective, got %d")
 }
 
 func TestDecisionAlternative(t *testing.T) {
@@ -1698,15 +1196,9 @@ func TestDecisionAlternative(t *testing.T) {
 		Benefits:        []Benefit{{}, {}},
 		Dependencies:    []string{"network", "storage"},
 	}
-	if alt.ExpectedUtility != 0.88 {
-		t.Errorf("expected utility 0.88, got %f", alt.ExpectedUtility)
-	}
-	if alt.Feasibility != 0.95 {
-		t.Errorf("expected feasibility 0.95, got %f", alt.Feasibility)
-	}
-	if alt.Cost != 15000.0 {
-		t.Errorf("expected cost 15000, got %f", alt.Cost)
-	}
+	assert.Equal(t, 0.88, alt.ExpectedUtility, "expected utility 0.88")
+	assert.Equal(t, 0.95, alt.Feasibility, "expected feasibility 0.95")
+	assert.Equal(t, 15000.0, alt.Cost, "expected cost 15000")
 }
 
 // ---------------------------------------------------------------------------
@@ -1723,13 +1215,9 @@ func TestEngineFullLifecycle(t *testing.T) {
 		EnableStrategicPlanning:      true,
 		EnableAnomalyDetection:       true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if err := eng.Start(); err != nil {
-		t.Fatalf("Start() failed: %v", err)
-	}
+	require.NoError(t, eng.Start())
 
 	// Let background loops start
 	time.Sleep(50 * time.Millisecond)
@@ -1737,14 +1225,10 @@ func TestEngineFullLifecycle(t *testing.T) {
 	eng.Stop()
 
 	// After stop, verify no panics and clean state
-	if eng.isRunning {
-		t.Error("engine should not be running after stop")
-	}
+	assert.False(t, eng.isRunning, "engine should not be running after stop")
 
 	// Verify knowledge base is intact after lifecycle
-	if eng.knowledgeBase == nil {
-		t.Error("knowledge base should persist")
-	}
+	assert.NotNil(t, eng.knowledgeBase, "knowledge base should persist")
 }
 
 // ---------------------------------------------------------------------------
@@ -1757,9 +1241,7 @@ func TestEngineConcurrentAccess(t *testing.T) {
 		EnablePredictiveAnalytics:    true,
 		EnableAnomalyDetection:       true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	done := make(chan bool)
 	go func() {
@@ -1787,17 +1269,13 @@ func TestEngineContextCancelled(t *testing.T) {
 	eng, err := NewIntelligenceEngine(slog.Default(), IntelligenceConfig{
 		EnableAdaptiveDecisionMaking: true,
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	eng.ctx = ctx
 	eng.cancel = cancel
 
-	if err := eng.Start(); err != nil {
-		t.Fatalf("Start() failed: %v", err)
-	}
+	require.NoError(t, eng.Start())
 
 	cancel()
 	time.Sleep(50 * time.Millisecond)

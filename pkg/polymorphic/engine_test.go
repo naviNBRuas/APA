@@ -3,6 +3,9 @@ package polymorphic
 import (
 	"log/slog"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTransformCode(t *testing.T) {
@@ -12,20 +15,10 @@ func TestTransformCode(t *testing.T) {
 	// Test data
 	original := []byte("This is a test message")
 
-	// Transform the code
 	transformed, err := engine.TransformCode(original)
-	if err != nil {
-		t.Fatalf("Failed to transform code: %v", err)
-	}
-
-	// Check that the transformed code is not empty and generally larger or equal in size
-	if len(transformed) == 0 {
-		t.Fatalf("Transformed code should not be empty")
-	}
-
-	if len(transformed) < len(original) {
-		t.Errorf("Expected transformed code length to be >= %d, got %d", len(original), len(transformed))
-	}
+	require.NoError(t, err, "Failed to transform code: %v", err)
+	require.NotEmpty(t, transformed, "Transformed code should not be empty")
+	assert.GreaterOrEqual(t, len(transformed), len(original), "Expected transformed code length to be >= %d, got %d", len(original), len(transformed))
 }
 
 func TestGenerateGarbageCode(t *testing.T) {
@@ -34,14 +27,8 @@ func TestGenerateGarbageCode(t *testing.T) {
 
 	// Generate garbage code
 	garbage, err := engine.GenerateGarbageCode(100)
-	if err != nil {
-		t.Fatalf("Failed to generate garbage code: %v", err)
-	}
-
-	// Check that the garbage code has the correct length
-	if len(garbage) != 100 {
-		t.Errorf("Expected garbage code length 100, got %d", len(garbage))
-	}
+	require.NoError(t, err, "Failed to generate garbage code: %v", err)
+	assert.Equal(t, 100, len(garbage), "Expected garbage code length 100, got %d", len(garbage))
 }
 
 func TestInsertGarbageCode(t *testing.T) {
@@ -53,16 +40,10 @@ func TestInsertGarbageCode(t *testing.T) {
 
 	// Insert garbage code
 	result, err := engine.InsertGarbageCode(original, 0.5)
-	if err != nil {
-		t.Fatalf("Failed to insert garbage code: %v", err)
-	}
+	require.NoError(t, err, "Failed to insert garbage code: %v", err)
 
-	// Check that the result is larger than the original
-	if len(result) <= len(original) {
-		t.Error("Result should be larger than original")
-	}
+	assert.Greater(t, len(result), len(original), "Result should be larger than original")
 
-	// Check that all original bytes are still present in the result (though not necessarily in order)
 	originalMap := make(map[byte]int)
 	resultMap := make(map[byte]int)
 
@@ -75,8 +56,6 @@ func TestInsertGarbageCode(t *testing.T) {
 	}
 
 	for b, count := range originalMap {
-		if resultMap[b] < count {
-			t.Errorf("Byte %d is missing from result", b)
-		}
+		assert.GreaterOrEqual(t, resultMap[b], count, "Byte %d is missing from result", b)
 	}
 }

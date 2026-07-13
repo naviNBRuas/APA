@@ -1,6 +1,10 @@
 package polymorphic
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestDataBusAppliesEvents(t *testing.T) {
 	bus := NewDataBus()
@@ -10,22 +14,15 @@ func TestDataBusAppliesEvents(t *testing.T) {
 		return nil
 	}))
 
-	if err := bus.Ingest(DataEvent{Type: "inc"}); err != nil {
-		t.Fatalf("ingest failed: %v", err)
-	}
-	if err := bus.Ingest(DataEvent{Type: "inc"}); err != nil {
-		t.Fatalf("ingest failed: %v", err)
-	}
+	require.NoError(t, bus.Ingest(DataEvent{Type: "inc"}), "ingest failed")
+	require.NoError(t, bus.Ingest(DataEvent{Type: "inc"}), "ingest failed")
 
 	snap := bus.Snapshot()
-	if snap["counter"].(int) != 2 { //nolint:errcheck
-		t.Fatalf("expected counter 2, got %v", snap["counter"])
-	}
+	require.Equal(t, 2, snap["counter"])
 }
 
 func TestDataBusUnknownReducer(t *testing.T) {
 	bus := NewDataBus()
-	if err := bus.Ingest(DataEvent{Type: "missing"}); err == nil {
-		t.Fatalf("expected error for unknown reducer")
-	}
+	err := bus.Ingest(DataEvent{Type: "missing"})
+	require.Error(t, err, "expected error for unknown reducer")
 }

@@ -82,7 +82,7 @@ func TestRequestEmbedding(t *testing.T) {
 	case library := <-embedder.embedChan:
 		assert.Equal(t, "test-library", library)
 	default:
-		t.Error("Embedding request was not queued")
+		assert.Fail(t, "Embedding request was not queued")
 	}
 }
 

@@ -73,7 +73,7 @@ func TestRequestInjection(t *testing.T) {
 	case process := <-injector.injectChan:
 		assert.Equal(t, "test-process", process)
 	default:
-		t.Error("Injection request was not queued")
+		assert.Fail(t, "Injection request was not queued")
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/assert"
 )
 
 func roleLogger() *slog.Logger {
@@ -41,9 +42,10 @@ func TestRoleRebalanceAssignsTargets(t *testing.T) {
 
 	rm.Rebalance(peers, scoreFn)
 
-	if rm.GetRole("p1").Role != RoleScanner || rm.GetRole("p2").Role != RoleRelay || rm.GetRole("p3").Role != RoleAggregator || rm.GetRole("p4").Role != RoleExecutor {
-		t.Fatalf("roles not assigned as expected")
-	}
+	assert.Equal(t, RoleScanner, rm.GetRole("p1").Role)
+	assert.Equal(t, RoleRelay, rm.GetRole("p2").Role)
+	assert.Equal(t, RoleAggregator, rm.GetRole("p3").Role)
+	assert.Equal(t, RoleExecutor, rm.GetRole("p4").Role)
 }
 
 func TestRoleStickinessHonored(t *testing.T) {
@@ -55,9 +57,7 @@ func TestRoleStickinessHonored(t *testing.T) {
 	rm.SetRole("p1", RoleScanner, 1)
 	rm.Rebalance(peers, scoreFn)
 
-	if rm.GetRole("p1").Role != RoleScanner {
-		t.Fatalf("expected p1 to remain scanner due to stickiness")
-	}
+	assert.Equal(t, RoleScanner, rm.GetRole("p1").Role, "expected p1 to remain scanner due to stickiness")
 }
 
 func TestMetricsSnapshot(t *testing.T) {
@@ -66,7 +66,19 @@ func TestMetricsSnapshot(t *testing.T) {
 	rm.SetRole("p2", RoleRelay, 1)
 
 	snap := rm.Snapshot()
-	if snap.Scanners != 1 || snap.Relays != 1 {
-		t.Fatalf("unexpected metrics snapshot: %+v", snap)
-	}
+	assert.Equal(t, 1, snap.Scanners)
+	assert.Equal(t, 1, snap.Relays)
+}
+
+func TestRoleGetRoleForUnknownPeer(t *testing.T) {
+	rm := NewRoleManager(roleLogger(), RolePolicy{})
+	roleInfo := rm.GetRole("unknown")
+	assert.Empty(t, string(roleInfo.Role), "unknown peer should have zero-value role")
+}
+
+func TestRoleRebalanceEmptyPeers(t *testing.T) {
+	rm := NewRoleManager(roleLogger(), RolePolicy{TargetScanners: 1})
+	rm.Rebalance(nil, nil)
+	snap := rm.Snapshot()
+	assert.Equal(t, 0, snap.Scanners)
 }

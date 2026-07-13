@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/require"
 )
 
 type stubRep struct{ score float64 }
@@ -23,35 +24,23 @@ func sfwdLogger() *slog.Logger {
 
 func TestSelectiveForwarderRespectsReputation(t *testing.T) {
 	sf := NewSelectiveForwarder(ForwardPolicy{MinReputation: 60}, stubRep{score: 50}, nil)
-	if sf.AllowForward("peer", 100) {
-		t.Fatalf("expected forward to be denied for low reputation")
-	}
+	require.False(t, sf.AllowForward("peer", 100), "expected forward to be denied for low reputation")
 }
 
 func TestSelectiveForwarderRespectsNetworkStats(t *testing.T) {
 	stats := &NetworkStats{Latency: 800 * time.Millisecond, Bandwidth: 10, PacketLoss: 0.1}
 	sf := NewSelectiveForwarder(ForwardPolicy{MaxLatency: 500 * time.Millisecond}, nil, stubNet{stats: stats})
-	if sf.AllowForward("peer", 100) {
-		t.Fatalf("expected forward to be denied due to latency")
-	}
+	require.False(t, sf.AllowForward("peer", 100), "expected forward to be denied due to latency")
 }
 
 func TestSelectiveForwarderTokenBucket(t *testing.T) {
 	sf := NewSelectiveForwarder(ForwardPolicy{BucketBytes: 100, RefillBytesPerSec: 0}, nil, nil)
-	if !sf.AllowForward("peer", 60) {
-		t.Fatalf("expected first forward to pass")
-	}
-	if sf.AllowForward("peer", 60) {
-		t.Fatalf("expected second forward to fail due to budget")
-	}
+	require.True(t, sf.AllowForward("peer", 60), "expected first forward to pass")
+	require.False(t, sf.AllowForward("peer", 60), "expected second forward to fail due to budget")
 }
 
 func TestSelectiveForwarderCooldown(t *testing.T) {
 	sf := NewSelectiveForwarder(ForwardPolicy{MinReputation: 80, Cooldown: time.Second}, stubRep{score: 50}, nil)
-	if sf.AllowForward("peer", 10) {
-		t.Fatalf("expected deny")
-	}
-	if sf.AllowForward("peer", 10) {
-		t.Fatalf("expected deny during cooldown")
-	}
+	require.False(t, sf.AllowForward("peer", 10), "expected deny")
+	require.False(t, sf.AllowForward("peer", 10), "expected deny during cooldown")
 }

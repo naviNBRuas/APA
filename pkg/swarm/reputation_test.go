@@ -1,111 +1,117 @@
 package swarm
 
 import (
+	"io"
 	"log/slog"
 	"testing"
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// TestReputationSystem tests the reputation system functionality
-func TestReputationSystem(t *testing.T) {
-	// Create a logger
-	logger := slog.Default()
-
-	// Create a reputation system
-	rs := NewReputationSystem(logger)
-
-	// Test that we can create a reputation system
-	if rs == nil {
-		t.Error("Failed to create reputation system")
-	}
-
-	// Test recording interactions
-	peerID := peer.ID("test-peer")
-
-	// Record a successful interaction
-	rs.RecordInteraction(string(peerID), ModuleTransfer, Success)
-
-	// Check the score
-	score := rs.GetScore(string(peerID))
-	if score <= 50.0 {
-		t.Errorf("Expected score > 50.0, got %f", score)
-	}
-
-	// Record a failed interaction
-	rs.RecordInteraction(string(peerID), ModuleTransfer, Failure)
-
-	// Check the score again
-	newScore := rs.GetScore(string(peerID))
-	if newScore >= score {
-		t.Errorf("Expected score to decrease after failure, got %f (was %f)", newScore, score)
-	}
-
-	// Test getting peer score
-	peerScore := rs.GetPeerScore(string(peerID))
-	if peerScore == nil {
-		t.Error("Failed to get peer score")
-	}
-
-	if peerScore.PeerID != string(peerID) {
-		t.Errorf("Expected peer ID %s, got %s", peerID, peerScore.PeerID)
-	}
-
-	// Test trusted peer functionality
-	if !rs.IsTrustedPeer(string(peerID), 40.0) {
-		t.Error("Peer should be trusted with threshold 40.0")
-	}
-
-	if rs.IsTrustedPeer(string(peerID), 100.0) {
-		t.Error("Peer should not be trusted with threshold 100.0")
-	}
-
-	// Test getting trusted peers
-	trustedPeers := rs.GetTrustedPeers(40.0)
-	if len(trustedPeers) != 1 {
-		t.Errorf("Expected 1 trusted peer, got %d", len(trustedPeers))
-	}
-
-	// Test getting all scores
-	allScores := rs.GetAllScores()
-	if len(allScores) != 1 {
-		t.Errorf("Expected 1 score, got %d", len(allScores))
-	}
+func repLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelDebug}))
 }
 
-// TestReputationDecay tests the time decay functionality
+func TestReputationRecordInteraction(t *testing.T) {
+	rs := NewReputationSystem(repLogger())
+	pid := peer.ID("test-peer")
+
+	rs.RecordInteraction(string(pid), ModuleTransfer, Success)
+	score := rs.GetScore(string(pid))
+	assert.Greater(t, score, 50.0, "score should increase after success")
+
+	rs.RecordInteraction(string(pid), ModuleTransfer, Failure)
+	newScore := rs.GetScore(string(pid))
+	assert.Less(t, newScore, score, "score should decrease after failure")
+}
+
+func TestReputationPeerScore(t *testing.T) {
+	rs := NewReputationSystem(repLogger())
+	pid := peer.ID("test-peer")
+	rs.RecordInteraction(string(pid), ModuleTransfer, Success)
+
+	ps := rs.GetPeerScore(string(pid))
+	require.NotNil(t, ps)
+	assert.Equal(t, string(pid), ps.PeerID)
+	assert.Equal(t, 1, ps.InteractionCount)
+	assert.Equal(t, 1, ps.SuccessCount)
+	assert.Equal(t, 0, ps.FailureCount)
+}
+
+func TestReputationGetScoreForUnknownPeer(t *testing.T) {
+	rs := NewReputationSystem(repLogger())
+	score := rs.GetScore("unknown")
+	assert.Equal(t, 50.0, score, "unknown peers should get neutral score")
+}
+
+func TestReputationTrustedPeer(t *testing.T) {
+	rs := NewReputationSystem(repLogger())
+	pid := peer.ID("trusted-peer")
+	rs.RecordInteraction(string(pid), ModuleTransfer, Success)
+
+	assert.True(t, rs.IsTrustedPeer(string(pid), 40.0), "peer should be trusted with threshold 40.0")
+	assert.False(t, rs.IsTrustedPeer(string(pid), 100.0), "peer should not be trusted with threshold 100.0")
+}
+
+func TestReputationGetTrustedPeers(t *testing.T) {
+	rs := NewReputationSystem(repLogger())
+	pid := peer.ID("peer-1")
+	rs.RecordInteraction(string(pid), ModuleTransfer, Success)
+
+	trusted := rs.GetTrustedPeers(40.0)
+	require.Len(t, trusted, 1)
+	assert.Equal(t, string(pid), trusted[0])
+
+	trusted = rs.GetTrustedPeers(100.0)
+	require.Empty(t, trusted)
+}
+
+func TestReputationGetAllScores(t *testing.T) {
+	rs := NewReputationSystem(repLogger())
+	rs.RecordInteraction("peer-a", ModuleTransfer, Success)
+	rs.RecordInteraction("peer-b", ModuleTransfer, Failure)
+
+	scores := rs.GetAllScores()
+	assert.Len(t, scores, 2)
+}
+
 func TestReputationDecay(t *testing.T) {
-	// Create a logger
-	logger := slog.Default()
+	rs := NewReputationSystem(repLogger())
+	pid := peer.ID("decay-peer")
+	rs.RecordInteraction(string(pid), ModuleTransfer, Success)
+	rs.RecordInteraction(string(pid), ModuleTransfer, Success)
+	rs.RecordInteraction(string(pid), ModuleTransfer, Success)
 
-	// Create a reputation system
-	rs := NewReputationSystem(logger)
+	initialScore := rs.GetScore(string(pid))
 
-	// Add a peer with a high score
-	peerID := peer.ID("test-peer")
-	rs.RecordInteraction(string(peerID), ModuleTransfer, Success)
-	rs.RecordInteraction(string(peerID), ModuleTransfer, Success)
-	rs.RecordInteraction(string(peerID), ModuleTransfer, Success)
-
-	initialScore := rs.GetScore(string(peerID))
-
-	// Manually update the score's LastUpdated time in the reputation system
 	rs.mu.Lock()
-	if score, exists := rs.scores[string(peerID)]; exists {
-		score.LastUpdated = time.Now().Add(-48 * time.Hour) // 2 days ago
+	if score, exists := rs.scores[string(pid)]; exists {
+		score.LastUpdated = time.Now().Add(-48 * time.Hour)
 	}
 	rs.mu.Unlock()
 
-	// Apply decay
 	rs.DecayScores()
+	decayedScore := rs.GetScore(string(pid))
+	assert.Less(t, decayedScore, initialScore, "score should have decayed")
+	assert.GreaterOrEqual(t, decayedScore, 0.0, "decayed score should not be negative")
+}
 
-	decayedScore := rs.GetScore(string(peerID))
-	if decayedScore >= initialScore {
-		t.Errorf("Score should have decayed, initial: %f, decayed: %f", initialScore, decayedScore)
-	}
+func TestReputationAllInteractionTypes(t *testing.T) {
+	rs := NewReputationSystem(repLogger())
+	pid := "multi-peer"
 
-	if decayedScore < 0.0 {
-		t.Error("Decayed score should not be negative")
+	for _, it := range []InteractionType{ModuleTransfer, ControllerCommunication, NetworkConnection, ModuleExecution} {
+		rs.RecordInteraction(pid, it, Success)
 	}
+	score := rs.GetScore(pid)
+	assert.Greater(t, score, 50.0)
+
+	for _, it := range []InteractionType{ModuleTransfer, ControllerCommunication, NetworkConnection, ModuleExecution} {
+		rs.RecordInteraction(pid, it, Failure)
+	}
+	score = rs.GetScore(pid)
+	assert.Less(t, score, 50.0, "score should drop below neutral after failures")
 }

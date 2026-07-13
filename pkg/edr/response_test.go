@@ -5,32 +5,25 @@ import (
 	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestResponseManager(t *testing.T) {
 	logger := slog.Default()
 	responseManager := NewResponseManager(logger)
 
-	// Test creating a response manager
-	if responseManager == nil {
-		t.Fatal("Failed to create response manager")
-	}
+	require.NotNil(t, responseManager, "Failed to create response manager")
 
-	// Test that fields are initialized
-	if responseManager.actions == nil {
-		t.Error("Actions map not initialized")
-	}
-
-	if responseManager.responseRules == nil {
-		t.Error("Response rules map not initialized")
-	}
+	assert.NotNil(t, responseManager.actions, "Actions map not initialized")
+	assert.NotNil(t, responseManager.responseRules, "Response rules map not initialized")
 }
 
 func TestAddRemoveAction(t *testing.T) {
 	logger := slog.Default()
 	responseManager := NewResponseManager(logger)
 
-	// Create a test action
 	action := &ResponseAction{
 		ID:          "test-action-001",
 		Name:        "Test Action",
@@ -41,34 +34,19 @@ func TestAddRemoveAction(t *testing.T) {
 		CreatedAt:   time.Now(),
 	}
 
-	// Test adding an action
 	err := responseManager.AddAction(action)
-	if err != nil {
-		t.Errorf("Failed to add action: %v", err)
-	}
+	assert.NoError(t, err, "Failed to add action")
+	assert.Equal(t, 1, len(responseManager.actions))
 
-	// Check that action was added
-	if len(responseManager.actions) != 1 {
-		t.Errorf("Expected 1 action, got %d", len(responseManager.actions))
-	}
-
-	// Test removing an action
 	err = responseManager.RemoveAction(action.ID)
-	if err != nil {
-		t.Errorf("Failed to remove action: %v", err)
-	}
-
-	// Check that action was removed
-	if len(responseManager.actions) != 0 {
-		t.Errorf("Expected 0 actions, got %d", len(responseManager.actions))
-	}
+	assert.NoError(t, err, "Failed to remove action")
+	assert.Equal(t, 0, len(responseManager.actions))
 }
 
 func TestEnableDisableAction(t *testing.T) {
 	logger := slog.Default()
 	responseManager := NewResponseManager(logger)
 
-	// Create a test action (disabled by default)
 	action := &ResponseAction{
 		ID:          "test-action-002",
 		Name:        "Test Action 2",
@@ -79,59 +57,36 @@ func TestEnableDisableAction(t *testing.T) {
 		CreatedAt:   time.Now(),
 	}
 
-	// Add the action
 	if err := responseManager.AddAction(action); err != nil {
-		t.Errorf("Failed to add action: %v", err)
+		assert.NoError(t, err, "Failed to add action")
 	}
 
-	// Test enabling an action
 	err := responseManager.EnableAction(action.ID)
-	if err != nil {
-		t.Errorf("Failed to enable action: %v", err)
-	}
+	assert.NoError(t, err, "Failed to enable action")
+	assert.True(t, responseManager.actions[action.ID].Enabled, "Action should be enabled")
 
-	if !responseManager.actions[action.ID].Enabled {
-		t.Error("Action should be enabled")
-	}
-
-	// Test disabling an action
 	err = responseManager.DisableAction(action.ID)
-	if err != nil {
-		t.Errorf("Failed to disable action: %v", err)
-	}
-
-	if responseManager.actions[action.ID].Enabled {
-		t.Error("Action should be disabled")
-	}
+	assert.NoError(t, err, "Failed to disable action")
+	assert.False(t, responseManager.actions[action.ID].Enabled, "Action should be disabled")
 }
 
 func TestResponseRules(t *testing.T) {
 	logger := slog.Default()
 	responseManager := NewResponseManager(logger)
 
-	// Test adding response rules
 	actionIDs := []string{"action-001", "action-002", "action-003"}
 	err := responseManager.AddResponseRule("high", actionIDs)
-	if err != nil {
-		t.Errorf("Failed to add response rule: %v", err)
-	}
+	assert.NoError(t, err, "Failed to add response rule")
 
-	// Check that rule was added
 	rules := responseManager.GetResponseRules()
-	if len(rules) != 1 {
-		t.Errorf("Expected 1 rule, got %d", len(rules))
-	}
-
-	if len(rules["high"]) != 3 {
-		t.Errorf("Expected 3 action IDs, got %d", len(rules["high"]))
-	}
+	assert.Equal(t, 1, len(rules))
+	assert.Equal(t, 3, len(rules["high"]))
 }
 
 func TestExecuteResponse(t *testing.T) {
 	logger := slog.Default()
 	responseManager := NewResponseManager(logger)
 
-	// Create test actions
 	quarantineAction := &ResponseAction{
 		ID:          "quarantine-action",
 		Name:        "Quarantine Node",
@@ -152,23 +107,20 @@ func TestExecuteResponse(t *testing.T) {
 		CreatedAt:   time.Now(),
 	}
 
-	// Add actions
 	if err := responseManager.AddAction(quarantineAction); err != nil {
-		t.Errorf("Failed to add quarantine action: %v", err)
+		assert.NoError(t, err, "Failed to add quarantine action")
 	}
 	if err := responseManager.AddAction(terminateAction); err != nil {
-		t.Errorf("Failed to add terminate action: %v", err)
+		assert.NoError(t, err, "Failed to add terminate action")
 	}
 
-	// Add response rules
 	if err := responseManager.AddResponseRule("high", []string{"quarantine-action"}); err != nil {
-		t.Errorf("Failed to add high response rule: %v", err)
+		assert.NoError(t, err, "Failed to add high response rule")
 	}
 	if err := responseManager.AddResponseRule("critical", []string{"terminate-action"}); err != nil {
-		t.Errorf("Failed to add critical response rule: %v", err)
+		assert.NoError(t, err, "Failed to add critical response rule")
 	}
 
-	// Create test events
 	highEvent := &Event{
 		ID:        "high-event-001",
 		Type:      "process",
@@ -187,25 +139,18 @@ func TestExecuteResponse(t *testing.T) {
 		Severity:  "critical",
 	}
 
-	// Test executing response for high severity event
 	ctx := context.Background()
 	err := responseManager.ExecuteResponse(ctx, highEvent)
-	if err != nil {
-		t.Errorf("Failed to execute response for high severity event: %v", err)
-	}
+	assert.NoError(t, err, "Failed to execute response for high severity event")
 
-	// Test executing response for critical severity event
 	err = responseManager.ExecuteResponse(ctx, criticalEvent)
-	if err != nil {
-		t.Errorf("Failed to execute response for critical severity event: %v", err)
-	}
+	assert.NoError(t, err, "Failed to execute response for critical severity event")
 }
 
 func TestGetAvailableActions(t *testing.T) {
 	logger := slog.Default()
 	responseManager := NewResponseManager(logger)
 
-	// Create test actions
 	action1 := &ResponseAction{
 		ID:          "action-001",
 		Name:        "Action 1",
@@ -226,13 +171,9 @@ func TestGetAvailableActions(t *testing.T) {
 		CreatedAt:   time.Now(),
 	}
 
-	// Add actions
 	responseManager.AddAction(action1) //nolint:errcheck
 	responseManager.AddAction(action2) //nolint:errcheck
 
-	// Test getting available actions
 	actions := responseManager.GetAvailableActions()
-	if len(actions) != 2 {
-		t.Errorf("Expected 2 actions, got %d", len(actions))
-	}
+	assert.Equal(t, 2, len(actions))
 }

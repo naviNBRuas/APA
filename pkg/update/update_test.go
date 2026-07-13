@@ -301,7 +301,7 @@ func TestStartPeriodicCheck_Cancellation(t *testing.T) {
 	select {
 	case <-done:
 	case <-time.After(2 * time.Second):
-		t.Fatal("StartPeriodicCheck did not return after cancellation")
+		require.Fail(t, "StartPeriodicCheck did not return after cancellation")
 	}
 }
 

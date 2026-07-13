@@ -5,48 +5,34 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBackupManager(t *testing.T) {
-	// Create a temporary directory for backups
 	tempDir, err := os.MkdirTemp("", "backup_test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	logger := slog.Default()
 	passphrase := "test-passphrase"
 	backupManager := NewBackupManager(logger, tempDir, passphrase)
 
-	// Test creating a backup manager
-	if backupManager == nil {
-		t.Fatal("Failed to create backup manager")
-	}
-
-	// Test that fields are initialized
-	if backupManager.backupDir != tempDir {
-		t.Errorf("Expected backupDir %s, got %s", tempDir, backupManager.backupDir)
-	}
-
-	if backupManager.passphrase != passphrase {
-		t.Errorf("Expected passphrase %s, got %s", passphrase, backupManager.passphrase)
-	}
+	require.NotNil(t, backupManager, "Failed to create backup manager")
+	assert.Equal(t, tempDir, backupManager.backupDir)
+	assert.Equal(t, passphrase, backupManager.passphrase)
 }
 
 func TestCreateRestoreBackup(t *testing.T) {
-	// Create a temporary directory for backups
 	tempDir, err := os.MkdirTemp("", "backup_test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	logger := slog.Default()
 	passphrase := "test-passphrase"
 	backupManager := NewBackupManager(logger, tempDir, passphrase)
 
-	// Test data
 	config := map[string]interface{}{
 		"agent_name": "test-agent",
 		"version":    "1.0.0",
@@ -62,139 +48,76 @@ func TestCreateRestoreBackup(t *testing.T) {
 		"credentials": "sensitive-credentials",
 	}
 
-	// Test creating a backup
 	backupFile, err := backupManager.CreateBackup(config, state, criticalData)
-	if err != nil {
-		t.Fatalf("Failed to create backup: %v", err)
-	}
+	require.NoError(t, err, "Failed to create backup")
 
-	// Check that backup file exists
-	if _, err := os.Stat(backupFile); os.IsNotExist(err) {
-		t.Error("Backup file was not created")
-	}
+	assert.FileExists(t, backupFile, "Backup file was not created")
 
-	// Test listing backups
 	backups, err := backupManager.ListBackups()
-	if err != nil {
-		t.Errorf("Failed to list backups: %v", err)
-	}
+	assert.NoError(t, err, "Failed to list backups")
+	assert.Equal(t, 1, len(backups))
 
-	if len(backups) != 1 {
-		t.Errorf("Expected 1 backup, got %d", len(backups))
-	}
-
-	// Test restoring from backup
 	restoredData, err := backupManager.RestoreBackup(backupFile)
-	if err != nil {
-		t.Fatalf("Failed to restore backup: %v", err)
-	}
+	require.NoError(t, err, "Failed to restore backup")
 
-	// Check restored data
-	if restoredData.Version != "1.0" {
-		t.Errorf("Expected version 1.0, got %s", restoredData.Version)
-	}
+	assert.Equal(t, "1.0", restoredData.Version)
+	assert.Equal(t, "test-agent", restoredData.Config["agent_name"])
 
-	if restoredData.Config["agent_name"] != "test-agent" {
-		t.Errorf("Expected agent_name test-agent, got %v", restoredData.Config["agent_name"])
-	}
-
-	// Test deleting backup
 	err = backupManager.DeleteBackup(backupFile)
-	if err != nil {
-		t.Errorf("Failed to delete backup: %v", err)
-	}
+	assert.NoError(t, err, "Failed to delete backup")
 
-	// Check that backup file no longer exists
 	if _, err := os.Stat(backupFile); !os.IsNotExist(err) {
-		t.Error("Backup file was not deleted")
+		assert.True(t, os.IsNotExist(err), "Backup file was not deleted")
 	}
 }
 
 func TestListBackups(t *testing.T) {
-	// Create a temporary directory for backups
 	tempDir, err := os.MkdirTemp("", "backup_test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	logger := slog.Default()
 	passphrase := "test-passphrase"
 	backupManager := NewBackupManager(logger, tempDir, passphrase)
 
-	// Test listing backups with empty directory
 	backups, err := backupManager.ListBackups()
-	if err != nil {
-		t.Errorf("Failed to list backups: %v", err)
-	}
+	assert.NoError(t, err, "Failed to list backups")
+	assert.Equal(t, 0, len(backups))
 
-	if len(backups) != 0 {
-		t.Errorf("Expected 0 backups, got %d", len(backups))
-	}
-
-	// Create some test files (non-backup files)
 	testFile := filepath.Join(tempDir, "test.txt")
 	err = os.WriteFile(testFile, []byte("test content"), 0644)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	// Create a backup file
 	backupFile := filepath.Join(tempDir, "backup_20230101_120000.enc")
 	err = os.WriteFile(backupFile, []byte("encrypted backup data"), 0600)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
-	// Test listing backups again
 	backups, err = backupManager.ListBackups()
-	if err != nil {
-		t.Errorf("Failed to list backups: %v", err)
-	}
-
-	if len(backups) != 1 {
-		t.Errorf("Expected 1 backup, got %d", len(backups))
-	}
-
-	if backups[0] != backupFile {
-		t.Errorf("Expected backup file %s, got %s", backupFile, backups[0])
-	}
+	assert.NoError(t, err, "Failed to list backups")
+	assert.Equal(t, 1, len(backups))
+	assert.Equal(t, backupFile, backups[0])
 }
 
 func TestEncryptionDecryption(t *testing.T) {
-	// Create a temporary directory for backups
 	tempDir, err := os.MkdirTemp("", "backup_test")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	logger := slog.Default()
 	passphrase := "test-passphrase"
 	backupManager := NewBackupManager(logger, tempDir, passphrase)
 
-	// Test data
 	testData := []byte("This is test data to encrypt and decrypt")
 
-	// Test encryption
 	encryptedData, err := backupManager.encryptData(testData)
-	if err != nil {
-		t.Fatalf("Failed to encrypt data: %v", err)
-	}
+	require.NoError(t, err, "Failed to encrypt data")
 
-	if len(encryptedData) <= len(testData) {
-		t.Error("Encrypted data should be longer than original data")
-	}
+	assert.Greater(t, len(encryptedData), len(testData), "Encrypted data should be longer than original data")
 
-	// Test decryption
 	decryptedData, err := backupManager.decryptData(encryptedData)
-	if err != nil {
-		t.Fatalf("Failed to decrypt data: %v", err)
-	}
+	require.NoError(t, err, "Failed to decrypt data")
 
-	if string(decryptedData) != string(testData) {
-		t.Errorf("Decrypted data does not match original. Expected: %s, Got: %s", testData, decryptedData)
-	}
+	assert.Equal(t, string(testData), string(decryptedData), "Decrypted data does not match original")
 }
 
 func TestChecksum(t *testing.T) {
@@ -202,23 +125,13 @@ func TestChecksum(t *testing.T) {
 	passphrase := "test-passphrase"
 	backupManager := NewBackupManager(logger, "/tmp", passphrase)
 
-	// Test data
 	testData := []byte("This is test data for checksum")
 
-	// Test calculating checksum
 	checksum := backupManager.calculateChecksum(testData)
-	if checksum == "" {
-		t.Error("Checksum should not be empty")
-	}
+	assert.NotEmpty(t, checksum, "Checksum should not be empty")
 
-	// Test verifying checksum
-	if !backupManager.verifyChecksum(testData, checksum) {
-		t.Error("Checksum verification should pass for correct data")
-	}
+	assert.True(t, backupManager.verifyChecksum(testData, checksum), "Checksum verification should pass for correct data")
 
-	// Test verifying checksum with incorrect data
 	wrongData := []byte("This is wrong data")
-	if backupManager.verifyChecksum(wrongData, checksum) {
-		t.Error("Checksum verification should fail for incorrect data")
-	}
+	assert.False(t, backupManager.verifyChecksum(wrongData, checksum), "Checksum verification should fail for incorrect data")
 }
