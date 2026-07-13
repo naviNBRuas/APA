@@ -16,6 +16,7 @@ type ResilienceAnalyzer struct {
 
 	mu              sync.RWMutex
 	analysisHistory []*ResilienceAnalysis
+	shutdown        bool
 }
 
 type ResilienceConfig struct{}
@@ -47,8 +48,7 @@ type ImprovementEngine struct {
 	improvementStrategies []ImprovementStrategy
 	prioritizer           *ImprovementPrioritizer
 	implementer           *ImprovementImplementer
-
-	mu sync.RWMutex
+	mu                    sync.RWMutex
 }
 
 type TestResults struct {
@@ -99,8 +99,36 @@ func NewResilienceAnalyzer(logger *slog.Logger, config ResilienceConfig) *Resili
 }
 
 func NewImprovementEngine(logger *slog.Logger) *ImprovementEngine {
-	return &ImprovementEngine{logger: logger, improvementStrategies: []ImprovementStrategy{}, prioritizer: &ImprovementPrioritizer{}, implementer: &ImprovementImplementer{}}
+	return &ImprovementEngine{
+		logger:                logger,
+		improvementStrategies: []ImprovementStrategy{},
+		prioritizer:           &ImprovementPrioritizer{},
+		implementer:           &ImprovementImplementer{},
+	}
 }
 
-func (ra *ResilienceAnalyzer) StoreAnalysis(analysis *ResilienceAnalysis) {}
-func (ra *ResilienceAnalyzer) Shutdown()                                  {}
+func (ra *ResilienceAnalyzer) StoreAnalysis(analysis *ResilienceAnalysis) {
+	ra.mu.Lock()
+	defer ra.mu.Unlock()
+	if analysis == nil {
+		return
+	}
+	if analysis.ID == "" {
+		analysis.ID = generateID()
+	}
+	if analysis.Timestamp.IsZero() {
+		analysis.Timestamp = time.Now()
+	}
+	ra.analysisHistory = append(ra.analysisHistory, analysis)
+	ra.logger.Debug("resilience analysis stored", "score", analysis.Metrics)
+}
+
+func (ra *ResilienceAnalyzer) Shutdown() {
+	ra.mu.Lock()
+	defer ra.mu.Unlock()
+	if !ra.shutdown {
+		ra.shutdown = true
+		ra.analysisHistory = nil
+		ra.logger.Debug("resilience analyzer shut down")
+	}
+}

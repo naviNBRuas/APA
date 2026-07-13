@@ -371,7 +371,7 @@ func (rm *RobustnessManager) triggerRecovery(err *ErrorEvent) {
 }
 
 func (rm *RobustnessManager) performRecovery() {
-	if rm.recoveryEngine == nil {
+	if rm.recoveryEngine == nil || rm.healthMonitor == nil {
 		return
 	}
 

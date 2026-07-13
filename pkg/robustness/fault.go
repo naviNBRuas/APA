@@ -14,6 +14,7 @@ type FaultInjector struct {
 
 	mu               sync.RWMutex
 	activeInjections map[string]*ActiveInjection
+	shutdown         bool
 }
 
 type FaultInjectionConfig struct{}
@@ -23,8 +24,7 @@ type StressTester struct {
 	testScenarios []StressTestScenario
 	executor      *StressTestExecutor
 	analyzer      *StressTestAnalyzer
-
-	mu sync.RWMutex
+	mu            sync.RWMutex
 }
 
 type FailureAnalyzer struct {
@@ -32,8 +32,7 @@ type FailureAnalyzer struct {
 	analyzers  []FailureAnalyzerComponent
 	correlator *FailureCorrelator
 	predictor  *FailurePredictor
-
-	mu sync.RWMutex
+	mu         sync.RWMutex
 }
 
 type InjectionPoint struct {
@@ -114,12 +113,45 @@ func NewFaultInjector(logger *slog.Logger, config FaultInjectionConfig) *FaultIn
 }
 
 func NewStressTester(logger *slog.Logger) *StressTester {
-	return &StressTester{logger: logger, testScenarios: []StressTestScenario{}, executor: &StressTestExecutor{}, analyzer: &StressTestAnalyzer{}}
+	return &StressTester{
+		logger:        logger,
+		testScenarios: []StressTestScenario{},
+		executor:      &StressTestExecutor{},
+		analyzer:      &StressTestAnalyzer{},
+	}
 }
 
 func NewFailureAnalyzer(logger *slog.Logger) *FailureAnalyzer {
-	return &FailureAnalyzer{logger: logger, analyzers: []FailureAnalyzerComponent{}, correlator: &FailureCorrelator{}, predictor: &FailurePredictor{}}
+	return &FailureAnalyzer{
+		logger:     logger,
+		analyzers:  []FailureAnalyzerComponent{},
+		correlator: &FailureCorrelator{},
+		predictor:  &FailurePredictor{},
+	}
 }
 
-func (fi *FaultInjector) InjectFault(faultType FaultType) error { return nil }
-func (fi *FaultInjector) Shutdown()                             {}
+func (fi *FaultInjector) InjectFault(faultType FaultType) error {
+	fi.mu.Lock()
+	defer fi.mu.Unlock()
+	inj := &ActiveInjection{
+		ID:        generateID(),
+		StartTime: time.Now(),
+		Active:    true,
+		Metrics:   &InjectionMetrics{InjectCount: 1, SuccessCount: 1},
+	}
+	fi.activeInjections[string(faultType)] = inj
+	fi.logger.Debug("fault injected", "type", faultType)
+	return nil
+}
+
+func (fi *FaultInjector) Shutdown() {
+	fi.mu.Lock()
+	defer fi.mu.Unlock()
+	if !fi.shutdown {
+		fi.shutdown = true
+		fi.activeInjections = nil
+		fi.injectionPoints = nil
+		fi.scenarios = nil
+		fi.logger.Debug("fault injector shut down")
+	}
+}

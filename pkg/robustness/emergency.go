@@ -16,6 +16,7 @@ type EmergencyProtocols struct {
 
 	mu                sync.RWMutex
 	activeEmergencies map[EmergencyType]*ActiveEmergency
+	shutdown          bool
 }
 
 type EmergencyConfig struct{}
@@ -25,8 +26,7 @@ type EmergencyResponseEngine struct {
 	responsePlans map[EmergencyType]*EmergencyResponsePlan
 	executor      *EmergencyExecutor
 	coordinator   *EmergencyCoordinator
-
-	mu sync.RWMutex
+	mu            sync.RWMutex
 }
 
 type EmergencyCoordination struct {
@@ -34,8 +34,7 @@ type EmergencyCoordination struct {
 	coordinators []EmergencyCoordinatorComponent
 	synchronizer *EmergencySynchronizer
 	communicator *EmergencyCommunicator
-
-	mu sync.RWMutex
+	mu           sync.RWMutex
 }
 
 type EscalationManager struct {
@@ -43,8 +42,7 @@ type EscalationManager struct {
 	escalationPaths map[EmergencyType][]EscalationStep
 	trigger         *EscalationTrigger
 	notifier        *EscalationNotifier
-
-	mu sync.RWMutex
+	mu              sync.RWMutex
 }
 
 type EmergencyProtocol struct {
@@ -117,16 +115,55 @@ func NewEmergencyProtocols(logger *slog.Logger, config EmergencyConfig) *Emergen
 }
 
 func NewEmergencyResponseEngine(logger *slog.Logger) *EmergencyResponseEngine {
-	return &EmergencyResponseEngine{logger: logger, responsePlans: make(map[EmergencyType]*EmergencyResponsePlan), executor: &EmergencyExecutor{}, coordinator: &EmergencyCoordinator{}}
+	return &EmergencyResponseEngine{
+		logger:        logger,
+		responsePlans: make(map[EmergencyType]*EmergencyResponsePlan),
+		executor:      &EmergencyExecutor{},
+		coordinator:   &EmergencyCoordinator{},
+	}
 }
 
 func NewEmergencyCoordination(logger *slog.Logger) *EmergencyCoordination {
-	return &EmergencyCoordination{logger: logger, coordinators: []EmergencyCoordinatorComponent{}, synchronizer: &EmergencySynchronizer{}, communicator: &EmergencyCommunicator{}}
+	return &EmergencyCoordination{
+		logger:       logger,
+		coordinators: []EmergencyCoordinatorComponent{},
+		synchronizer: &EmergencySynchronizer{},
+		communicator: &EmergencyCommunicator{},
+	}
 }
 
 func NewEscalationManager(logger *slog.Logger) *EscalationManager {
-	return &EscalationManager{logger: logger, escalationPaths: make(map[EmergencyType][]EscalationStep), trigger: &EscalationTrigger{}, notifier: &EscalationNotifier{}}
+	return &EscalationManager{
+		logger:          logger,
+		escalationPaths: make(map[EmergencyType][]EscalationStep),
+		trigger:         &EscalationTrigger{},
+		notifier:        &EscalationNotifier{},
+	}
 }
 
-func (ep *EmergencyProtocols) ActivateProtocol(protocol EmergencyType) {}
-func (ep *EmergencyProtocols) Shutdown()                               {}
+func (ep *EmergencyProtocols) ActivateProtocol(emergencyType EmergencyType) {
+	ep.mu.Lock()
+	defer ep.mu.Unlock()
+
+	ae := &ActiveEmergency{
+		ID:        generateID(),
+		Type:      emergencyType,
+		StartTime: time.Now(),
+		Status:    EmergencyStatus("active"),
+		Steps:     []EmergencyStepExecution{},
+		Metrics:   &EmergencyMetrics{},
+	}
+	ep.activeEmergencies[emergencyType] = ae
+	ep.logger.Warn("emergency protocol activated", "type", emergencyType)
+}
+
+func (ep *EmergencyProtocols) Shutdown() {
+	ep.mu.Lock()
+	defer ep.mu.Unlock()
+	if !ep.shutdown {
+		ep.shutdown = true
+		ep.activeEmergencies = nil
+		ep.protocols = nil
+		ep.logger.Debug("emergency protocols shut down")
+	}
+}

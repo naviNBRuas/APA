@@ -17,6 +17,7 @@ type DegradationManager struct {
 	mu                 sync.RWMutex
 	currentLevel       DegradationLevel
 	degradationHistory []*DegradationEvent
+	shutdown           bool
 }
 
 type DegradationConfig struct{}
@@ -26,8 +27,7 @@ type ModeSelector struct {
 	modes       map[DegradationLevel]*DegradationMode
 	selector    *ModeSelectionAlgorithm
 	transitions *ModeTransitionManager
-
-	mu sync.RWMutex
+	mu          sync.RWMutex
 }
 
 type ResourceScaler struct {
@@ -35,8 +35,7 @@ type ResourceScaler struct {
 	scalers    []ResourceScalerComponent
 	controller *ScalingController
 	optimizer  *ResourceOptimizer
-
-	mu sync.RWMutex
+	mu         sync.RWMutex
 }
 
 type QualityManager struct {
@@ -44,8 +43,7 @@ type QualityManager struct {
 	qualityMetrics map[ServiceType]*QualityMetrics
 	controller     *QualityController
 	prioritizer    *ServicePrioritizer
-
-	mu sync.RWMutex
+	mu             sync.RWMutex
 }
 
 type DegradationProfile struct {
@@ -107,20 +105,68 @@ func NewDegradationManager(logger *slog.Logger, config DegradationConfig) *Degra
 }
 
 func NewModeSelector(logger *slog.Logger) *ModeSelector {
-	return &ModeSelector{logger: logger, modes: make(map[DegradationLevel]*DegradationMode), selector: &ModeSelectionAlgorithm{}, transitions: &ModeTransitionManager{}}
+	return &ModeSelector{
+		logger:      logger,
+		modes:       make(map[DegradationLevel]*DegradationMode),
+		selector:    &ModeSelectionAlgorithm{},
+		transitions: &ModeTransitionManager{},
+	}
 }
 
 func NewResourceScaler(logger *slog.Logger) *ResourceScaler {
-	return &ResourceScaler{logger: logger, scalers: []ResourceScalerComponent{}, controller: &ScalingController{}, optimizer: &ResourceOptimizer{}}
+	return &ResourceScaler{
+		logger:     logger,
+		scalers:    []ResourceScalerComponent{},
+		controller: &ScalingController{},
+		optimizer:  &ResourceOptimizer{},
+	}
 }
 
 func NewQualityManager(logger *slog.Logger) *QualityManager {
-	return &QualityManager{logger: logger, qualityMetrics: make(map[ServiceType]*QualityMetrics), controller: &QualityController{}, prioritizer: &ServicePrioritizer{}}
+	return &QualityManager{
+		logger:         logger,
+		qualityMetrics: make(map[ServiceType]*QualityMetrics),
+		controller:     &QualityController{},
+		prioritizer:    &ServicePrioritizer{},
+	}
 }
 
 func (dm *DegradationManager) AssessDegradationLevel(metrics *HealthMetrics) DegradationLevel {
 	return DegradationNone
 }
-func (dm *DegradationManager) ApplyDegradation(level DegradationLevel) {}
-func (dm *DegradationManager) GetCurrentLevel() DegradationLevel       { return dm.currentLevel }
-func (dm *DegradationManager) Shutdown()                               {}
+
+func (dm *DegradationManager) ApplyDegradation(level DegradationLevel) {
+	if level == dm.currentLevel {
+		return
+	}
+	dm.mu.Lock()
+	fromLevel := dm.currentLevel
+	dm.currentLevel = level
+	dm.degradationHistory = append(dm.degradationHistory, &DegradationEvent{
+		ID:        generateID(),
+		Timestamp: time.Now(),
+		FromLevel: fromLevel,
+		ToLevel:   level,
+		Trigger:   "metric-based assessment",
+	})
+	dm.mu.Unlock()
+	dm.logger.Debug("degradation applied", "from", fromLevel, "to", level)
+}
+
+func (dm *DegradationManager) GetCurrentLevel() DegradationLevel {
+	dm.mu.RLock()
+	defer dm.mu.RUnlock()
+	return dm.currentLevel
+}
+
+func (dm *DegradationManager) Shutdown() {
+	dm.mu.Lock()
+	defer dm.mu.Unlock()
+	if !dm.shutdown {
+		dm.shutdown = true
+		dm.currentLevel = DegradationNone
+		dm.degradationHistory = nil
+		dm.degradationLevels = nil
+		dm.logger.Debug("degradation manager shut down")
+	}
+}
