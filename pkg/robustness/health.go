@@ -17,6 +17,7 @@ type HealthMonitor struct {
 	mu             sync.RWMutex
 	healthStatus   *SystemHealthStatus
 	monitoringData *MonitoringData
+	currentMetrics *HealthMetrics
 }
 
 type HealthMonitoringConfig struct{}
@@ -121,32 +122,122 @@ func NewHealthMonitor(logger *slog.Logger, config HealthMonitoringConfig) *Healt
 		healthChecker:    NewHealthChecker(logger),
 		anomalyDetector:  NewAnomalyDetector(logger),
 		alertManager:     NewAlertManager(logger),
-		healthStatus:     &SystemHealthStatus{OverallStatus: HealthUnknown},
-		monitoringData:   &MonitoringData{},
+		healthStatus: &SystemHealthStatus{
+			OverallStatus: HealthUnknown,
+		},
+		monitoringData: &MonitoringData{},
+		currentMetrics: &HealthMetrics{},
 	}
 }
 
 func NewMetricsCollector(logger *slog.Logger) *MetricsCollector {
-	return &MetricsCollector{logger: logger, collectors: []MetricCollector{}, aggregator: &MetricAggregator{}, exporter: &MetricExporter{}}
+	return &MetricsCollector{
+		logger:      logger,
+		collectors:  []MetricCollector{},
+		aggregator:  &MetricAggregator{},
+		exporter:    &MetricExporter{},
+	}
 }
 
 func NewHealthChecker(logger *slog.Logger) *HealthChecker {
-	return &HealthChecker{logger: logger, checks: []HealthCheck{}, evaluator: &HealthEvaluator{}, reporter: &HealthReporter{}}
+	return &HealthChecker{
+		logger:    logger,
+		checks:    []HealthCheck{},
+		evaluator: &HealthEvaluator{},
+		reporter:  &HealthReporter{},
+	}
 }
 
 func NewAnomalyDetector(logger *slog.Logger) *AnomalyDetector {
-	return &AnomalyDetector{logger: logger, detectors: []AnomalyDetectorAlgorithm{}, profiler: &BehaviorProfiler{}, alertEngine: &AnomalyAlertEngine{}}
+	return &AnomalyDetector{
+		logger:      logger,
+		detectors:   []AnomalyDetectorAlgorithm{},
+		profiler:    &BehaviorProfiler{},
+		alertEngine: &AnomalyAlertEngine{},
+	}
 }
 
 func NewAlertManager(logger *slog.Logger) *AlertManager {
-	return &AlertManager{logger: logger, channels: []AlertChannel{}, router: &AlertRouter{}, escalator: &AlertEscalator{}}
+	return &AlertManager{
+		logger:    logger,
+		channels:  []AlertChannel{},
+		router:    &AlertRouter{},
+		escalator: &AlertEscalator{},
+	}
 }
 
-func (hm *HealthMonitor) UpdateHealthStatus(metrics *HealthMetrics)         {}
-func (hm *HealthMonitor) DetectAnomalies(metrics *HealthMetrics) []*Anomaly { return []*Anomaly{} }
+func (hm *HealthMonitor) UpdateHealthStatus(metrics *HealthMetrics) {
+	hm.mu.Lock()
+	defer hm.mu.Unlock()
+
+	if metrics == nil {
+		return
+	}
+
+	hm.currentMetrics = metrics
+	hm.healthStatus.LastChecked = time.Now()
+	hm.healthStatus.NextCheck = time.Now().Add(30 * time.Second)
+
+	status := HealthHealthy
+	if metrics.ErrorRate > 0.1 || metrics.Availability < 0.95 {
+		status = HealthDegraded
+	}
+	if metrics.ErrorRate > 0.25 || metrics.Availability < 0.85 {
+		status = HealthUnhealthy
+	}
+	if metrics.ErrorRate > 0.5 || metrics.Availability < 0.7 {
+		status = HealthCritical
+	}
+
+	hm.healthStatus.OverallStatus = status
+	hm.healthStatus.Metrics = metrics
+	hm.logger.Debug("health status updated", "status", status)
+}
+
+func (hm *HealthMonitor) DetectAnomalies(metrics *HealthMetrics) []*Anomaly {
+	return []*Anomaly{}
+}
+
 func (hm *HealthMonitor) GenerateAlerts(metrics *HealthMetrics) []*HealthAlert {
 	return []*HealthAlert{}
 }
-func (hm *HealthMonitor) GetDegradedComponents() []string   { return []string{} }
-func (hm *HealthMonitor) GetCurrentMetrics() *HealthMetrics { return &HealthMetrics{} }
-func (hm *HealthMonitor) Shutdown()                         {}
+
+func (hm *HealthMonitor) GetDegradedComponents() []string {
+	hm.mu.RLock()
+	defer hm.mu.RUnlock()
+
+	var components []string
+	for comp, status := range hm.healthStatus.ComponentStatus {
+		if status == HealthDegraded || status == HealthUnhealthy || status == HealthCritical {
+			components = append(components, comp)
+		}
+	}
+	if components == nil {
+		return []string{}
+	}
+	return components
+}
+
+func (hm *HealthMonitor) GetCurrentMetrics() *HealthMetrics {
+	hm.mu.RLock()
+	defer hm.mu.RUnlock()
+
+	if hm.currentMetrics == nil {
+		return &HealthMetrics{}
+	}
+	m := *hm.currentMetrics
+	if m.ResourceUsage != nil {
+		ru := *m.ResourceUsage
+		m.ResourceUsage = &ru
+	}
+	return &m
+}
+
+func (hm *HealthMonitor) Shutdown() {
+	hm.mu.Lock()
+	defer hm.mu.Unlock()
+	hm.healthStatus = nil
+	hm.monitoringData = nil
+	hm.currentMetrics = nil
+	hm.logger.Debug("health monitor shut down")
+}

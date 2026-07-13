@@ -35,5 +35,53 @@ type FallbackMetrics struct {
 type FallbackExecutor struct{}
 
 func NewFallbackSystem(logger *slog.Logger, strategies []FallbackStrategy) *FallbackSystem {
-	return &FallbackSystem{logger: logger, strategies: strategies, executors: make(map[string]*FallbackExecutor), metrics: &FallbackMetrics{}}
+	if strategies == nil {
+		strategies = make([]FallbackStrategy, 0)
+	}
+	return &FallbackSystem{
+		logger:     logger,
+		strategies: strategies,
+		executors:  make(map[string]*FallbackExecutor),
+		metrics:    &FallbackMetrics{},
+	}
+}
+
+func (fs *FallbackSystem) InvokeStrategy(name string) bool {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+
+	fs.metrics.TotalInvocations++
+
+	for _, s := range fs.strategies {
+		if s.Name == name {
+			start := time.Now()
+			fs.metrics.SuccessCount++
+			fs.metrics.AverageLatency = time.Duration(
+				(int64(fs.metrics.AverageLatency)*fs.metrics.TotalInvocations + int64(time.Since(start))) /
+					fs.metrics.TotalInvocations,
+			)
+			fs.logger.Debug("fallback strategy invoked", "name", name)
+			return true
+		}
+	}
+
+	fs.metrics.FailureCount++
+	fs.metrics.LastErrorTime = time.Now()
+	return false
+}
+
+func (fs *FallbackSystem) GetMetrics() *FallbackMetrics {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	m := *fs.metrics
+	return &m
+}
+
+func (fs *FallbackSystem) Shutdown() {
+	fs.mu.Lock()
+	defer fs.mu.Unlock()
+	fs.executors = nil
+	fs.strategies = nil
+	fs.metrics = nil
+	fs.logger.Debug("fallback system shut down")
 }

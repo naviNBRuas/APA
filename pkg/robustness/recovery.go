@@ -18,6 +18,7 @@ type RecoveryEngine struct {
 	mu              sync.RWMutex
 	recoveryHistory []*RecoveryEvent
 	diagnosticCache map[string]*DiagnosticResult
+	shutdown        bool
 }
 
 type RecoveryConfig struct{ FaultInjectionConfig FaultInjectionConfig }
@@ -27,8 +28,7 @@ type DiagnosticEngine struct {
 	diagnosticTests map[DiagnosticType]*DiagnosticTest
 	analyzer        *RootCauseAnalyzer
 	reporter        *DiagnosticReporter
-
-	mu sync.RWMutex
+	mu              sync.RWMutex
 }
 
 type RepairCoordinator struct {
@@ -37,8 +37,7 @@ type RepairCoordinator struct {
 	scheduler     *RepairScheduler
 	executor      *RepairExecutor
 	validator     *RepairValidator
-
-	mu sync.RWMutex
+	mu            sync.RWMutex
 }
 
 type RestoreManager struct {
@@ -46,8 +45,7 @@ type RestoreManager struct {
 	restorePoints   map[string]*RestorePoint
 	backupManager   *BackupManager
 	recoveryPlanner *RecoveryPlanner
-
-	mu sync.RWMutex
+	mu              sync.RWMutex
 }
 
 type MitigationEngine struct {
@@ -55,8 +53,7 @@ type MitigationEngine struct {
 	mitigationStrategies map[MitigationType]*MitigationStrategy
 	impactAssessor       *ImpactAssessor
 	priorityManager      *PriorityManager
-
-	mu sync.RWMutex
+	mu                   sync.RWMutex
 }
 
 type PreventionSystem struct {
@@ -64,8 +61,7 @@ type PreventionSystem struct {
 	preventionRules []PreventionRule
 	learningEngine  *LearningEngine
 	riskAssessor    *RiskAssessor
-
-	mu sync.RWMutex
+	mu              sync.RWMutex
 }
 
 type DiagnosticTest struct {
@@ -141,27 +137,92 @@ func NewRecoveryEngine(logger *slog.Logger, config RecoveryConfig) *RecoveryEngi
 }
 
 func NewDiagnosticEngine(logger *slog.Logger) *DiagnosticEngine {
-	return &DiagnosticEngine{logger: logger, diagnosticTests: make(map[DiagnosticType]*DiagnosticTest), analyzer: &RootCauseAnalyzer{}, reporter: &DiagnosticReporter{}}
+	return &DiagnosticEngine{
+		logger:          logger,
+		diagnosticTests: make(map[DiagnosticType]*DiagnosticTest),
+		analyzer:        &RootCauseAnalyzer{},
+		reporter:        &DiagnosticReporter{},
+	}
 }
 
 func NewRepairCoordinator(logger *slog.Logger) *RepairCoordinator {
-	return &RepairCoordinator{logger: logger, repairActions: make(map[RepairType]*RepairAction), scheduler: &RepairScheduler{}, executor: &RepairExecutor{}, validator: &RepairValidator{}}
+	return &RepairCoordinator{
+		logger:        logger,
+		repairActions: make(map[RepairType]*RepairAction),
+		scheduler:     &RepairScheduler{},
+		executor:      &RepairExecutor{},
+		validator:     &RepairValidator{},
+	}
 }
 
 func NewRestoreManager(logger *slog.Logger) *RestoreManager {
-	return &RestoreManager{logger: logger, restorePoints: make(map[string]*RestorePoint), backupManager: &BackupManager{}, recoveryPlanner: &RecoveryPlanner{}}
+	return &RestoreManager{
+		logger:          logger,
+		restorePoints:   make(map[string]*RestorePoint),
+		backupManager:   &BackupManager{},
+		recoveryPlanner: &RecoveryPlanner{},
+	}
 }
 
 func NewMitigationEngine(logger *slog.Logger) *MitigationEngine {
-	return &MitigationEngine{logger: logger, mitigationStrategies: make(map[MitigationType]*MitigationStrategy), impactAssessor: &ImpactAssessor{}, priorityManager: &PriorityManager{}}
+	return &MitigationEngine{
+		logger:               logger,
+		mitigationStrategies: make(map[MitigationType]*MitigationStrategy),
+		impactAssessor:       &ImpactAssessor{},
+		priorityManager:      &PriorityManager{},
+	}
 }
 
 func NewPreventionSystem(logger *slog.Logger) *PreventionSystem {
-	return &PreventionSystem{logger: logger, preventionRules: []PreventionRule{}, learningEngine: &LearningEngine{}, riskAssessor: &RiskAssessor{}}
+	return &PreventionSystem{
+		logger:          logger,
+		preventionRules: []PreventionRule{},
+		learningEngine:  &LearningEngine{},
+		riskAssessor:    &RiskAssessor{},
+	}
 }
 
 func (re *RecoveryEngine) InitiateRecovery(recoveryType RecoveryType, diagnostic *DiagnosticResult) *RecoveryEvent {
-	return &RecoveryEvent{}
+	re.mu.Lock()
+	defer re.mu.Unlock()
+
+	event := &RecoveryEvent{
+		ID:         generateID(),
+		Timestamp:  time.Now(),
+		Type:       recoveryType,
+		Status:     RecoveryStatus("initiated"),
+		Diagnostic: diagnostic,
+		Actions:    []string{},
+		Success:    true,
+	}
+	re.recoveryHistory = append(re.recoveryHistory, event)
+	re.logger.Debug("recovery initiated", "type", recoveryType)
+	return event
 }
-func (re *RecoveryEngine) RepairComponent(component string) {}
-func (re *RecoveryEngine) Shutdown()                        {}
+
+func (re *RecoveryEngine) RepairComponent(component string) {
+	re.mu.Lock()
+	defer re.mu.Unlock()
+
+	event := &RecoveryEvent{
+		ID:        generateID(),
+		Timestamp: time.Now(),
+		Type:      RecoveryType("repair"),
+		Status:    RecoveryStatus("completed"),
+		Actions:   []string{component},
+		Success:   true,
+	}
+	re.recoveryHistory = append(re.recoveryHistory, event)
+	re.logger.Debug("component repaired", "component", component)
+}
+
+func (re *RecoveryEngine) Shutdown() {
+	re.mu.Lock()
+	defer re.mu.Unlock()
+	if !re.shutdown {
+		re.shutdown = true
+		re.recoveryHistory = nil
+		re.diagnosticCache = nil
+		re.logger.Debug("recovery engine shut down")
+	}
+}

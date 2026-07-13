@@ -1,6 +1,7 @@
 package intelligence
 
 import (
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -109,4 +110,206 @@ func NewAdaptiveDecisionMaker(logger *slog.Logger, config DecisionMakingConfig) 
 	}
 }
 
-func (adm *AdaptiveDecisionMaker) Shutdown() {}
+func (adm *AdaptiveDecisionMaker) MakeDecision(domain DecisionDomain, ctx map[string]interface{}) *DecisionAlternative {
+	adm.mu.Lock()
+	defer adm.mu.Unlock()
+
+	decisionCtx := adm.contextAnalyzer.Analyze(ctx)
+
+	alternatives := adm.generateAlternatives(domain, decisionCtx)
+	if len(alternatives) == 0 {
+		adm.logger.Warn("no alternatives generated for decision", "domain", domain)
+		return nil
+	}
+
+	for _, alt := range alternatives {
+		alt.RiskProfile = adm.riskAssessor.AssessRisk(alt, decisionCtx)
+	}
+
+	for _, alt := range alternatives {
+		alt.ExpectedUtility = adm.utilityCalculator.Calculate(alt, decisionCtx)
+	}
+
+	selected := adm.consensusBuilder.BuildConsensus(alternatives)
+	if selected == nil {
+		selected = alternatives[0]
+	}
+
+	model := adm.getOrCreateModel(domain)
+	model.LastUpdated = time.Now()
+
+	record := &DecisionRecord{
+		ID:           fmt.Sprintf("dec-%s-%d", domain, time.Now().UnixNano()),
+		Timestamp:    time.Now(),
+		Domain:       domain,
+		Context:      decisionCtx,
+		Alternatives: alternatives,
+		Selected:     selected,
+		Outcome:      nil,
+		Confidence:   selected.ExpectedUtility,
+	}
+
+	adm.decisionHistory = append(adm.decisionHistory, record)
+	adm.logger.Debug("decision made", "domain", domain, "selected", selected.ID, "utility", selected.ExpectedUtility)
+	return selected
+}
+
+func (adm *AdaptiveDecisionMaker) RecordOutcome(decisionID string, outcome *DecisionOutcome) {
+	adm.mu.Lock()
+	defer adm.mu.Unlock()
+
+	for _, record := range adm.decisionHistory {
+		if record.ID == decisionID {
+			record.Outcome = outcome
+			learning := &LearningFeedback{}
+			if outcome.Success {
+				learning.Reinforcement = outcome.ActualUtility
+			} else {
+				learning.Reinforcement = -outcome.ActualUtility
+			}
+			record.Learning = learning
+			adm.updateModelPerformance(record.Domain, outcome)
+			adm.logger.Debug("outcome recorded", "decision", decisionID, "success", outcome.Success)
+			return
+		}
+	}
+}
+
+func (adm *AdaptiveDecisionMaker) GetDecisionHistory(domain DecisionDomain) []*DecisionRecord {
+	adm.mu.RLock()
+	defer adm.mu.RUnlock()
+
+	if domain == "" {
+		result := make([]*DecisionRecord, len(adm.decisionHistory))
+		copy(result, adm.decisionHistory)
+		return result
+	}
+
+	var filtered []*DecisionRecord
+	for _, r := range adm.decisionHistory {
+		if r.Domain == domain {
+			filtered = append(filtered, r)
+		}
+	}
+	return filtered
+}
+
+func (adm *AdaptiveDecisionMaker) GetModelPerformance(domain DecisionDomain) *ModelPerformance {
+	adm.mu.RLock()
+	defer adm.mu.RUnlock()
+
+	key := string(domain)
+	if perf, ok := adm.modelPerformance[key]; ok {
+		return perf
+	}
+	return &ModelPerformance{Confidence: 0.5}
+}
+
+func (adm *AdaptiveDecisionMaker) LearnFromOutcome(record *DecisionRecord) {
+	adm.mu.Lock()
+	defer adm.mu.Unlock()
+
+	model := adm.getOrCreateModel(record.Domain)
+	if record.Outcome != nil {
+		sample := TrainingSample{
+			Features:  map[string]interface{}{"domain": record.Domain, "confidence": record.Confidence},
+			Target:    record.Outcome.Success,
+			Weight:    1.0,
+			Timestamp: time.Now(),
+			Quality:   record.Confidence,
+		}
+		model.TrainingData = append(model.TrainingData, sample)
+		model.Performance.SampleSize = len(model.TrainingData)
+
+		if len(model.TrainingData) > 1 {
+			successes := 0
+			for _, s := range model.TrainingData {
+				if s.Target == true {
+					successes++
+				}
+			}
+			model.Performance.Accuracy = float64(successes) / float64(len(model.TrainingData))
+		}
+		model.LastUpdated = time.Now()
+	}
+}
+
+func (adm *AdaptiveDecisionMaker) Shutdown() {
+	adm.mu.Lock()
+	defer adm.mu.Unlock()
+
+	adm.decisionHistory = nil
+	adm.decisionModels = nil
+	adm.modelPerformance = nil
+	adm.logger.Debug("adaptive decision maker shut down")
+}
+
+func (adm *AdaptiveDecisionMaker) generateAlternatives(domain DecisionDomain, ctx *DecisionContext) []*DecisionAlternative {
+	model := adm.getOrCreateModel(domain)
+	alternatives := []*DecisionAlternative{
+		{
+			ID:          fmt.Sprintf("alt-%s-proactive", domain),
+			Description: "Proactive action based on current context",
+			Attributes:  map[string]interface{}{"strategy": "proactive"},
+			Feasibility: 0.8,
+			Cost:        10.0,
+		},
+		{
+			ID:          fmt.Sprintf("alt-%s-reactive", domain),
+			Description: "Reactive response to observed conditions",
+			Attributes:  map[string]interface{}{"strategy": "reactive"},
+			Feasibility: 0.9,
+			Cost:        5.0,
+		},
+		{
+			ID:          fmt.Sprintf("alt-%s-balanced", domain),
+			Description: "Balanced approach considering all objectives",
+			Attributes:  map[string]interface{}{"strategy": "balanced"},
+			Feasibility: 0.85,
+			Cost:        7.5,
+		},
+	}
+
+	if model.Performance != nil && model.Performance.Accuracy > 0.5 {
+		alternatives = append(alternatives, &DecisionAlternative{
+			ID:          fmt.Sprintf("alt-%s-learned", domain),
+			Description: "Learned strategy from historical performance",
+			Attributes:  map[string]interface{}{"strategy": "learned", "model_accuracy": model.Performance.Accuracy},
+			Feasibility: model.Performance.Accuracy,
+			Cost:        6.0,
+		})
+	}
+	return alternatives
+}
+
+func (adm *AdaptiveDecisionMaker) getOrCreateModel(domain DecisionDomain) *DecisionModel {
+	model, exists := adm.decisionModels[domain]
+	if !exists {
+		model = &DecisionModel{
+			Domain:      domain,
+			ModelType:   ModelBayesian,
+			Parameters:  map[string]interface{}{"learning_rate": 0.1, "exploration_rate": 0.2},
+			Performance: &ModelPerformance{Confidence: 0.5},
+			Version:     "1.0.0",
+		}
+		adm.decisionModels[domain] = model
+	}
+	return model
+}
+
+func (adm *AdaptiveDecisionMaker) updateModelPerformance(domain DecisionDomain, outcome *DecisionOutcome) {
+	key := string(domain)
+	perf, exists := adm.modelPerformance[key]
+	if !exists {
+		perf = &ModelPerformance{Confidence: 0.5}
+		adm.modelPerformance[key] = perf
+	}
+	if outcome.Success {
+		perf.Accuracy = (perf.Accuracy*float64(perf.SampleSize) + 1.0) / float64(perf.SampleSize+1)
+	} else {
+		perf.Accuracy = (perf.Accuracy*float64(perf.SampleSize)) / float64(perf.SampleSize+1)
+	}
+	perf.SampleSize++
+	perf.LastEvaluated = time.Now()
+	perf.Confidence = 1.0 - 1.0/(1.0+float64(perf.SampleSize))
+}
