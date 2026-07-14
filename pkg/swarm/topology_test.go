@@ -1,6 +1,7 @@
 package swarm
 
 import (
+	"context"
 	"io"
 	"log/slog"
 	"testing"
@@ -91,7 +92,232 @@ func TestOverConnectedRelaySuggestsLowestScoreDisconnect(t *testing.T) {
 	assert.Equal(t, edgeWeak, disconnect[0], "expected weakest connection to be suggested for removal")
 }
 
-func TestRegionBiasInfluencesScoring(t *testing.T) {
+func TestTopologyManager_RegionFor_Known(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+	pid := peer.ID("peer-1")
+
+	tm.UpdatePeerConnection(pid, false, []string{"us-east"}, nil)
+	assert.Equal(t, "us-east", tm.RegionFor(pid))
+}
+
+func TestTopologyManager_RegionFor_Unknown(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+
+	assert.Equal(t, "", tm.RegionFor(peer.ID("nobody")))
+}
+
+func TestTopologyManager_GetPeerConnection_Known(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+	pid := peer.ID("peer-1")
+
+	tm.UpdatePeerConnection(pid, true, []string{"us-east"}, []string{"storage"})
+
+	conn := tm.GetPeerConnection(pid)
+	require.NotNil(t, conn)
+	assert.True(t, conn.Connected)
+	assert.Equal(t, []string{"us-east"}, conn.Regions)
+	assert.Equal(t, []string{"storage"}, conn.Capabilities)
+	assert.Equal(t, 1, conn.Connections)
+}
+
+func TestTopologyManager_GetPeerConnection_Unknown(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+
+	assert.Nil(t, tm.GetPeerConnection(peer.ID("nobody")))
+}
+
+func TestTopologyManager_GetPeerConnection_ReturnsCopy(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+	pid := peer.ID("peer-1")
+
+	tm.UpdatePeerConnection(pid, true, []string{"us-east"}, []string{"storage"})
+
+	conn := tm.GetPeerConnection(pid)
+	conn.Connected = false
+	conn.Regions[0] = "hacked"
+
+	conn2 := tm.GetPeerConnection(pid)
+	assert.True(t, conn2.Connected)
+	assert.Equal(t, "us-east", conn2.Regions[0])
+}
+
+func TestTopologyManager_GetTopology_ReturnsCopy(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+	pid := peer.ID("peer-1")
+
+	tm.UpdatePeerConnection(pid, false, nil, nil)
+	tm.UpdatePeerConnection(peer.ID("peer-2"), false, nil, nil)
+	tm.UpdateEdge(pid, peer.ID("peer-2"), 10*time.Millisecond, 100, 0.9)
+
+	topo := tm.GetTopology()
+	require.NotNil(t, topo)
+	assert.Len(t, topo.Nodes, 2)
+	assert.Len(t, topo.Edges, 1)
+
+	topo.Nodes[pid] = &NodeInfo{PeerID: peer.ID("hacker")}
+	delete(topo.Edges, string(pid)+"->peer-2")
+
+	topo2 := tm.GetTopology()
+	assert.Len(t, topo2.Nodes, 2)
+	assert.Len(t, topo2.Edges, 1)
+}
+
+func TestTopologyManager_FindOptimalPeers_Basic(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+	ctx := context.Background()
+
+	tm.UpdatePeerConnection(peer.ID("candidate-1"), false, nil, nil)
+	tm.UpdatePeerConnection(peer.ID("candidate-2"), false, nil, nil)
+
+	peers := tm.FindOptimalPeers(ctx, 2, nil)
+	require.Len(t, peers, 2)
+}
+
+func TestTopologyManager_FindOptimalPeers_ExcludesConnected(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+	ctx := context.Background()
+
+	tm.UpdatePeerConnection(peer.ID("connected-peer"), true, nil, nil)
+	tm.UpdatePeerConnection(peer.ID("available-peer"), false, nil, nil)
+
+	peers := tm.FindOptimalPeers(ctx, 5, nil)
+	require.Len(t, peers, 1)
+	assert.Equal(t, peer.ID("available-peer"), peers[0])
+}
+
+func TestTopologyManager_FindOptimalPeers_RequiresCapabilities(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+	ctx := context.Background()
+
+	tm.UpdatePeerConnection(peer.ID("has-storage"), false, nil, []string{"storage", "compute"})
+	tm.UpdatePeerConnection(peer.ID("compute-only"), false, nil, []string{"compute"})
+
+	peers := tm.FindOptimalPeers(ctx, 5, []string{"storage"})
+	require.Len(t, peers, 1)
+	assert.Equal(t, peer.ID("has-storage"), peers[0])
+}
+
+func TestTopologyManager_FindOptimalPeers_NoCandidates(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+	ctx := context.Background()
+
+	peers := tm.FindOptimalPeers(ctx, 5, nil)
+	assert.Empty(t, peers)
+}
+
+func TestTopologyManager_FindOptimalPeers_LimitsCount(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+	ctx := context.Background()
+
+	tm.UpdatePeerConnection(peer.ID("a"), false, nil, nil)
+	tm.UpdatePeerConnection(peer.ID("b"), false, nil, nil)
+	tm.UpdatePeerConnection(peer.ID("c"), false, nil, nil)
+
+	peers := tm.FindOptimalPeers(ctx, 2, nil)
+	require.Len(t, peers, 2)
+}
+
+func TestTopologyManager_FindOptimalPeers_PrefersHigherReputation(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+	ctx := context.Background()
+
+	highRep := peer.ID("high-rep")
+	lowRep := peer.ID("low-rep")
+
+	tm.UpdatePeerConnection(highRep, false, nil, nil)
+	tm.UpdatePeerConnection(lowRep, false, nil, nil)
+
+	rep.RecordInteraction(string(highRep), ModuleTransfer, Success)
+	rep.RecordInteraction(string(highRep), ModuleTransfer, Success)
+	rep.RecordInteraction(string(highRep), ModuleTransfer, Success)
+	rep.RecordInteraction(string(lowRep), ModuleTransfer, Failure)
+	rep.RecordInteraction(string(lowRep), ModuleTransfer, Failure)
+
+	peers := tm.FindOptimalPeers(ctx, 2, nil)
+	require.Len(t, peers, 2)
+	assert.Equal(t, highRep, peers[0])
+}
+
+func TestTopologyManager_OptimizeTopology_UnderConnected(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+	ctx := context.Background()
+
+	tm.UpdatePeerConnection(peer.ID("candidate-1"), false, nil, nil)
+	tm.UpdatePeerConnection(peer.ID("candidate-2"), false, nil, nil)
+
+	tm.OptimizeTopology(ctx)
+}
+
+func TestTopologyManager_OptimizeTopology_OverConnected(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+	ctx := context.Background()
+
+	for i := range 25 {
+		pid := peer.ID(peer.ID([]byte{byte(i)}))
+		tm.UpdatePeerConnection(pid, true, nil, nil)
+	}
+
+	tm.OptimizeTopology(ctx)
+}
+
+func TestTopologyManager_OptimizeTopology_NormalRange(t *testing.T) {
+	logger := newTestLogger()
+	rep := NewReputationSystem(logger)
+	routing := NewRoutingManager(logger, rep)
+	tm := NewTopologyManager(logger, rep, routing)
+	ctx := context.Background()
+
+	for i := range 10 {
+		pid := peer.ID(peer.ID([]byte{byte(i)}))
+		tm.UpdatePeerConnection(pid, true, nil, nil)
+	}
+
+	tm.OptimizeTopology(ctx)
+}
+
+func TestTopologyBiasInfluencesScoring(t *testing.T) {
 	logger := newTestLogger()
 	rep := NewReputationSystem(logger)
 	routing := NewRoutingManager(logger, rep)
