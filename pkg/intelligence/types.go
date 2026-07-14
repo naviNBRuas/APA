@@ -267,9 +267,20 @@ type OptimizationConfig struct{}
 type StrategicConfig struct{}
 type AnomalyDetectionConfig struct{}
 type FactorRange struct{}
-type TrainingJob struct{}
+type TrainingJob struct {
+	ID        string `json:"id"`
+	ModelRef  string `json:"model_ref"`
+	Status    string `json:"status"`
+	Progress  float64 `json:"progress"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Error     string `json:"error,omitempty"`
+}
 type FeaturePipeline struct{}
-type FeatureEngineeringRule struct{}
+type FeatureEngineeringRule struct {
+	Name   string                 `json:"name"`
+	Params map[string]interface{} `json:"params"`
+}
 type TimeSeriesModel struct{}
 type PatternTemplate struct{}
 type BehaviorBaseline struct{}
@@ -287,7 +298,10 @@ type FusionMethod struct{}
 type Benefit struct{}
 type UnintendedEffect struct{}
 type OutcomeFeedback struct{}
-type RiskFactor struct{}
+type RiskFactor struct {
+	Name  string  `json:"name"`
+	Score float64 `json:"score"`
+}
 type HistoricalDecision struct{}
 type Objective struct{}
 type Variable struct{}

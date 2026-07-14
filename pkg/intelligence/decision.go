@@ -221,15 +221,13 @@ func (adm *AdaptiveDecisionMaker) LearnFromOutcome(record *DecisionRecord) {
 		model.TrainingData = append(model.TrainingData, sample)
 		model.Performance.SampleSize = len(model.TrainingData)
 
-		if len(model.TrainingData) > 1 {
-			successes := 0
-			for _, s := range model.TrainingData {
-				if s.Target == true {
-					successes++
-				}
+		successes := 0
+		for _, s := range model.TrainingData {
+			if s.Target == true {
+				successes++
 			}
-			model.Performance.Accuracy = float64(successes) / float64(len(model.TrainingData))
 		}
+		model.Performance.Accuracy = float64(successes) / float64(len(model.TrainingData))
 		model.LastUpdated = time.Now()
 	}
 }
@@ -311,5 +309,5 @@ func (adm *AdaptiveDecisionMaker) updateModelPerformance(domain DecisionDomain, 
 	}
 	perf.SampleSize++
 	perf.LastEvaluated = time.Now()
-	perf.Confidence = 1.0 - 1.0/(1.0+float64(perf.SampleSize))
+	perf.Confidence = 1.0 - 1.0/(2.0+float64(perf.SampleSize))
 }
