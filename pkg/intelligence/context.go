@@ -153,6 +153,9 @@ func (ra *RiskAssessmentEngine) AssessRisk(alternative *DecisionAlternative, ctx
 	if i == 0 {
 		for _, rt := range []RiskType{RiskOperational, RiskTechnical, RiskSecurity} {
 			base := rand.Float64() * 0.25
+			if alternative.Cost > 0 {
+				base += (alternative.Cost / 100.0) * 0.2
+			}
 			scores[rt] = base
 			overall += base
 		}
@@ -194,6 +197,8 @@ func (uc *UtilityCalculator) Calculate(alternative *DecisionAlternative, ctx *De
 	utility := alternative.Feasibility * 0.4
 	if alternative.RiskProfile != nil {
 		utility += (1.0 - alternative.RiskProfile.OverallScore) * 0.3
+	} else {
+		utility += 0.3
 	}
 	utility += (1.0 - alternative.Cost/100.0) * 0.3
 

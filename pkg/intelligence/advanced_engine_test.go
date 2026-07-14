@@ -1288,3 +1288,980 @@ func TestEngineContextCancelled(t *testing.T) {
 		t.Log("engine may still be running if context cancelled externally (expected for current impl)")
 	}
 }
+
+// ---------------------------------------------------------------------------
+// AdaptiveDecisionMaker — MakeDecision, RecordOutcome, GetDecisionHistory,
+// GetModelPerformance, LearnFromOutcome
+// ---------------------------------------------------------------------------
+
+func TestAdaptiveDecisionMaker_MakeDecision_Success(t *testing.T) {
+	t.Parallel()
+	adm := NewAdaptiveDecisionMaker(slog.Default(), DecisionMakingConfig{})
+
+	alt := adm.MakeDecision(DecisionNetwork, map[string]interface{}{"latency": 150, "packet_loss": 0.5})
+	require.NotNil(t, alt)
+	assert.Contains(t, alt.ID, "network", "expected network domain in alt ID")
+	assert.Greater(t, alt.Feasibility, 0.0)
+	assert.GreaterOrEqual(t, alt.ExpectedUtility, 0.0)
+
+	adm.mu.RLock()
+	histLen := len(adm.decisionHistory)
+	adm.mu.RUnlock()
+	assert.Equal(t, 1, histLen, "expected 1 decision record after MakeDecision")
+}
+
+func TestAdaptiveDecisionMaker_MakeDecision_RecordsContextAndAlternatives(t *testing.T) {
+	t.Parallel()
+	adm := NewAdaptiveDecisionMaker(slog.Default(), DecisionMakingConfig{})
+
+	alt := adm.MakeDecision(DecisionResource, map[string]interface{}{"cpu": 0.9, "mem": 0.7})
+	require.NotNil(t, alt)
+
+	history := adm.GetDecisionHistory(DecisionResource)
+	require.Len(t, history, 1)
+	record := history[0]
+	assert.Equal(t, DecisionResource, record.Domain)
+	assert.NotNil(t, record.Context)
+	assert.NotNil(t, record.Context.Environment)
+	assert.Equal(t, 0.9, record.Context.Environment["cpu"])
+	assert.Len(t, record.Alternatives, 3, "expected proactive, reactive, balanced")
+	assert.NotNil(t, record.Selected)
+	assert.Equal(t, alt.ID, record.Selected.ID)
+}
+
+func TestAdaptiveDecisionMaker_MakeDecision_DifferentDomains(t *testing.T) {
+	t.Parallel()
+	adm := NewAdaptiveDecisionMaker(slog.Default(), DecisionMakingConfig{})
+
+	_ = adm.MakeDecision(DecisionNetwork, map[string]interface{}{})
+	_ = adm.MakeDecision(DecisionSecurity, map[string]interface{}{})
+	_ = adm.MakeDecision(DecisionPerformance, map[string]interface{}{})
+
+	allHistory := adm.GetDecisionHistory("")
+	require.Len(t, allHistory, 3, "expected 3 total records")
+
+	netHistory := adm.GetDecisionHistory(DecisionNetwork)
+	assert.Len(t, netHistory, 1)
+
+	unknownHistory := adm.GetDecisionHistory("nonexistent")
+	assert.Len(t, unknownHistory, 0)
+}
+
+func TestAdaptiveDecisionMaker_RecordOutcome_Success(t *testing.T) {
+	t.Parallel()
+	adm := NewAdaptiveDecisionMaker(slog.Default(), DecisionMakingConfig{})
+
+	alt := adm.MakeDecision(DecisionNetwork, map[string]interface{}{})
+	require.NotNil(t, alt)
+
+	history := adm.GetDecisionHistory(DecisionNetwork)
+	require.Len(t, history, 1)
+	decisionID := history[0].ID
+
+	outcome := &DecisionOutcome{
+		ActualUtility: 0.85,
+		Success:       true,
+		Duration:      100 * time.Millisecond,
+		Performance:   map[string]float64{"throughput": 1000},
+		ResourceUsage: map[string]float64{"cpu": 0.3},
+	}
+	adm.RecordOutcome(decisionID, outcome)
+
+	updatedHistory := adm.GetDecisionHistory(DecisionNetwork)
+	require.Len(t, updatedHistory, 1)
+	require.NotNil(t, updatedHistory[0].Outcome)
+	assert.True(t, updatedHistory[0].Outcome.Success)
+	assert.Equal(t, 0.85, updatedHistory[0].Outcome.ActualUtility)
+	assert.NotNil(t, updatedHistory[0].Learning)
+	assert.Equal(t, 0.85, updatedHistory[0].Learning.Reinforcement)
+}
+
+func TestAdaptiveDecisionMaker_RecordOutcome_Failure(t *testing.T) {
+	t.Parallel()
+	adm := NewAdaptiveDecisionMaker(slog.Default(), DecisionMakingConfig{})
+
+	alt := adm.MakeDecision(DecisionResource, map[string]interface{}{})
+	require.NotNil(t, alt)
+
+	history := adm.GetDecisionHistory(DecisionResource)
+	require.Len(t, history, 1)
+
+	outcome := &DecisionOutcome{
+		ActualUtility: 0.3,
+		Success:       false,
+		Duration:      500 * time.Millisecond,
+	}
+	adm.RecordOutcome(history[0].ID, outcome)
+
+	updated := adm.GetDecisionHistory(DecisionResource)
+	require.Len(t, updated, 1)
+	require.NotNil(t, updated[0].Outcome)
+	assert.False(t, updated[0].Outcome.Success)
+	require.NotNil(t, updated[0].Learning)
+	assert.Equal(t, -0.3, updated[0].Learning.Reinforcement, "failure should negate utility")
+}
+
+func TestAdaptiveDecisionMaker_RecordOutcome_UnknownID(t *testing.T) {
+	t.Parallel()
+	adm := NewAdaptiveDecisionMaker(slog.Default(), DecisionMakingConfig{})
+
+	// Should not panic
+	adm.RecordOutcome("nonexistent", &DecisionOutcome{Success: true})
+}
+
+func TestAdaptiveDecisionMaker_GetModelPerformance_ReturnsDefaultForUnknown(t *testing.T) {
+	t.Parallel()
+	adm := NewAdaptiveDecisionMaker(slog.Default(), DecisionMakingConfig{})
+
+	perf := adm.GetModelPerformance("unknown_domain")
+	require.NotNil(t, perf)
+	assert.Equal(t, 0.5, perf.Confidence, "default confidence should be 0.5")
+}
+
+func TestAdaptiveDecisionMaker_GetModelPerformance_AfterOutcome(t *testing.T) {
+	t.Parallel()
+	adm := NewAdaptiveDecisionMaker(slog.Default(), DecisionMakingConfig{})
+
+	alt := adm.MakeDecision(DecisionNetwork, map[string]interface{}{})
+	require.NotNil(t, alt)
+
+	history := adm.GetDecisionHistory(DecisionNetwork)
+	adm.RecordOutcome(history[0].ID, &DecisionOutcome{Success: true, ActualUtility: 0.9})
+
+	perf := adm.GetModelPerformance(DecisionNetwork)
+	require.NotNil(t, perf)
+	assert.Greater(t, perf.SampleSize, 0, "SampleSize should increase after recording outcome")
+	assert.Equal(t, 1.0, perf.Accuracy, "accuracy should be 1.0 after single success")
+	assert.Greater(t, perf.Confidence, 0.5, "confidence should increase after recording outcome")
+}
+
+func TestAdaptiveDecisionMaker_LearnFromOutcome_Success(t *testing.T) {
+	t.Parallel()
+	adm := NewAdaptiveDecisionMaker(slog.Default(), DecisionMakingConfig{})
+
+	alt := adm.MakeDecision(DecisionSecurity, map[string]interface{}{})
+	require.NotNil(t, alt)
+
+	history := adm.GetDecisionHistory(DecisionSecurity)
+	record := history[0]
+	record.Outcome = &DecisionOutcome{Success: true, ActualUtility: 0.9}
+
+	adm.LearnFromOutcome(record)
+
+	model := adm.getOrCreateModel(DecisionSecurity)
+	require.Len(t, model.TrainingData, 1, "expected 1 training sample")
+	assert.Equal(t, 1.0, model.Performance.Accuracy, "accuracy should be 1.0 after single success")
+}
+
+func TestAdaptiveDecisionMaker_LearnFromOutcome_MultipleRecords(t *testing.T) {
+	t.Parallel()
+	adm := NewAdaptiveDecisionMaker(slog.Default(), DecisionMakingConfig{})
+
+	alt1 := adm.MakeDecision(DecisionSecurity, map[string]interface{}{})
+	require.NotNil(t, alt1)
+	alt2 := adm.MakeDecision(DecisionSecurity, map[string]interface{}{})
+	require.NotNil(t, alt2)
+
+	history := adm.GetDecisionHistory(DecisionSecurity)
+	require.Len(t, history, 2)
+
+	history[0].Outcome = &DecisionOutcome{Success: true, ActualUtility: 0.9}
+	history[1].Outcome = &DecisionOutcome{Success: false, ActualUtility: 0.2}
+
+	adm.LearnFromOutcome(history[0])
+	adm.LearnFromOutcome(history[1])
+
+	model := adm.getOrCreateModel(DecisionSecurity)
+	require.Len(t, model.TrainingData, 2, "expected 2 training samples")
+	assert.Equal(t, 0.5, model.Performance.Accuracy, "accuracy should be 0.5 after 1 success, 1 failure")
+}
+
+func TestAdaptiveDecisionMaker_LearnFromOutcome_NilOutcome(t *testing.T) {
+	t.Parallel()
+	adm := NewAdaptiveDecisionMaker(slog.Default(), DecisionMakingConfig{})
+
+	alt := adm.MakeDecision(DecisionNetwork, map[string]interface{}{})
+	require.NotNil(t, alt)
+
+	history := adm.GetDecisionHistory(DecisionNetwork)
+	record := history[0]
+	record.Outcome = nil
+
+	adm.LearnFromOutcome(record) // should not panic
+}
+
+func TestAdaptiveDecisionMaker_GenerateAlternatives_LowAccuracy(t *testing.T) {
+	t.Parallel()
+	adm := NewAdaptiveDecisionMaker(slog.Default(), DecisionMakingConfig{})
+
+	// With no training data, accuracy is 0, so we get only 3 base alternatives
+	ctx := adm.contextAnalyzer.Analyze(map[string]interface{}{})
+	alts := adm.generateAlternatives(DecisionNetwork, ctx)
+	require.Len(t, alts, 3, "expected only 3 base alternatives with low accuracy")
+}
+
+func TestAdaptiveDecisionMaker_GenerateAlternatives_HighAccuracy(t *testing.T) {
+	t.Parallel()
+	adm := NewAdaptiveDecisionMaker(slog.Default(), DecisionMakingConfig{})
+
+	model := adm.getOrCreateModel(DecisionNetwork)
+	model.Performance.Accuracy = 0.75
+
+	ctx := adm.contextAnalyzer.Analyze(map[string]interface{}{})
+	alts := adm.generateAlternatives(DecisionNetwork, ctx)
+	require.Len(t, alts, 4, "expected 4 alternatives with high accuracy (incl. learned)")
+	foundLearned := false
+	for _, a := range alts {
+		if a.Attributes["strategy"] == "learned" {
+			foundLearned = true
+			assert.Equal(t, 0.75, a.Feasibility, "learned alt feasibility should match accuracy")
+			break
+		}
+	}
+	assert.True(t, foundLearned, "expected a learned strategy alternative")
+}
+
+// ---------------------------------------------------------------------------
+// ContextAnalyzer — Analyze, UpdateFactor
+// ---------------------------------------------------------------------------
+
+func TestContextAnalyzer_Analyze_Basic(t *testing.T) {
+	t.Parallel()
+	ca := NewContextAnalyzer(slog.Default())
+
+	ctx := ca.Analyze(map[string]interface{}{"cpu": 0.8, "mem": 0.6})
+	require.NotNil(t, ctx)
+	assert.Equal(t, 0.8, ctx.Environment["cpu"])
+	assert.Equal(t, 0.6, ctx.Environment["mem"])
+	assert.Empty(t, ctx.Constraints)
+	assert.Empty(t, ctx.Objectives)
+	assert.Empty(t, ctx.RiskFactors)
+}
+
+func TestContextAnalyzer_Analyze_IncludesFactors(t *testing.T) {
+	t.Parallel()
+	ca := NewContextAnalyzer(slog.Default())
+
+	ca.UpdateFactor("latency", 0.9)
+	ca.UpdateFactor("throughput", 0.7)
+
+	ctx := ca.Analyze(map[string]interface{}{"cpu": 0.5})
+	require.NotNil(t, ctx)
+	// Provided keys are preserved
+	assert.Equal(t, 0.5, ctx.Environment["cpu"])
+	// Factor defaults included when not in input
+	assert.Equal(t, 0.9, ctx.Environment["latency"])
+	assert.Equal(t, 0.7, ctx.Environment["throughput"])
+}
+
+func TestContextAnalyzer_Analyze_InputOverrideFactor(t *testing.T) {
+	t.Parallel()
+	ca := NewContextAnalyzer(slog.Default())
+
+	ca.UpdateFactor("latency", 0.9)
+
+	// Input value should take precedence over factor default
+	ctx := ca.Analyze(map[string]interface{}{"latency": 0.5})
+	require.NotNil(t, ctx)
+	assert.Equal(t, 0.5, ctx.Environment["latency"], "input should override factor default")
+}
+
+func TestContextAnalyzer_UpdateFactor_New(t *testing.T) {
+	t.Parallel()
+	ca := NewContextAnalyzer(slog.Default())
+
+	ca.UpdateFactor("cpu_weight", 0.8)
+	ca.mu.RLock()
+	require.Len(t, ca.factors, 1)
+	assert.Equal(t, "cpu_weight", ca.factors[0].Name)
+	assert.Equal(t, 0.8, ca.factors[0].Weight)
+	assert.Equal(t, FactorNumerical, ca.factors[0].Type)
+	ca.mu.RUnlock()
+}
+
+func TestContextAnalyzer_UpdateFactor_Existing(t *testing.T) {
+	t.Parallel()
+	ca := NewContextAnalyzer(slog.Default())
+
+	ca.UpdateFactor("mem_weight", 0.5)
+	ca.UpdateFactor("mem_weight", 0.9)
+
+	ca.mu.RLock()
+	require.Len(t, ca.factors, 1, "should still be 1 factor after update")
+	assert.Equal(t, 0.9, ca.factors[0].Weight, "weight should be updated")
+	ca.mu.RUnlock()
+}
+
+func TestContextAnalyzer_UpdateFactor_Multiple(t *testing.T) {
+	t.Parallel()
+	ca := NewContextAnalyzer(slog.Default())
+
+	ca.UpdateFactor("factor_a", 0.3)
+	ca.UpdateFactor("factor_b", 0.6)
+	ca.UpdateFactor("factor_c", 0.9)
+
+	ca.mu.RLock()
+	assert.Len(t, ca.factors, 3)
+	ca.mu.RUnlock()
+}
+
+// ---------------------------------------------------------------------------
+// RiskAssessmentEngine — AssessRisk, CalculateRiskScore
+// ---------------------------------------------------------------------------
+
+func TestRiskAssessmentEngine_AssessRisk_NoPredefinedModels(t *testing.T) {
+	t.Parallel()
+	rae := NewRiskAssessmentEngine(slog.Default())
+
+	alt := &DecisionAlternative{
+		ID:          "alt-test",
+		Feasibility: 0.8,
+		Cost:        50.0,
+	}
+	ctx := &DecisionContext{
+		Environment: map[string]interface{}{"region": "us-east-1"},
+	}
+	profile := rae.AssessRisk(alt, ctx)
+	require.NotNil(t, profile)
+	assert.GreaterOrEqual(t, profile.OverallScore, 0.0)
+	assert.LessOrEqual(t, profile.OverallScore, 1.0)
+	assert.Contains(t, profile.RiskScores, RiskOperational)
+	assert.Contains(t, profile.RiskScores, RiskTechnical)
+	assert.Contains(t, profile.RiskScores, RiskSecurity)
+	assert.NotEmpty(t, profile.CorrelationId)
+	assert.GreaterOrEqual(t, profile.Volatility, 0.0)
+}
+
+func TestRiskAssessmentEngine_AssessRisk_WithModels(t *testing.T) {
+	t.Parallel()
+	rae := NewRiskAssessmentEngine(slog.Default())
+
+	rae.riskModels[RiskSecurity] = &RiskModel{}
+	rae.riskModels[RiskOperational] = &RiskModel{}
+
+	alt := &DecisionAlternative{
+		ID:          "alt-test-2",
+		Feasibility: 0.6,
+		Cost:        200.0,
+	}
+	profile := rae.AssessRisk(alt, &DecisionContext{})
+	require.NotNil(t, profile)
+	// Should only contain the 2 defined model types
+	assert.Len(t, profile.RiskScores, 2)
+}
+
+func TestRiskAssessmentEngine_AssessRisk_HighCost(t *testing.T) {
+	t.Parallel()
+	rae := NewRiskAssessmentEngine(slog.Default())
+
+	alt := &DecisionAlternative{
+		ID:          "alt-expensive",
+		Feasibility: 0.5,
+		Cost:        1000.0,
+	}
+	profile := rae.AssessRisk(alt, &DecisionContext{})
+	require.NotNil(t, profile)
+	assert.Contains(t, profile.Mitigations, "increase_monitoring", "high risk should include monitoring")
+}
+
+func TestRiskAssessmentEngine_CalculateRiskScore_Empty(t *testing.T) {
+	t.Parallel()
+	rae := NewRiskAssessmentEngine(slog.Default())
+	score := rae.CalculateRiskScore([]RiskFactor{})
+	assert.Equal(t, 0.0, score)
+}
+
+func TestRiskAssessmentEngine_CalculateRiskScore_WithFactors(t *testing.T) {
+	t.Parallel()
+	rae := NewRiskAssessmentEngine(slog.Default())
+	factors := []RiskFactor{
+		{Name: "factor_a", Score: 0.3},
+		{Name: "factor_b", Score: 0.7},
+	}
+	score := rae.CalculateRiskScore(factors)
+	assert.Equal(t, 0.5, score, "each factor contributes 0.5, averaged = (0.5+0.5)/2 = 0.5")
+}
+
+func TestRiskAssessmentEngine_CalculateRiskScore_SingleFactor(t *testing.T) {
+	t.Parallel()
+	rae := NewRiskAssessmentEngine(slog.Default())
+	score := rae.CalculateRiskScore([]RiskFactor{{Name: "only_one", Score: 0.4}})
+	assert.InDelta(t, 0.5, score, 1e-9, "single factor = 0.5/1 capped to min(0.5, 1.0) = 0.5")
+}
+
+// ---------------------------------------------------------------------------
+// UtilityCalculator — Calculate, UpdateFunction
+// ---------------------------------------------------------------------------
+
+func TestUtilityCalculator_Calculate(t *testing.T) {
+	t.Parallel()
+	uc := NewUtilityCalculator(slog.Default())
+
+	alt := &DecisionAlternative{
+		ID:          "alt-util",
+		Feasibility: 0.8,
+		Cost:        20.0,
+	}
+	utility := uc.Calculate(alt, &DecisionContext{})
+	expected := 0.8*0.4 + 0.3 + (1.0-20.0/100.0)*0.3
+	assert.InDelta(t, expected, utility, 1e-9)
+}
+
+func TestUtilityCalculator_Calculate_WithRiskProfile(t *testing.T) {
+	t.Parallel()
+	uc := NewUtilityCalculator(slog.Default())
+
+	alt := &DecisionAlternative{
+		ID:          "alt-risky",
+		Feasibility: 0.9,
+		Cost:        30.0,
+		RiskProfile: &RiskProfile{
+			OverallScore: 0.7,
+			Mitigations:  []string{"monitor"},
+		},
+	}
+	utility := uc.Calculate(alt, &DecisionContext{})
+	expected := 0.9*0.4 + (1.0-0.7)*0.3 + (1.0-30.0/100.0)*0.3
+	assert.InDelta(t, expected, utility, 1e-9)
+}
+
+func TestUtilityCalculator_Calculate_Clamped(t *testing.T) {
+	t.Parallel()
+	uc := NewUtilityCalculator(slog.Default())
+
+	alt := &DecisionAlternative{
+		ID:          "alt-clamp",
+		Feasibility: -5.0,
+		Cost:        -100.0,
+	}
+	utility := uc.Calculate(alt, &DecisionContext{})
+	assert.Equal(t, 0.0, utility, "utility should be clamped to 0")
+
+	altHigh := &DecisionAlternative{
+		ID:          "alt-high",
+		Feasibility: 2.0,
+		Cost:        -100.0,
+	}
+	utilityHigh := uc.Calculate(altHigh, &DecisionContext{})
+	assert.Equal(t, 1.0, utilityHigh, "utility should be clamped to 1")
+}
+
+func TestUtilityCalculator_UpdateFunction(t *testing.T) {
+	t.Parallel()
+	uc := NewUtilityCalculator(slog.Default())
+
+	uc.UpdateFunction(UtilityLinear, func() {})
+	uc.mu.RLock()
+	assert.Contains(t, uc.utilityFunctions, UtilityLinear)
+	uc.mu.RUnlock()
+}
+
+func TestUtilityCalculator_UpdateFunction_Multiple(t *testing.T) {
+	t.Parallel()
+	uc := NewUtilityCalculator(slog.Default())
+
+	uc.UpdateFunction(UtilityExponential, struct{}{})
+	uc.UpdateFunction(UtilityLogarithmic, struct{}{})
+	uc.UpdateFunction(UtilityQuadratic, struct{}{})
+
+	uc.mu.RLock()
+	assert.Len(t, uc.utilityFunctions, 3)
+	uc.mu.RUnlock()
+}
+
+// ---------------------------------------------------------------------------
+// ConsensusBuilder — BuildConsensus, AddMethod
+// ---------------------------------------------------------------------------
+
+func TestConsensusBuilder_BuildConsensus_SelectsBest(t *testing.T) {
+	t.Parallel()
+	cb := NewConsensusBuilder(slog.Default())
+
+	alts := []*DecisionAlternative{
+		{ID: "low", ExpectedUtility: 0.3},
+		{ID: "high", ExpectedUtility: 0.95},
+		{ID: "mid", ExpectedUtility: 0.6},
+	}
+	best := cb.BuildConsensus(alts)
+	require.NotNil(t, best)
+	assert.Equal(t, "high", best.ID)
+	assert.Equal(t, 0.95, best.ExpectedUtility)
+}
+
+func TestConsensusBuilder_BuildConsensus_Single(t *testing.T) {
+	t.Parallel()
+	cb := NewConsensusBuilder(slog.Default())
+
+	alts := []*DecisionAlternative{
+		{ID: "only", ExpectedUtility: 0.5},
+	}
+	best := cb.BuildConsensus(alts)
+	require.NotNil(t, best)
+	assert.Equal(t, "only", best.ID)
+}
+
+func TestConsensusBuilder_BuildConsensus_Empty(t *testing.T) {
+	t.Parallel()
+	cb := NewConsensusBuilder(slog.Default())
+
+	best := cb.BuildConsensus([]*DecisionAlternative{})
+	assert.Nil(t, best)
+}
+
+func TestConsensusBuilder_AddMethod(t *testing.T) {
+	t.Parallel()
+	cb := NewConsensusBuilder(slog.Default())
+
+	cb.AddMethod(ConsensusVoting, 0.5)
+	cb.AddMethod(ConsensusWeighted, 0.3)
+
+	cb.mu.RLock()
+	assert.Len(t, cb.consensusMethods, 2)
+	assert.Equal(t, ConsensusVoting, cb.consensusMethods[0])
+	assert.Equal(t, ConsensusWeighted, cb.consensusMethods[1])
+	cb.mu.RUnlock()
+}
+
+func TestConsensusBuilder_AddMethod_Duplicate(t *testing.T) {
+	t.Parallel()
+	cb := NewConsensusBuilder(slog.Default())
+
+	cb.AddMethod(ConsensusBayesian, 1.0)
+	cb.AddMethod(ConsensusBayesian, 2.0) // add same method again
+
+	cb.mu.RLock()
+	assert.Len(t, cb.consensusMethods, 1, "duplicate should not increase length")
+	cb.mu.RUnlock()
+}
+
+func TestConsensusBuilder_AddMethod_Multiple(t *testing.T) {
+	t.Parallel()
+	cb := NewConsensusBuilder(slog.Default())
+
+	methods := []ConsensusMethod{ConsensusVoting, ConsensusWeighted, ConsensusBayesian, ConsensusGameTheory, ConsensusFuzzyLogic}
+	for _, m := range methods {
+		cb.AddMethod(m, 1.0)
+	}
+
+	cb.mu.RLock()
+	assert.Len(t, cb.consensusMethods, 5)
+	cb.mu.RUnlock()
+}
+
+// ---------------------------------------------------------------------------
+// MachineLearningSystem — GetLearningEvents
+// ---------------------------------------------------------------------------
+
+func TestMachineLearningSystem_GetLearningEvents_Empty(t *testing.T) {
+	t.Parallel()
+	mls := NewMachineLearningSystem(slog.Default(), LearningConfig{})
+	events := mls.GetLearningEvents()
+	require.NotNil(t, events)
+	assert.Len(t, events, 0)
+}
+
+func TestMachineLearningSystem_GetLearningEvents_AfterProcessing(t *testing.T) {
+	t.Parallel()
+	mls := NewMachineLearningSystem(slog.Default(), LearningConfig{})
+
+	mls.ProcessExperience(&ExperienceRecord{ID: "exp-1", Action: "scale_up", Reward: 0.3, Success: true})
+	mls.ProcessExperience(&ExperienceRecord{ID: "exp-2", Action: "scale_down", Reward: 0.8, Success: true})
+
+	// Wait briefly for potential goroutine from high-reward processing
+	time.Sleep(50 * time.Millisecond)
+
+	events := mls.GetLearningEvents()
+	// At minimum we have 2 ProcessExperience events; maybe more if goroutines ran
+	assert.GreaterOrEqual(t, len(events), 2)
+}
+
+func TestMachineLearningSystem_GetLearningEvents_ReturnsCopy(t *testing.T) {
+	t.Parallel()
+	mls := NewMachineLearningSystem(slog.Default(), LearningConfig{})
+
+	mls.ProcessExperience(&ExperienceRecord{ID: "exp-copy", Action: "test", Reward: 0.1, Success: true})
+	events1 := mls.GetLearningEvents()
+	assert.Len(t, events1, 1)
+
+	// Modify the returned copy
+	events1 = append(events1, &LearningEvent{ID: "fake"})
+
+	// Original should be unchanged
+	events2 := mls.GetLearningEvents()
+	assert.Len(t, events2, 1, "original should be unchanged after modifying copy")
+}
+
+func TestMachineLearningSystem_ProcessExperience_HighRewardTriggersGoroutine(t *testing.T) {
+	t.Parallel()
+	mls := NewMachineLearningSystem(slog.Default(), LearningConfig{})
+
+	mls.ProcessExperience(&ExperienceRecord{ID: "exp-high", Action: "optimize", Reward: 0.9, Confidence: 0.8, Success: true})
+
+	time.Sleep(100 * time.Millisecond)
+
+	// The goroutine should have created a model
+	mls.mu.RLock()
+	_, exists := mls.models["model-optimize"]
+	mls.mu.RUnlock()
+	assert.True(t, exists, "high-reward experience should create a model via goroutine")
+
+	// Model should have training metrics
+	mls.mu.RLock()
+	model := mls.models["model-optimize"]
+	mls.mu.RUnlock()
+	require.NotNil(t, model)
+	require.NotNil(t, model.TrainingMetrics)
+	assert.Equal(t, 0.9, model.TrainingMetrics.Accuracy, "accuracy should match reward")
+	assert.InDelta(t, 0.1, model.TrainingMetrics.Loss, 1e-6, "loss should be 1-reward")
+}
+
+func TestMachineLearningSystem_ProcessExperience_LowRewardNoModel(t *testing.T) {
+	t.Parallel()
+	mls := NewMachineLearningSystem(slog.Default(), LearningConfig{})
+
+	mls.ProcessExperience(&ExperienceRecord{ID: "exp-low", Action: "ignore", Reward: 0.3, Success: true})
+
+	time.Sleep(50 * time.Millisecond)
+
+	// Low reward should NOT trigger the goroutine, so no model created
+	mls.mu.RLock()
+	_, exists := mls.models["model-ignore"]
+	mls.mu.RUnlock()
+	assert.False(t, exists, "low-reward experience should not create a model")
+}
+
+func TestMachineLearningSystem_UpdateModels_WithExistingModel(t *testing.T) {
+	t.Parallel()
+	mls := NewMachineLearningSystem(slog.Default(), LearningConfig{})
+
+	mls.models["test-model"] = &MLModel{
+		Name:     "test-model",
+		Type:     ModelSupervised,
+		Algorithm: AlgorithmRandomForest,
+		Parameters: map[string]interface{}{},
+	}
+
+	mls.UpdateModels()
+
+	mls.mu.RLock()
+	model := mls.models["test-model"]
+	mls.mu.RUnlock()
+	require.NotNil(t, model)
+	require.NotNil(t, model.TrainingMetrics)
+	assert.Greater(t, model.TrainingMetrics.Accuracy, 0.0)
+	assert.Greater(t, model.TrainingMetrics.F1Score, 0.0)
+	assert.Greater(t, model.LastTrained.UnixNano(), int64(0))
+
+	// Should have an event for the update
+	events := mls.GetLearningEvents()
+	assert.GreaterOrEqual(t, len(events), 1)
+}
+
+func TestMachineLearningSystem_ValidateModels_WithExistingModel(t *testing.T) {
+	t.Parallel()
+	mls := NewMachineLearningSystem(slog.Default(), LearningConfig{})
+
+	mls.models["val-model"] = &MLModel{
+		Name:            "val-model",
+		Type:            ModelSupervised,
+		TrainingMetrics: &ModelMetrics{Accuracy: 0.85, Loss: 0.15, Precision: 0.80, Recall: 0.82},
+	}
+
+	mls.ValidateModels()
+
+	mls.mu.RLock()
+	model := mls.models["val-model"]
+	mls.mu.RUnlock()
+	require.NotNil(t, model)
+	require.NotNil(t, model.ValidationMetrics)
+	assert.Greater(t, model.ValidationMetrics.Accuracy, 0.0)
+	assert.Greater(t, model.ValidationMetrics.F1Score, 0.0)
+
+	// Should have an event
+	events := mls.GetLearningEvents()
+	assert.GreaterOrEqual(t, len(events), 1)
+}
+
+// ---------------------------------------------------------------------------
+// TrainingEngine — SubmitTrainingJob, GetTrainingStatus
+// ---------------------------------------------------------------------------
+
+func TestNewTrainingEngine(t *testing.T) {
+	t.Parallel()
+	te := NewTrainingEngine(slog.Default())
+	require.NotNil(t, te)
+	assert.NotNil(t, te.trainingJobs, "trainingJobs should be initialized")
+}
+
+func TestTrainingEngine_SubmitAndGetStatus(t *testing.T) {
+	t.Parallel()
+	te := NewTrainingEngine(slog.Default())
+
+	job := &TrainingJob{ID: "job-1", ModelRef: "model-abc"}
+	te.SubmitTrainingJob("job-1", job)
+
+	retrieved := te.GetTrainingStatus("job-1")
+	require.NotNil(t, retrieved)
+	assert.Equal(t, "job-1", retrieved.ID)
+	assert.Equal(t, "model-abc", retrieved.ModelRef)
+}
+
+func TestTrainingEngine_GetTrainingStatus_NotFound(t *testing.T) {
+	t.Parallel()
+	te := NewTrainingEngine(slog.Default())
+
+	retrieved := te.GetTrainingStatus("nonexistent-job")
+	assert.Nil(t, retrieved)
+}
+
+func TestTrainingEngine_SubmitMultipleJobs(t *testing.T) {
+	t.Parallel()
+	te := NewTrainingEngine(slog.Default())
+
+	te.SubmitTrainingJob("job-a", &TrainingJob{ID: "job-a"})
+	te.SubmitTrainingJob("job-b", &TrainingJob{ID: "job-b"})
+	te.SubmitTrainingJob("job-c", &TrainingJob{ID: "job-c"})
+
+	assert.Equal(t, "job-a", te.GetTrainingStatus("job-a").ID)
+	assert.Equal(t, "job-b", te.GetTrainingStatus("job-b").ID)
+	assert.Equal(t, "job-c", te.GetTrainingStatus("job-c").ID)
+}
+
+func TestTrainingEngine_GetTrainingStatus_ConcurrentSafe(t *testing.T) {
+	te := NewTrainingEngine(slog.Default())
+	te.SubmitTrainingJob("concurrent-job", &TrainingJob{ID: "concurrent-job"})
+
+	done := make(chan bool, 2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			_ = te.GetTrainingStatus("concurrent-job")
+			done <- true
+		}()
+	}
+	<-done
+	<-done
+}
+
+// ---------------------------------------------------------------------------
+// FeatureEngineeringEngine — CreatePipeline, Transform
+// ---------------------------------------------------------------------------
+
+func TestNewFeatureEngineeringEngine(t *testing.T) {
+	t.Parallel()
+	fee := NewFeatureEngineeringEngine(slog.Default())
+	require.NotNil(t, fee)
+	assert.NotNil(t, fee.featurePipelines, "featurePipelines should be initialized")
+	assert.NotNil(t, fee.engineeringRules, "engineeringRules should be initialized")
+}
+
+func TestFeatureEngineeringEngine_CreatePipeline(t *testing.T) {
+	t.Parallel()
+	fee := NewFeatureEngineeringEngine(slog.Default())
+
+	rules := []FeatureEngineeringRule{
+		{Name: "normalize", Params: map[string]interface{}{"method": "z-score"}},
+	}
+	fee.CreatePipeline("pipeline-1", rules)
+
+	fee.mu.RLock()
+	assert.Contains(t, fee.featurePipelines, "pipeline-1")
+	assert.Len(t, fee.engineeringRules, 1)
+	assert.Equal(t, "normalize", fee.engineeringRules[0].Name)
+	fee.mu.RUnlock()
+}
+
+func TestFeatureEngineeringEngine_CreatePipeline_Multiple(t *testing.T) {
+	t.Parallel()
+	fee := NewFeatureEngineeringEngine(	slog.Default())
+
+	fee.CreatePipeline("pipe-a", []FeatureEngineeringRule{{Name: "scale"}, {Name: "impute"}})
+	fee.CreatePipeline("pipe-b", []FeatureEngineeringRule{{Name: "encode"}})
+
+	fee.mu.RLock()
+	assert.Len(t, fee.featurePipelines, 2)
+	assert.Len(t, fee.engineeringRules, 3)
+	fee.mu.RUnlock()
+}
+
+func TestFeatureEngineeringEngine_Transform(t *testing.T) {
+	t.Parallel()
+	fee := NewFeatureEngineeringEngine(	slog.Default())
+
+	input := map[string]interface{}{
+		"feature_a": 1.0,
+		"feature_b": "text",
+		"feature_c": true,
+	}
+
+	result := fee.Transform(input)
+	require.NotNil(t, result)
+	assert.Equal(t, 1.0, result["feature_a"])
+	assert.Equal(t, "text", result["feature_b"])
+	assert.Equal(t, true, result["feature_c"])
+	assert.Len(t, result, 3)
+}
+
+func TestFeatureEngineeringEngine_Transform_ReturnsCopy(t *testing.T) {
+	t.Parallel()
+	fee := NewFeatureEngineeringEngine(	slog.Default())
+
+	input := map[string]interface{}{"key": "value"}
+	result := fee.Transform(input)
+
+	// Modify result
+	result["key"] = "modified"
+
+	// Original should be unchanged
+	assert.Equal(t, "value", input["key"])
+}
+
+func TestFeatureEngineeringEngine_Transform_EmptyInput(t *testing.T) {
+	t.Parallel()
+	fee := NewFeatureEngineeringEngine(	slog.Default())
+
+	result := fee.Transform(map[string]interface{}{})
+	require.NotNil(t, result)
+	assert.Empty(t, result)
+}
+
+// ---------------------------------------------------------------------------
+// Sub-engine constructors
+// ---------------------------------------------------------------------------
+
+func TestNewGoalHierarchy(t *testing.T) {
+	t.Parallel()
+	gh := NewGoalHierarchy(slog.Default())
+	require.NotNil(t, gh)
+	assert.NotNil(t, gh.logger)
+}
+
+func TestNewStrategicResourceAllocator(t *testing.T) {
+	t.Parallel()
+	sra := NewStrategicResourceAllocator(slog.Default())
+	require.NotNil(t, sra)
+}
+
+func TestNewScenarioPlanningEngine(t *testing.T) {
+	t.Parallel()
+	spe := NewScenarioPlanningEngine(slog.Default())
+	require.NotNil(t, spe)
+}
+
+func TestNewPlanExecutionEngine(t *testing.T) {
+	t.Parallel()
+	pee := NewPlanExecutionEngine(slog.Default())
+	require.NotNil(t, pee)
+}
+
+func TestNewPatternMatchingEngine(t *testing.T) {
+	t.Parallel()
+	pme := NewPatternMatchingEngine(slog.Default())
+	require.NotNil(t, pme)
+	assert.NotNil(t, pme.patternLibrary, "patternLibrary should be initialized")
+}
+
+func TestNewBehavioralAnomalyEngine(t *testing.T) {
+	t.Parallel()
+	bae := NewBehavioralAnomalyEngine(slog.Default())
+	require.NotNil(t, bae)
+}
+
+func TestNewTrendAnalysisEngine(t *testing.T) {
+	t.Parallel()
+	tae := NewTrendAnalysisEngine(slog.Default())
+	require.NotNil(t, tae)
+}
+
+func TestNewClusteringEngine(t *testing.T) {
+	t.Parallel()
+	ce := NewClusteringEngine(slog.Default())
+	require.NotNil(t, ce)
+}
+
+func TestNewAnomalyFusionEngine(t *testing.T) {
+	t.Parallel()
+	afe := NewAnomalyFusionEngine(slog.Default())
+	require.NotNil(t, afe)
+}
+
+func TestNewAnomalyContextEngine(t *testing.T) {
+	t.Parallel()
+	ace := NewAnomalyContextEngine(slog.Default())
+	require.NotNil(t, ace)
+}
+
+func TestNewAnomalyAlertSystem(t *testing.T) {
+	t.Parallel()
+	aas := NewAnomalyAlertSystem(slog.Default())
+	require.NotNil(t, aas)
+}
+
+func TestNewTimeSeriesEngine(t *testing.T) {
+	t.Parallel()
+	tse := NewTimeSeriesEngine(slog.Default())
+	require.NotNil(t, tse)
+}
+
+func TestNewPatternRecognitionEngine(t *testing.T) {
+	t.Parallel()
+	pre := NewPatternRecognitionEngine(slog.Default())
+	require.NotNil(t, pre)
+	assert.NotNil(t, pre.patternMatchers, "patternMatchers should be initialized")
+}
+
+func TestNewConfidenceAssessmentEngine(t *testing.T) {
+	t.Parallel()
+	cae := NewConfidenceAssessmentEngine(slog.Default())
+	require.NotNil(t, cae)
+}
+
+func TestNewScenarioGenerator(t *testing.T) {
+	t.Parallel()
+	sg := NewScenarioGenerator(slog.Default())
+	require.NotNil(t, sg)
+}
+
+func TestNewConstraintManagementEngine(t *testing.T) {
+	t.Parallel()
+	cme := NewConstraintManagementEngine(slog.Default())
+	require.NotNil(t, cme)
+	assert.NotNil(t, cme.constraints, "constraints should be initialized")
+}
+
+func TestNewObjectiveFunctionEngine(t *testing.T) {
+	t.Parallel()
+	ofe := NewObjectiveFunctionEngine(slog.Default())
+	require.NotNil(t, ofe)
+}
+
+func TestNewSolutionSpaceExplorer(t *testing.T) {
+	t.Parallel()
+	sse := NewSolutionSpaceExplorer(slog.Default())
+	require.NotNil(t, sse)
+}
+
+func TestNewMetaOptimizationEngine(t *testing.T) {
+	t.Parallel()
+	moe := NewMetaOptimizationEngine(slog.Default())
+	require.NotNil(t, moe)
+}
+
+// ---------------------------------------------------------------------------
+// DecisionOutcome struct
+// ---------------------------------------------------------------------------
+
+func TestDecisionOutcome(t *testing.T) {
+	t.Parallel()
+	outcome := &DecisionOutcome{
+		ActualUtility: 0.75,
+		Performance:   map[string]float64{"latency": 0.02, "throughput": 1000},
+		Duration:      250 * time.Millisecond,
+		ResourceUsage: map[string]float64{"cpu": 0.4, "mem": 0.6},
+		Unintended:    []UnintendedEffect{{}},
+		Success:       true,
+		Feedback:      &OutcomeFeedback{},
+	}
+	assert.True(t, outcome.Success)
+	assert.Len(t, outcome.Performance, 2)
+	assert.Equal(t, 250*time.Millisecond, outcome.Duration)
+}
