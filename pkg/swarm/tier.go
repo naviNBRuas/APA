@@ -52,13 +52,15 @@ func (p TierPolicy) withDefaults() TierPolicy {
 
 // OptimizeTopology optimizes the network topology by suggesting new connections or disconnections
 func (tm *TopologyManager) OptimizeTopology(ctx context.Context) {
-	tm.mu.Lock()
-	defer tm.mu.Unlock()
+	tm.mu.RLock()
+	defer tm.mu.RUnlock()
 
-	// This is a simplified optimization algorithm
-	// In a real implementation, this would be much more sophisticated
-
-	currentPeers := tm.GetConnectedPeers()
+	var currentPeers []peer.ID
+	for peerID, conn := range tm.peerConnections {
+		if conn.Connected {
+			currentPeers = append(currentPeers, peerID)
+		}
+	}
 
 	// If we have too few connections, suggest new ones
 	if len(currentPeers) < 5 {
