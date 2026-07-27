@@ -247,7 +247,10 @@ func (c *ControlPlane) handleControlMessage(ctx context.Context, msg controlMess
 	// Leader-mode routing: requests handled by leader only
 	if c.cfg.Mode == "elected" {
 		if msg.Type == "request" {
-			if c.isLeader {
+			c.mu.RLock()
+			isLeader := c.isLeader
+			c.mu.RUnlock()
+			if isLeader {
 				msg.Type = "update"
 				c.handleControlMessage(ctx, msg)
 			}

@@ -325,8 +325,6 @@ type UtilityFunction struct{}
 type MultiCriteriaDecisionEngine struct{}
 type SensitivityAnalyzer struct{}
 type ConsensusWeightEngine struct{}
-type ModelSelectionEngine struct{}
-type EnsembleLearningSystem struct{}
 type ConflictResolutionEngine struct{}
 type TrainingScheduler struct{}
 type TrainingResourceManager struct{}

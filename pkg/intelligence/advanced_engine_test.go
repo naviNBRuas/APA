@@ -1030,13 +1030,6 @@ func TestBehavioralAnalysisSystem_UpdateProfiles(t *testing.T) {
 	bas.UpdateProfiles([]interface{}{}) // should not panic
 }
 
-func TestBehavioralAnalysisSystem_GenerateInsights(t *testing.T) {
-	t.Parallel()
-	bas := NewBehavioralAnalysisSystem(slog.Default(), BehavioralConfig{})
-	insights := bas.GenerateInsights([]interface{}{}, []interface{}{})
-	require.NotNil(t, insights)
-}
-
 func TestBehavioralAnalysisSystem_Shutdown(t *testing.T) {
 	t.Parallel()
 	bas := NewBehavioralAnalysisSystem(slog.Default(), BehavioralConfig{})
@@ -1123,25 +1116,11 @@ func TestNewStrategicPlanningEngine(t *testing.T) {
 	assert.NotNil(t, spe.planProgress, "planProgress should be initialized")
 }
 
-func TestStrategicPlanningEngine_GetCurrentPlans(t *testing.T) {
-	t.Parallel()
-	spe := NewStrategicPlanningEngine(slog.Default(), StrategicConfig{})
-	plans := spe.GetCurrentPlans()
-	require.NotNil(t, plans)
-	assert.Len(t, plans, 0, "expected 0 plans, got %d")
-}
-
 func TestStrategicPlanningEngine_CreatePlan(t *testing.T) {
 	t.Parallel()
 	spe := NewStrategicPlanningEngine(slog.Default(), StrategicConfig{})
 	plan := spe.CreatePlan("initiative-1")
 	require.NotNil(t, plan)
-}
-
-func TestStrategicPlanningEngine_UpdatePlanProgress(t *testing.T) {
-	t.Parallel()
-	spe := NewStrategicPlanningEngine(slog.Default(), StrategicConfig{})
-	spe.UpdatePlanProgress("plan-1", &PlanProgress{}) // should not panic
 }
 
 func TestStrategicPlanningEngine_Shutdown(t *testing.T) {
@@ -2264,4 +2243,725 @@ func TestDecisionOutcome(t *testing.T) {
 	assert.True(t, outcome.Success)
 	assert.Len(t, outcome.Performance, 2)
 	assert.Equal(t, 250*time.Millisecond, outcome.Duration)
+}
+
+// ---------------------------------------------------------------------------
+// PredictiveAnalyticsEngine enhanced tests
+// ---------------------------------------------------------------------------
+
+func TestPredictiveAnalyticsEngine_GenerateForecast_WithData(t *testing.T) {
+	t.Parallel()
+	pae := NewPredictiveAnalyticsEngine(slog.Default(), PredictiveConfig{})
+	data := []float64{10, 12, 15, 14, 18, 20, 22, 25, 24, 28}
+	prediction := pae.GenerateForecast(ForecastDemand, data)
+	require.NotNil(t, prediction)
+	assert.NotEmpty(t, prediction.ID)
+	assert.Equal(t, ForecastDemand, prediction.Type)
+	assert.Len(t, prediction.Forecast, 10)
+	assert.Greater(t, prediction.Confidence, 0.0)
+	assert.Equal(t, "exponential_smoothing", prediction.Method)
+}
+
+func TestPredictiveAnalyticsEngine_GenerateForecast_EmptyData(t *testing.T) {
+	t.Parallel()
+	pae := NewPredictiveAnalyticsEngine(slog.Default(), PredictiveConfig{})
+	prediction := pae.GenerateForecast(ForecastPerformance, []float64{})
+	require.NotNil(t, prediction)
+	assert.Equal(t, 0.0, prediction.Confidence)
+	assert.Empty(t, prediction.Forecast)
+}
+
+func TestPredictiveAnalyticsEngine_GenerateForecast_IntData(t *testing.T) {
+	t.Parallel()
+	pae := NewPredictiveAnalyticsEngine(slog.Default(), PredictiveConfig{})
+	data := []int{5, 10, 15, 20, 25}
+	prediction := pae.GenerateForecast(ForecastResource, data)
+	require.NotNil(t, prediction)
+	assert.Len(t, prediction.Forecast, 10)
+}
+
+func TestPredictiveAnalyticsEngine_GenerateScenario(t *testing.T) {
+	t.Parallel()
+	pae := NewPredictiveAnalyticsEngine(slog.Default(), PredictiveConfig{})
+	data := []float64{10, 12, 15, 18, 20}
+	scenarios := pae.GenerateScenario(ForecastDemand, data, []string{"optimistic", "pessimistic", "best_case"})
+	require.NotNil(t, scenarios)
+	assert.Contains(t, scenarios, "optimistic")
+	assert.Contains(t, scenarios, "pessimistic")
+	assert.Contains(t, scenarios, "best_case")
+	opt := scenarios["optimistic"]
+	pes := scenarios["pessimistic"]
+	require.NotNil(t, opt)
+	require.NotNil(t, pes)
+	assert.Greater(t, toFloat64(opt.Forecast[0].Value), toFloat64(pes.Forecast[0].Value))
+}
+
+func TestPredictiveAnalyticsEngine_RecordActual_UpdatesAccuracy(t *testing.T) {
+	t.Parallel()
+	pae := NewPredictiveAnalyticsEngine(slog.Default(), PredictiveConfig{})
+	data := []float64{10, 12, 15, 18, 20}
+	pae.GenerateForecast(ForecastDemand, data)
+
+	pae.RecordActual(ForecastDemand, 22.0)
+
+	metrics := pae.GetForecastAccuracy(ForecastDemand)
+	require.NotNil(t, metrics)
+	assert.Greater(t, metrics.SampleSize, 0)
+	assert.Greater(t, metrics.MAE, 0.0)
+}
+
+func TestPredictiveAnalyticsEngine_GetForecastAccuracy_Unknown(t *testing.T) {
+	t.Parallel()
+	pae := NewPredictiveAnalyticsEngine(slog.Default(), PredictiveConfig{})
+	metrics := pae.GetForecastAccuracy(ForecastSecurity)
+	assert.Nil(t, metrics)
+}
+
+func TestPredictiveAnalyticsEngine_GetModel(t *testing.T) {
+	t.Parallel()
+	pae := NewPredictiveAnalyticsEngine(slog.Default(), PredictiveConfig{})
+	data := []float64{10, 12, 15}
+	pae.GenerateForecast(ForecastDemand, data)
+	model := pae.GetModel(ForecastDemand)
+	require.NotNil(t, model)
+	assert.Equal(t, ForecastDemand, model.Type)
+	assert.Greater(t, model.Confidence, 0.0)
+}
+
+func TestPredictiveAnalyticsEngine_GetModel_Unknown(t *testing.T) {
+	t.Parallel()
+	pae := NewPredictiveAnalyticsEngine(slog.Default(), PredictiveConfig{})
+	model := pae.GetModel(ForecastFailure)
+	assert.Nil(t, model)
+}
+
+func TestPredictiveAnalyticsEngine_DetectTrend_Increasing(t *testing.T) {
+	t.Parallel()
+	pae := NewPredictiveAnalyticsEngine(slog.Default(), PredictiveConfig{})
+	trend := pae.DetectTrend([]float64{1, 2, 3, 4, 5, 6, 7, 8, 9, 10})
+	assert.Equal(t, "increasing", trend)
+}
+
+func TestPredictiveAnalyticsEngine_DetectTrend_Decreasing(t *testing.T) {
+	t.Parallel()
+	pae := NewPredictiveAnalyticsEngine(slog.Default(), PredictiveConfig{})
+	trend := pae.DetectTrend([]float64{10, 9, 8, 7, 6, 5, 4, 3, 2, 1})
+	assert.Equal(t, "decreasing", trend)
+}
+
+func TestPredictiveAnalyticsEngine_DetectTrend_Stable(t *testing.T) {
+	t.Parallel()
+	pae := NewPredictiveAnalyticsEngine(slog.Default(), PredictiveConfig{})
+	trend := pae.DetectTrend([]float64{5, 5, 5, 5, 5})
+	assert.Equal(t, "stable", trend)
+}
+
+func TestPredictiveAnalyticsEngine_DetectTrend_InsufficientData(t *testing.T) {
+	t.Parallel()
+	pae := NewPredictiveAnalyticsEngine(slog.Default(), PredictiveConfig{})
+	trend := pae.DetectTrend([]float64{1})
+	assert.Equal(t, "insufficient_data", trend)
+}
+
+func TestTimeSeriesEngine_DetectAnomalies(t *testing.T) {
+	t.Parallel()
+	tse := NewTimeSeriesEngine(slog.Default())
+	data := []float64{10, 11, 10.5, 100, 9.8, 10.2, 9.5, 95, 10.1, 10.3}
+	anomalies := tse.DetectAnomalies(data)
+	require.NotNil(t, anomalies)
+	assert.Greater(t, len(anomalies), 0)
+}
+
+func TestTimeSeriesEngine_DetectAnomalies_NoAnomalies(t *testing.T) {
+	t.Parallel()
+	tse := NewTimeSeriesEngine(slog.Default())
+	data := []float64{10, 10.1, 9.9, 10.05, 10.03, 9.97}
+	anomalies := tse.DetectAnomalies(data)
+	assert.Empty(t, anomalies)
+}
+
+func TestTimeSeriesEngine_DetectAnomalies_InsufficientData(t *testing.T) {
+	t.Parallel()
+	tse := NewTimeSeriesEngine(slog.Default())
+	anomalies := tse.DetectAnomalies([]float64{1, 2})
+	assert.Nil(t, anomalies)
+}
+
+func TestPatternRecognitionEngine_FindPatterns_Sequential(t *testing.T) {
+	t.Parallel()
+	pre := NewPatternRecognitionEngine(slog.Default())
+	data := []float64{1, 2, 3, 4, 5, 4, 3, 2, 1}
+	patterns := pre.FindPatterns(data, PatternSequential)
+	require.NotNil(t, patterns)
+	assert.Greater(t, len(patterns), 0)
+}
+
+func TestPatternRecognitionEngine_FindPatterns_Recurring(t *testing.T) {
+	t.Parallel()
+	pre := NewPatternRecognitionEngine(slog.Default())
+	data := []float64{1, 2, 1, 2, 1, 2, 1, 2}
+	patterns := pre.FindPatterns(data, PatternRecurring)
+	assert.NotNil(t, patterns)
+}
+
+func TestPatternRecognitionEngine_FindPatterns_EmptyData(t *testing.T) {
+	t.Parallel()
+	pre := NewPatternRecognitionEngine(slog.Default())
+	patterns := pre.FindPatterns([]float64{}, PatternSequential)
+	assert.Nil(t, patterns)
+}
+
+func TestPatternRecognitionEngine_MatchPattern(t *testing.T) {
+	t.Parallel()
+	pre := NewPatternRecognitionEngine(slog.Default())
+	score := pre.MatchPattern([]interface{}{"a", "b", "c", "d"}, PatternSequential)
+	assert.GreaterOrEqual(t, score, 0.0)
+	assert.LessOrEqual(t, score, 1.0)
+}
+
+func TestDetectSeasonality(t *testing.T) {
+	t.Parallel()
+	data := []float64{1, 2, 1, 2, 1, 2, 1, 2}
+	period, score := DetectSeasonality(data)
+	assert.Greater(t, period, 1)
+	assert.Greater(t, score, 0.5)
+}
+
+func TestDetectSeasonality_RandomData(t *testing.T) {
+	t.Parallel()
+	data := []float64{1, 5, 3, 8, 2, 7, 4, 9}
+	period, score := DetectSeasonality(data)
+	assert.GreaterOrEqual(t, period, 1)
+	assert.GreaterOrEqual(t, score, 0.0)
+	assert.LessOrEqual(t, score, 1.0)
+}
+
+func TestDetectSeasonality_InsufficientData(t *testing.T) {
+	t.Parallel()
+	period, score := DetectSeasonality([]float64{1, 2, 3})
+	assert.Equal(t, 1, period)
+	assert.Equal(t, 0.0, score)
+}
+
+// ---------------------------------------------------------------------------
+// OptimizationEngine enhanced tests
+// ---------------------------------------------------------------------------
+
+func TestOptimizationEngine_Solve_WithProblem(t *testing.T) {
+	t.Parallel()
+	oe := NewOptimizationEngine(slog.Default(), OptimizationConfig{})
+	problem := map[string]interface{}{
+		"variables":   []string{"x", "y", "z"},
+		"objectives":  []string{"minimize_cost", "maximize_throughput"},
+		"constraints": []Constraint{{}},
+	}
+	solution := oe.Solve(problem)
+	require.NotNil(t, solution)
+	assert.True(t, solution.Feasibility)
+	assert.NotEmpty(t, solution.Variables)
+	assert.Contains(t, solution.Variables, "x")
+	assert.Contains(t, solution.Variables, "y")
+	assert.Contains(t, solution.Variables, "z")
+	assert.GreaterOrEqual(t, solution.Optimality, 0.0)
+	assert.Greater(t, solution.Confidence, 0.0)
+}
+
+func TestOptimizationEngine_Solve_Default(t *testing.T) {
+	t.Parallel()
+	oe := NewOptimizationEngine(slog.Default(), OptimizationConfig{})
+	solution := oe.Solve(42)
+	require.NotNil(t, solution)
+	assert.True(t, solution.Feasibility)
+	assert.Contains(t, solution.Variables, "x")
+	assert.Contains(t, solution.Variables, "y")
+}
+
+func TestOptimizationEngine_GetHistory(t *testing.T) {
+	t.Parallel()
+	oe := NewOptimizationEngine(slog.Default(), OptimizationConfig{})
+	oe.Solve(42)
+	oe.Solve(99)
+	history := oe.GetHistory(10)
+	require.Len(t, history, 2)
+	assert.True(t, history[0].Success)
+	assert.True(t, history[1].Success)
+}
+
+func TestOptimizationEngine_GetHistory_Limit(t *testing.T) {
+	t.Parallel()
+	oe := NewOptimizationEngine(slog.Default(), OptimizationConfig{})
+	oe.Solve(1)
+	oe.Solve(2)
+	oe.Solve(3)
+	history := oe.GetHistory(2)
+	require.Len(t, history, 2)
+}
+
+func TestOptimizationEngine_RegisterOptimizer(t *testing.T) {
+	t.Parallel()
+	oe := NewOptimizationEngine(slog.Default(), OptimizationConfig{})
+	opt := &Optimizer{Type: OptimizationLinear, Algorithm: AlgorithmGradientDescent}
+	oe.RegisterOptimizer(OptimizationLinear, opt)
+}
+
+func TestConstraintManagementEngine_AddConstraint(t *testing.T) {
+	t.Parallel()
+	cm := NewConstraintManagementEngine(slog.Default())
+	cm.AddConstraint("cpu_max", &ConstraintDefinition{})
+	cm.AddConstraint("mem_min", &ConstraintDefinition{})
+}
+
+func TestConstraintManagementEngine_RemoveConstraint(t *testing.T) {
+	t.Parallel()
+	cm := NewConstraintManagementEngine(slog.Default())
+	cm.AddConstraint("test", &ConstraintDefinition{})
+	cm.RemoveConstraint("test")
+}
+
+func TestConstraintManagementEngine_Validate_NoViolations(t *testing.T) {
+	t.Parallel()
+	cm := NewConstraintManagementEngine(slog.Default())
+	valid, violations := cm.Validate(map[string]interface{}{"x": 1.0})
+	assert.True(t, valid)
+	assert.Empty(t, violations)
+}
+
+// ---------------------------------------------------------------------------
+// StrategicPlanningEngine enhanced tests
+// ---------------------------------------------------------------------------
+
+func TestStrategicPlanningEngine_CreatePlan_WithInitiative(t *testing.T) {
+	t.Parallel()
+	spe := NewStrategicPlanningEngine(slog.Default(), StrategicConfig{})
+	initiative := map[string]interface{}{
+		"name":        "Scale Cluster",
+		"description": "Scale the cluster to 100 nodes",
+		"horizon":     string(HorizonLongTerm),
+		"budget":      50000.0,
+	}
+	plan := spe.CreatePlan(initiative)
+	require.NotNil(t, plan)
+	assert.Equal(t, "Scale Cluster", plan.Name)
+	assert.Equal(t, "Scale the cluster to 100 nodes", plan.Description)
+	assert.Equal(t, HorizonLongTerm, plan.Horizon)
+	assert.Equal(t, 50000.0, plan.Budget)
+}
+
+func TestStrategicPlanningEngine_CreatePlan_Default(t *testing.T) {
+	t.Parallel()
+	spe := NewStrategicPlanningEngine(slog.Default(), StrategicConfig{})
+	plan := spe.CreatePlan("simple initiative")
+	require.NotNil(t, plan)
+	assert.NotEmpty(t, plan.ID)
+	assert.NotEmpty(t, plan.Goals)
+}
+
+func TestStrategicPlanningEngine_GetCurrentPlans(t *testing.T) {
+	t.Parallel()
+	spe := NewStrategicPlanningEngine(slog.Default(), StrategicConfig{})
+	spe.CreatePlan("plan1")
+	spe.CreatePlan("plan2")
+	plans := spe.GetCurrentPlans()
+	assert.Len(t, plans, 2)
+}
+
+func TestStrategicPlanningEngine_UpdatePlanProgress(t *testing.T) {
+	t.Parallel()
+	spe := NewStrategicPlanningEngine(slog.Default(), StrategicConfig{})
+	plan := spe.CreatePlan("test")
+	progress := &PlanProgress{
+		OverallProgress:   0.5,
+		MilestonesReached: 2,
+		TotalMilestones:   4,
+		OnTrack:           true,
+	}
+	spe.UpdatePlanProgress(plan.ID, progress)
+	retrieved := spe.GetPlanProgress(plan.ID)
+	require.NotNil(t, retrieved)
+	assert.Equal(t, 0.5, retrieved.OverallProgress)
+	assert.Equal(t, 2, retrieved.MilestonesReached)
+}
+
+func TestStrategicPlanningEngine_GetPlan_NotFound(t *testing.T) {
+	t.Parallel()
+	spe := NewStrategicPlanningEngine(slog.Default(), StrategicConfig{})
+	plan := spe.GetPlan("nonexistent")
+	assert.Nil(t, plan)
+}
+
+func TestStrategicPlanningEngine_GetPlanProgress_NotFound(t *testing.T) {
+	t.Parallel()
+	spe := NewStrategicPlanningEngine(slog.Default(), StrategicConfig{})
+	progress := spe.GetPlanProgress("nonexistent")
+	assert.Nil(t, progress)
+}
+
+func TestStrategicPlanningEngine_EvaluateRisk_NoRisks(t *testing.T) {
+	t.Parallel()
+	spe := NewStrategicPlanningEngine(slog.Default(), StrategicConfig{})
+	plan := spe.CreatePlan("test")
+	risks := spe.EvaluateRisk(plan.ID)
+	assert.NotNil(t, risks)
+}
+
+func TestStrategicPlanningEngine_EvaluateRisk_UnknownPlan(t *testing.T) {
+	t.Parallel()
+	spe := NewStrategicPlanningEngine(slog.Default(), StrategicConfig{})
+	risks := spe.EvaluateRisk("nonexistent")
+	assert.Nil(t, risks)
+}
+
+func TestGoalHierarchy_AddRootGoal(t *testing.T) {
+	t.Parallel()
+	gh := NewGoalHierarchy(slog.Default())
+	goal := &GoalNode{}
+	gh.AddRootGoal(goal)
+	gh.AddRootGoal(&GoalNode{})
+	goals := gh.GetRootGoals()
+	assert.Len(t, goals, 2)
+}
+
+func TestGoalHierarchy_Prioritize(t *testing.T) {
+	t.Parallel()
+	gh := NewGoalHierarchy(slog.Default())
+	gh.AddRootGoal(&GoalNode{})
+	prioritized := gh.Prioritize()
+	assert.Len(t, prioritized, 1)
+}
+
+func TestCreateStrategicInitiative(t *testing.T) {
+	t.Parallel()
+	init := CreateStrategicInitiative("test", "description", HorizonShortTerm)
+	require.NotNil(t, init)
+	assert.Equal(t, "test", init["name"])
+	assert.Equal(t, "description", init["description"])
+	assert.Equal(t, string(HorizonShortTerm), init["horizon"])
+}
+
+// ---------------------------------------------------------------------------
+// BehavioralAnalysisSystem enhanced tests
+// ---------------------------------------------------------------------------
+
+func TestBehavioralAnalysisSystem_AnalyzePatterns_WithFloatData(t *testing.T) {
+	t.Parallel()
+	bas := NewBehavioralAnalysisSystem(slog.Default(), BehavioralConfig{})
+	data := []float64{10, 12, 15, 14, 18, 20, 22, 25, 24, 28}
+	patterns := bas.AnalyzePatterns(data)
+	require.NotNil(t, patterns)
+	assert.Greater(t, len(patterns), 0)
+}
+
+func TestBehavioralAnalysisSystem_AnalyzePatterns_SingleValue(t *testing.T) {
+	t.Parallel()
+	bas := NewBehavioralAnalysisSystem(slog.Default(), BehavioralConfig{})
+	patterns := bas.AnalyzePatterns([]float64{42})
+	assert.Empty(t, patterns)
+}
+
+func TestBehavioralAnalysisSystem_DetectAnomalies_WithPatterns(t *testing.T) {
+	t.Parallel()
+	bas := NewBehavioralAnalysisSystem(slog.Default(), BehavioralConfig{})
+	data := []float64{1, 2, 3, 100, 4, 5, 6, 200, 7}
+	patterns := bas.AnalyzePatterns(data)
+	anomalies := bas.DetectAnomalies(patterns)
+	assert.NotNil(t, anomalies)
+}
+
+func TestBehavioralAnalysisSystem_UpdateProfilesAndGetProfile(t *testing.T) {
+	t.Parallel()
+	bas := NewBehavioralAnalysisSystem(slog.Default(), BehavioralConfig{})
+	data := []float64{10, 12, 15, 14, 18}
+	patterns := bas.AnalyzePatterns(data)
+	bas.UpdateProfiles(patterns)
+	profile := bas.GetProfile("sequential")
+	assert.NotNil(t, profile)
+}
+
+func TestBehavioralAnalysisSystem_GenerateInsights(t *testing.T) {
+	t.Parallel()
+	bas := NewBehavioralAnalysisSystem(slog.Default(), BehavioralConfig{})
+	data := []float64{1, 2, 3, 100, 4, 5, 6, 200, 7}
+	patterns := bas.AnalyzePatterns(data)
+	anomalies := bas.DetectAnomalies(patterns)
+	insights := bas.GenerateInsights(patterns, anomalies)
+	require.NotNil(t, insights)
+	assert.Greater(t, len(insights), 0)
+}
+
+func TestBehavioralAnalysisSystem_GetAnalysisHistory(t *testing.T) {
+	t.Parallel()
+	bas := NewBehavioralAnalysisSystem(slog.Default(), BehavioralConfig{})
+	bas.AnalyzePatterns([]float64{1, 2, 3})
+	bas.AnalyzePatterns([]float64{4, 5, 6})
+	history := bas.GetAnalysisHistory(10)
+	assert.Len(t, history, 2)
+}
+
+func TestBehavioralAnalysisSystem_GetAnalysisHistory_Limit(t *testing.T) {
+	t.Parallel()
+	bas := NewBehavioralAnalysisSystem(slog.Default(), BehavioralConfig{})
+	bas.AnalyzePatterns([]float64{1, 2, 3})
+	bas.AnalyzePatterns([]float64{4, 5, 6})
+	bas.AnalyzePatterns([]float64{7, 8, 9})
+	history := bas.GetAnalysisHistory(2)
+	assert.Len(t, history, 2)
+}
+
+func TestPatternMatchingEngine_RegisterAndMatch(t *testing.T) {
+	t.Parallel()
+	pme := NewPatternMatchingEngine(slog.Default())
+	pme.RegisterPattern("up-trend", &PatternTemplate{})
+	input := []float64{1, 2, 3, 4, 5}
+	matches := pme.Match(input)
+	assert.NotNil(t, matches)
+}
+
+func TestPatternMatchingEngine_Match_ShortInput(t *testing.T) {
+	t.Parallel()
+	pme := NewPatternMatchingEngine(slog.Default())
+	matches := pme.Match([]float64{1})
+	assert.Nil(t, matches)
+}
+
+// ---------------------------------------------------------------------------
+// AdvancedAnomalyDetector enhanced tests
+// ---------------------------------------------------------------------------
+
+func TestAdvancedAnomalyDetector_DetectMultiple_WithAnomalousData(t *testing.T) {
+	t.Parallel()
+	aad := NewAdvancedAnomalyDetector(slog.Default(), AnomalyDetectionConfig{})
+	data := []float64{10, 11, 9.5, 10.2, 100, 9.8, 10.5, 9.3, 95, 10.1}
+	anomalies := aad.DetectMultiple(data)
+	require.NotNil(t, anomalies)
+	assert.Greater(t, len(anomalies), 0)
+	for _, a := range anomalies {
+		assert.NotEmpty(t, a.ID)
+		assert.NotEmpty(t, a.Description)
+		assert.NotEmpty(t, a.Recommendations)
+		assert.NotEmpty(t, a.Severity)
+		assert.Greater(t, a.Confidence, 0.0)
+	}
+}
+
+func TestAdvancedAnomalyDetector_DetectMultiple_NoAnomalies(t *testing.T) {
+	t.Parallel()
+	aad := NewAdvancedAnomalyDetector(slog.Default(), AnomalyDetectionConfig{})
+	data := []float64{10, 10.1, 9.9, 10.05, 10.03, 9.97}
+	anomalies := aad.DetectMultiple(data)
+	assert.NotNil(t, anomalies)
+	assert.Empty(t, anomalies)
+}
+
+func TestAdvancedAnomalyDetector_GetAnomalyHistory(t *testing.T) {
+	t.Parallel()
+	aad := NewAdvancedAnomalyDetector(slog.Default(), AnomalyDetectionConfig{})
+	data := []float64{10, 11, 9.5, 10.2, 100, 9.8, 10.5}
+	aad.DetectMultiple(data)
+	history := aad.GetAnomalyHistory(AnomalyStatistical, 10)
+	assert.NotNil(t, history)
+}
+
+func TestAdvancedAnomalyDetector_GetMetrics(t *testing.T) {
+	t.Parallel()
+	aad := NewAdvancedAnomalyDetector(slog.Default(), AnomalyDetectionConfig{})
+	data := []float64{10, 11, 9.5, 10.2, 100, 9.8}
+	aad.DetectMultiple(data)
+	metrics := aad.GetMetrics(AnomalyStatistical)
+	require.NotNil(t, metrics)
+	assert.Greater(t, metrics.TotalDetections, 0)
+}
+
+func TestAdvancedAnomalyDetector_GetMetrics_Unknown(t *testing.T) {
+	t.Parallel()
+	aad := NewAdvancedAnomalyDetector(slog.Default(), AnomalyDetectionConfig{})
+	metrics := aad.GetMetrics(AnomalyBehavioral)
+	assert.Nil(t, metrics)
+}
+
+func TestAdvancedAnomalyDetector_ResolveAnomaly(t *testing.T) {
+	t.Parallel()
+	aad := NewAdvancedAnomalyDetector(slog.Default(), AnomalyDetectionConfig{})
+	data := []float64{10, 11, 9.5, 10.2, 100, 9.8}
+	anomalies := aad.DetectMultiple(data)
+	require.Greater(t, len(anomalies), 0)
+	aad.ResolveAnomaly(anomalies[0].ID)
+}
+
+func TestAdvancedAnomalyDetector_UpdateModels_WithAnomalies(t *testing.T) {
+	t.Parallel()
+	aad := NewAdvancedAnomalyDetector(slog.Default(), AnomalyDetectionConfig{})
+	anomalies := []*DetectedAnomaly{
+		{
+			ID: "test-1", Type: AnomalyStatistical, Severity: AnomalySeverityCritical,
+			Confidence: 0.99, Description: "Test anomaly",
+		},
+		{
+			ID: "test-2", Type: AnomalyContextual, Severity: AnomalySeverityHigh,
+			Confidence: 0.85, Description: "Context shift",
+		},
+	}
+	aad.UpdateModels(anomalies)
+	metrics := aad.GetMetrics(AnomalyStatistical)
+	require.NotNil(t, metrics)
+	assert.Equal(t, 1, metrics.TotalDetections)
+}
+
+func TestAnomalyFusionEngine_Fuse_Deduplicates(t *testing.T) {
+	t.Parallel()
+	afe := NewAnomalyFusionEngine(slog.Default())
+	anomalies := []*DetectedAnomaly{
+		{ID: "a1", Entity: "node1", Description: "CPU spike", Confidence: 0.8, Severity: AnomalySeverityHigh},
+		{ID: "a2", Entity: "node1", Description: "CPU spike", Confidence: 0.9, Severity: AnomalySeverityCritical},
+		{ID: "a3", Entity: "node2", Description: "Memory leak", Confidence: 0.7, Severity: AnomalySeverityMedium},
+	}
+	result := afe.Fuse(anomalies)
+	assert.Len(t, result, 2)
+}
+
+func TestAnomalyFusionEngine_Fuse_Single(t *testing.T) {
+	t.Parallel()
+	afe := NewAnomalyFusionEngine(slog.Default())
+	anomalies := []*DetectedAnomaly{
+		{ID: "a1", Entity: "node1", Description: "CPU spike"},
+	}
+	result := afe.Fuse(anomalies)
+	assert.Len(t, result, 1)
+}
+
+func TestAnomalyFusionEngine_AddFusionMethod(t *testing.T) {
+	t.Parallel()
+	afe := NewAnomalyFusionEngine(slog.Default())
+	afe.AddFusionMethod(FusionMethod{})
+	afe.AddFusionMethod(FusionMethod{})
+}
+
+func TestSeverityScore(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, 4, severityScore(AnomalySeverityCritical))
+	assert.Equal(t, 3, severityScore(AnomalySeverityHigh))
+	assert.Equal(t, 2, severityScore(AnomalySeverityMedium))
+	assert.Equal(t, 1, severityScore(AnomalySeverityLow))
+	assert.Equal(t, 0, severityScore(""))
+}
+
+// ---------------------------------------------------------------------------
+// ModelSelectionEngine tests
+// ---------------------------------------------------------------------------
+
+func TestNewModelSelectionEngine(t *testing.T) {
+	t.Parallel()
+	mse := NewModelSelectionEngine(slog.Default())
+	require.NotNil(t, mse)
+}
+
+func TestModelSelectionEngine_SelectModel_Empty(t *testing.T) {
+	t.Parallel()
+	mse := NewModelSelectionEngine(slog.Default())
+	selected := mse.SelectModel(nil, "accuracy")
+	assert.Nil(t, selected)
+}
+
+func TestModelSelectionEngine_SelectModel_ByAccuracy(t *testing.T) {
+	t.Parallel()
+	mse := NewModelSelectionEngine(slog.Default())
+	models := []*MLModel{
+		{Name: "model-a", TrainingMetrics: &ModelMetrics{Accuracy: 0.7, F1Score: 0.65}},
+		{Name: "model-b", TrainingMetrics: &ModelMetrics{Accuracy: 0.9, F1Score: 0.85}},
+		{Name: "model-c", TrainingMetrics: &ModelMetrics{Accuracy: 0.8, F1Score: 0.75}},
+	}
+	selected := mse.SelectModel(models, "accuracy")
+	require.NotNil(t, selected)
+	assert.Equal(t, "model-b", selected.Name)
+}
+
+func TestModelSelectionEngine_SelectModel_ByF1(t *testing.T) {
+	t.Parallel()
+	mse := NewModelSelectionEngine(slog.Default())
+	models := []*MLModel{
+		{Name: "model-a", TrainingMetrics: &ModelMetrics{Accuracy: 0.9, F1Score: 0.65}},
+		{Name: "model-b", TrainingMetrics: &ModelMetrics{Accuracy: 0.7, F1Score: 0.95}},
+	}
+	selected := mse.SelectModel(models, "f1")
+	require.NotNil(t, selected)
+	assert.Equal(t, "model-b", selected.Name)
+}
+
+func TestModelSelectionEngine_SelectModel_NoMetrics(t *testing.T) {
+	t.Parallel()
+	mse := NewModelSelectionEngine(slog.Default())
+	models := []*MLModel{
+		{Name: "model-a"},
+		{Name: "model-b", TrainingMetrics: &ModelMetrics{Accuracy: 0.9}},
+	}
+	selected := mse.SelectModel(models, "accuracy")
+	require.NotNil(t, selected)
+	assert.Equal(t, "model-b", selected.Name)
+}
+
+func TestModelSelectionEngine_RankModels(t *testing.T) {
+	t.Parallel()
+	mse := NewModelSelectionEngine(slog.Default())
+	models := []*MLModel{
+		{Name: "low", TrainingMetrics: &ModelMetrics{Accuracy: 0.3, F1Score: 0.2}},
+		{Name: "high", TrainingMetrics: &ModelMetrics{Accuracy: 0.9, F1Score: 0.8}},
+		{Name: "mid", TrainingMetrics: &ModelMetrics{Accuracy: 0.6, F1Score: 0.5}},
+	}
+	ranked := mse.RankModels(models)
+	require.Len(t, ranked, 3)
+	assert.Equal(t, "high", ranked[0].Name)
+	assert.Equal(t, "mid", ranked[1].Name)
+	assert.Equal(t, "low", ranked[2].Name)
+}
+
+// ---------------------------------------------------------------------------
+// EnsembleLearningSystem tests
+// ---------------------------------------------------------------------------
+
+func TestNewEnsembleLearningSystem(t *testing.T) {
+	t.Parallel()
+	els := NewEnsembleLearningSystem(slog.Default())
+	require.NotNil(t, els)
+}
+
+func TestEnsembleLearningSystem_AddAndGetModels(t *testing.T) {
+	t.Parallel()
+	els := NewEnsembleLearningSystem(slog.Default())
+	els.AddModel(&MLModel{Name: "m1"})
+	els.AddModel(&MLModel{Name: "m2"})
+	els.AddModel(&MLModel{Name: "m3"})
+	models := els.GetModels()
+	assert.Len(t, models, 3)
+}
+
+func TestEnsembleLearningSystem_RemoveModel(t *testing.T) {
+	t.Parallel()
+	els := NewEnsembleLearningSystem(slog.Default())
+	els.AddModel(&MLModel{Name: "keep"})
+	els.AddModel(&MLModel{Name: "remove"})
+	els.AddModel(&MLModel{Name: "keep2"})
+	els.RemoveModel("remove")
+	models := els.GetModels()
+	assert.Len(t, models, 2)
+	for _, m := range models {
+		assert.NotEqual(t, "remove", m.Name)
+	}
+}
+
+func TestEnsembleLearningSystem_Predict_WithModels(t *testing.T) {
+	t.Parallel()
+	els := NewEnsembleLearningSystem(slog.Default())
+	els.AddModel(&MLModel{Name: "m1", TrainingMetrics: &ModelMetrics{Accuracy: 0.8}})
+	els.AddModel(&MLModel{Name: "m2", TrainingMetrics: &ModelMetrics{Accuracy: 0.6}})
+	result := els.Predict("test")
+	require.NotNil(t, result)
+	assert.Contains(t, result, "m1")
+	assert.Contains(t, result, "m2")
+	assert.Greater(t, result["m1"], result["m2"])
+}
+
+func TestEnsembleLearningSystem_Predict_Empty(t *testing.T) {
+	t.Parallel()
+	els := NewEnsembleLearningSystem(slog.Default())
+	result := els.Predict("test")
+	assert.Empty(t, result)
 }

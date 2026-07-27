@@ -36,6 +36,7 @@ const (
 	ModuleFetchProtocol = "/apa/fetch-module/1.0.0"
 	UpdateFetchProtocol = "/apa/fetch-update/1.0.0"
 	PropagationProtocol = "/apa/propagate/1.0.0"
+	MeshProtocol        = "/apa/mesh/1.0.0"
 )
 
 // PropagationPayload is exchanged over the propagation protocol to deliver
@@ -410,6 +411,16 @@ func (p *P2P) FetchModule(ctx context.Context, peerID peer.ID, name, version str
 	}
 
 	return response.Manifest, response.Wasm, nil
+}
+
+// NewStream opens a new libp2p stream to the given peer for the mesh protocol.
+func (p *P2P) NewStream(ctx context.Context, peerID peer.ID) (network.Stream, error) {
+	return p.host.NewStream(ctx, peerID, MeshProtocol)
+}
+
+// SetStreamHandler registers a handler for incoming mesh protocol streams.
+func (p *P2P) SetStreamHandler(handler func(network.Stream)) {
+	p.host.SetStreamHandler(MeshProtocol, handler)
 }
 
 // ClosePeer closes any connections to the given peer.

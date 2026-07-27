@@ -139,46 +139,62 @@ func (ie *IntelligenceEngine) Start() error {
 		return fmt.Errorf("intelligence engine is already running")
 	}
 	ie.isRunning = true
+
+	count := 1
+	if ie.decisionMaker != nil {
+		count++
+	}
+	if ie.learningSystem != nil {
+		count++
+	}
+	if ie.predictiveEngine != nil {
+		count++
+	}
+	if ie.behaviorAnalyzer != nil {
+		count++
+	}
+	if ie.optimizationEngine != nil {
+		count++
+	}
+	if ie.strategyPlanner != nil {
+		count++
+	}
+	if ie.anomalyDetector != nil {
+		count++
+	}
+	ie.wg.Add(count)
 	ie.mu.Unlock()
 
 	ie.logger.Info("Starting intelligence engine")
 
 	if ie.decisionMaker != nil {
-		ie.wg.Add(1)
 		go ie.decisionMakingLoop()
 	}
 
 	if ie.learningSystem != nil {
-		ie.wg.Add(1)
 		go ie.learningLoop()
 	}
 
 	if ie.predictiveEngine != nil {
-		ie.wg.Add(1)
 		go ie.predictionLoop()
 	}
 
 	if ie.behaviorAnalyzer != nil {
-		ie.wg.Add(1)
 		go ie.behavioralAnalysisLoop()
 	}
 
 	if ie.optimizationEngine != nil {
-		ie.wg.Add(1)
 		go ie.optimizationLoop()
 	}
 
 	if ie.strategyPlanner != nil {
-		ie.wg.Add(1)
 		go ie.strategicPlanningLoop()
 	}
 
 	if ie.anomalyDetector != nil {
-		ie.wg.Add(1)
 		go ie.anomalyDetectionLoop()
 	}
 
-	ie.wg.Add(1)
 	go ie.knowledgeManagementLoop()
 
 	return nil

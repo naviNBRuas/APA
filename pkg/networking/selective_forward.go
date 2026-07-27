@@ -45,9 +45,6 @@ func (p ForwardPolicy) withDefaults() ForwardPolicy {
 	if p.BucketBytes == 0 {
 		p.BucketBytes = 256 * 1024
 	}
-	if p.RefillBytesPerSec == 0 {
-		p.RefillBytesPerSec = 256 * 1024
-	}
 	return p
 }
 
@@ -131,6 +128,9 @@ func (sf *SelectiveForwarder) AllowForward(target peer.ID, payloadBytes int) boo
 }
 
 func (sf *SelectiveForwarder) refillLocked(now time.Time) {
+	if sf.policy.RefillBytesPerSec <= 0 {
+		return
+	}
 	elapsed := now.Sub(sf.lastFill)
 	if elapsed <= 0 {
 		return

@@ -17,6 +17,7 @@ import (
 	"github.com/naviNBRuas/APA/pkg/health"
 	"github.com/naviNBRuas/APA/pkg/module"
 	"github.com/naviNBRuas/APA/pkg/networking"
+	"github.com/naviNBRuas/APA/pkg/networking/mesh"
 	"github.com/naviNBRuas/APA/pkg/obfuscation"
 	"github.com/naviNBRuas/APA/pkg/opa"
 	"github.com/naviNBRuas/APA/pkg/persistence"
@@ -51,6 +52,7 @@ type Config struct {
 	Update                    update.Config       `yaml:"update"`
 	ControlPlane              controlplane.Config `yaml:"control_plane"`
 	EphemeralIdentity         EphemeralConfig     `yaml:"ephemeral_identity"`
+	Mesh                      mesh.MeshConfig     `yaml:"mesh"`
 }
 
 type Runtime struct {
@@ -90,6 +92,7 @@ type Runtime struct {
 	binaryPath                string
 	controlPlane              *controlplane.ControlPlane
 	ephemeralIDs              *EphemeralIdentityManager
+	meshNetwork               *mesh.MeshNetwork
 	rateLimiters              map[string]*rate.Limiter
 	rateMu                    sync.Mutex
 	runMu                     sync.RWMutex

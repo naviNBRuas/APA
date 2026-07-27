@@ -260,6 +260,68 @@ func (rt *Runtime) configHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (rt *Runtime) meshHandler(w http.ResponseWriter, r *http.Request) {
+	if !rt.checkRateLimit(w, r) {
+		return
+	}
+	input := rt.createAuthzInput(r)
+	if allowed, err := rt.authorizeAdminRequest(r.Context(), r, input); err != nil {
+		writeJSONError(w, "Authorization error", http.StatusInternalServerError)
+		return
+	} else if !allowed {
+		writeJSONError(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
+	defer rt.appendAudit("mesh", input)
+
+	w.Header().Set("Content-Type", "application/json")
+
+	if rt.meshNetwork == nil {
+		writeJSONError(w, "Mesh network not enabled", http.StatusNotImplemented)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		info := rt.meshNetwork.Info()
+		if err := json.NewEncoder(w).Encode(info); err != nil {
+			rt.logger.Error("Failed to encode mesh info", "error", err)
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+	case http.MethodPost:
+		var req struct {
+			Action string `json:"action"`
+			PeerID string `json:"peer_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeJSONError(w, "Invalid request body", http.StatusBadRequest)
+			return
+		}
+		switch req.Action {
+		case "ban":
+			rt.meshNetwork.BanPeer(req.PeerID)
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintf(w, "Peer %s banned.\n", req.PeerID)
+		case "admit":
+			rt.meshNetwork.AdmitPeer(req.PeerID)
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintf(w, "Peer %s admitted.\n", req.PeerID)
+		case "sync-code":
+			n := rt.meshNetwork.TriggerCodeSync()
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintf(w, "Code sync triggered to %d peers.\n", n)
+		case "sync-state":
+			n := rt.meshNetwork.TriggerStateSync()
+			w.WriteHeader(http.StatusOK)
+			_, _ = fmt.Fprintf(w, "State sync triggered to %d peers.\n", n)
+		default:
+			writeJSONError(w, "Unknown action: "+req.Action, http.StatusBadRequest)
+		}
+	default:
+		writeJSONError(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 func (rt *Runtime) updateHandler(w http.ResponseWriter, r *http.Request) {
 	if !rt.checkRateLimit(w, r) {
 		return

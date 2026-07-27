@@ -56,6 +56,16 @@ type FeatureEngineeringEngine struct {
 	mu sync.RWMutex
 }
 
+type ModelSelectionEngine struct {
+	logger *slog.Logger
+}
+
+type EnsembleLearningSystem struct {
+	logger *slog.Logger
+	models []*MLModel
+	mu     sync.RWMutex
+}
+
 type ModelMetrics struct {
 	Accuracy  float64   `json:"accuracy"`
 	Loss      float64   `json:"loss"`
@@ -108,11 +118,114 @@ func NewFeatureEngineeringEngine(logger *slog.Logger) *FeatureEngineeringEngine 
 }
 
 func NewModelSelectionEngine(logger *slog.Logger) *ModelSelectionEngine {
-	return &ModelSelectionEngine{}
+	return &ModelSelectionEngine{logger: logger}
 }
 
 func NewEnsembleLearningSystem(logger *slog.Logger) *EnsembleLearningSystem {
-	return &EnsembleLearningSystem{}
+	return &EnsembleLearningSystem{logger: logger, models: make([]*MLModel, 0)}
+}
+
+func (mse *ModelSelectionEngine) SelectModel(candidates []*MLModel, criteria string) *MLModel {
+	if len(candidates) == 0 {
+		return nil
+	}
+	best := candidates[0]
+	bestScore := 0.0
+	for _, m := range candidates {
+		var score float64
+		switch criteria {
+		case "accuracy":
+			if m.TrainingMetrics != nil {
+				score = m.TrainingMetrics.Accuracy
+			}
+		case "f1":
+			if m.TrainingMetrics != nil {
+				score = m.TrainingMetrics.F1Score
+			}
+		case "latency":
+			score = 1.0
+		default:
+			if m.TrainingMetrics != nil {
+				score = m.TrainingMetrics.Accuracy
+			}
+		}
+		if score > bestScore {
+			bestScore = score
+			best = m
+		}
+	}
+	return best
+}
+
+func (mse *ModelSelectionEngine) RankModels(candidates []*MLModel) []*MLModel {
+	if len(candidates) <= 1 {
+		return candidates
+	}
+	ranked := make([]*MLModel, len(candidates))
+	copy(ranked, candidates)
+	for i := 0; i < len(ranked); i++ {
+		for j := i + 1; j < len(ranked); j++ {
+			scoreI := 0.0
+			scoreJ := 0.0
+			if ranked[i].TrainingMetrics != nil {
+				scoreI = ranked[i].TrainingMetrics.Accuracy + ranked[i].TrainingMetrics.F1Score
+			}
+			if ranked[j].TrainingMetrics != nil {
+				scoreJ = ranked[j].TrainingMetrics.Accuracy + ranked[j].TrainingMetrics.F1Score
+			}
+			if scoreJ > scoreI {
+				ranked[i], ranked[j] = ranked[j], ranked[i]
+			}
+		}
+	}
+	return ranked
+}
+
+func (els *EnsembleLearningSystem) AddModel(model *MLModel) {
+	els.mu.Lock()
+	defer els.mu.Unlock()
+	els.models = append(els.models, model)
+}
+
+func (els *EnsembleLearningSystem) RemoveModel(name string) {
+	els.mu.Lock()
+	defer els.mu.Unlock()
+	for i, m := range els.models {
+		if m.Name == name {
+			els.models = append(els.models[:i], els.models[i+1:]...)
+			return
+		}
+	}
+}
+
+func (els *EnsembleLearningSystem) Predict(input interface{}) map[string]float64 {
+	els.mu.RLock()
+	defer els.mu.RUnlock()
+
+	result := make(map[string]float64)
+	if len(els.models) == 0 {
+		return result
+	}
+
+	weight := 1.0 / float64(len(els.models))
+	for _, m := range els.models {
+		var score float64
+		if m.TrainingMetrics != nil {
+			score = m.TrainingMetrics.Accuracy * weight
+		} else {
+			score = 0.5 * weight
+		}
+		result[m.Name] = score
+	}
+	return result
+}
+
+func (els *EnsembleLearningSystem) GetModels() []*MLModel {
+	els.mu.RLock()
+	defer els.mu.RUnlock()
+	models := make([]*MLModel, len(els.models))
+	copy(models, els.models)
+	return models
 }
 
 func (mls *MachineLearningSystem) Shutdown() {

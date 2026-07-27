@@ -5,6 +5,7 @@ import (
 	"crypto/ed25519"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"golang.org/x/time/rate"
 
@@ -22,6 +24,7 @@ import (
 	"github.com/naviNBRuas/APA/pkg/health"
 	"github.com/naviNBRuas/APA/pkg/module"
 	"github.com/naviNBRuas/APA/pkg/networking"
+	"github.com/naviNBRuas/APA/pkg/networking/mesh"
 	"github.com/naviNBRuas/APA/pkg/obfuscation"
 	"github.com/naviNBRuas/APA/pkg/opa"
 	"github.com/naviNBRuas/APA/pkg/persistence"
@@ -101,6 +104,19 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 	p2p, err := networking.NewP2P(ctx, logger, config.P2P, identity.PeerID, identity.PrivKey, policyEnforcer)
 	if err != nil {
 		return fmt.Errorf("failed to initialize P2P networking: %w", err)
+	}
+
+	if config.Mesh.NodeName == "" {
+		config.Mesh.NodeName = identity.PeerID.String()[:12]
+	}
+	meshCfg := config.Mesh
+	meshCfg.BootstrapPeers = config.P2P.BootstrapPeers
+	meshNet, err := mesh.NewMeshNetwork(logger, meshCfg, nil)
+	if err != nil {
+		logger.Warn("Failed to initialize mesh network", "error", err)
+	} else {
+		rt.meshNetwork = meshNet
+		logger.Info("Mesh network initialized")
 	}
 
 	privBytes, err := crypto.MarshalPrivateKey(identity.PrivKey)
@@ -266,6 +282,10 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 		if err := p2p.AnnounceModule(context.Background(), manifest); err != nil {
 			logger.Error("Failed to announce module", "name", manifest.Name, "error", err)
 		}
+		if rt.meshNetwork != nil {
+			data, _ := json.Marshal(manifest)
+			_ = rt.meshNetwork.SyncCode(manifest.Name, manifest.Version, data)
+		}
 	}
 
 	p2p.FetchModuleHandler = func(name, version string) (*module.Manifest, []byte, error) {
@@ -297,6 +317,29 @@ func (rt *Runtime) init(ctx context.Context, config *Config, version string) err
 				}
 			}()
 		}
+	}
+
+	if rt.meshNetwork != nil && p2p != nil {
+		for _, bp := range config.P2P.BootstrapPeers {
+			rt.meshNetwork.InjectDiscoveredPeer(bp, "bootstrap-"+bp[:8], []string{bp})
+		}
+		connectedPeers := p2p.GetConnectedPeers()
+		for _, pid := range connectedPeers {
+			rt.meshNetwork.InjectDiscoveredPeer(pid.String(), pid.String()[:12], nil)
+		}
+		p2p.SetStreamHandler(func(stream network.Stream) {
+			defer stream.Close()
+			remoteID := stream.Conn().RemotePeer().String()
+			var env mesh.Envelope
+			if err := json.NewDecoder(stream).Decode(&env); err != nil {
+				logger.Debug("Failed to decode mesh envelope from P2P stream", "peer", remoteID, "error", err)
+				return
+			}
+			_ = rt.meshNetwork.SyncCode(env.Type, "p2p", env.Payload)
+		})
+		logger.Info("P2P mesh integration wired",
+			"bootstrap_peers", len(config.P2P.BootstrapPeers),
+			"connected_peers", len(connectedPeers))
 	}
 
 	updateManager.OnUpdateReady = rt.Stop

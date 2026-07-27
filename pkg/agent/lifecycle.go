@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -92,6 +93,12 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 	}
 
 	rt.p2p.StartDiscovery(ctx)
+
+	if rt.meshNetwork != nil {
+		if err := rt.meshNetwork.Start(); err != nil {
+			rt.logger.Error("Failed to start mesh network", "error", err)
+		}
+	}
 
 	if err := rt.p2p.JoinHeartbeatTopic(ctx); err != nil {
 		rt.logger.Error("Failed to join heartbeat topic", "error", err)
@@ -238,6 +245,14 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 		}(manifest.Name)
 	}
 
+	if rt.meshNetwork != nil {
+		for _, manifest := range rt.moduleManager.ListModules() {
+			data, _ := json.Marshal(manifest)
+			_ = rt.meshNetwork.SyncCode(manifest.Name, manifest.Version, data)
+		}
+		rt.logger.Info("Synced module manifests to mesh network")
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/admin/metrics", rt.metricsHandler)
 	mux.HandleFunc("/admin/audit", rt.auditHandler)
@@ -250,6 +265,7 @@ func (rt *Runtime) Start(ctx context.Context, cancel context.CancelFunc) {
 	mux.HandleFunc("/admin/peer-copy", rt.peerCopyHandler)
 	mux.HandleFunc("/admin/regenerate", rt.triggerRegenerationHandler)
 	mux.HandleFunc("/admin/propagate", rt.triggerPropagationHandler)
+	mux.HandleFunc("/admin/mesh", rt.meshHandler)
 	mux.Handle("/metrics", rt.prometheusHandler())
 
 	tlsConfig, serveTLS := rt.buildAdminTLSConfig()
@@ -313,6 +329,10 @@ func (rt *Runtime) Stop() {
 	defer cmCancel()
 	if err := rt.controllerManager.Shutdown(cmCtx); err != nil {
 		rt.logger.Error("Failed to shutdown controller manager", "error", err)
+	}
+
+	if rt.meshNetwork != nil {
+		rt.meshNetwork.Stop()
 	}
 
 	if err := rt.p2p.Shutdown(); err != nil {
